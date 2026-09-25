@@ -32,7 +32,7 @@ public partial class MainForm
                 BackColor = Color.Transparent,
                 Margin = new Padding(0)
             };
-            modesFlowPanel.Controls.Add(label);
+            AddModePlaceholder(label);
             EnsureMinimumUsableWidth();
             ScheduleContentFit();
             return;
@@ -86,13 +86,61 @@ public partial class MainForm
                 cardWidth,
                 cardHeight);
         }
-        modesFlowPanel.Height = cardCount == 0
-            ? modesFlowPanel.Padding.Top + UiTheme.Scale(modesFlowPanel, 56)
-            : modesFlowPanel.Padding.Top + rows * cardHeight + (rows - 1) * gap;
-        modeGroupBox.Height = modeSectionCaptionLabel.PreferredHeight
-            + modeSectionCaptionLabel.Margin.Vertical
-            + modesFlowPanel.Height;
+        if (cardCount == 0)
+        {
+            var placeholder = modesFlowPanel.Controls.Cast<Control>().FirstOrDefault();
+            if (placeholder != null)
+            {
+                RefreshModePlaceholderLayout(placeholder);
+            }
+            else
+            {
+                modesFlowPanel.Height = modesFlowPanel.Padding.Top + UiTheme.Scale(modesFlowPanel, 56);
+                UpdateModeSectionHeight();
+            }
+        }
+        else
+        {
+            modesFlowPanel.Height = modesFlowPanel.Padding.Top + rows * cardHeight + (rows - 1) * gap;
+            UpdateModeSectionHeight();
+        }
         modesFlowPanel.PerformLayout();
+    }
+
+
+    private void AddModePlaceholder(Label label)
+    {
+        modesFlowPanel.Controls.Add(label);
+        RefreshModePlaceholderLayout(label);
+    }
+
+
+    private void RefreshModePlaceholderLayout(Control placeholder)
+    {
+        var availableWidth = Math.Max(1,
+            modesFlowPanel.ClientSize.Width
+            - modesFlowPanel.Padding.Horizontal
+            - placeholder.Margin.Horizontal);
+        placeholder.MaximumSize = new Size(availableWidth, 0);
+        var preferredSize = placeholder.GetPreferredSize(new Size(availableWidth, 0));
+        placeholder.Size = preferredSize;
+        placeholder.Location = new Point(
+            modesFlowPanel.Padding.Left + placeholder.Margin.Left,
+            modesFlowPanel.Padding.Top + placeholder.Margin.Top);
+        modesFlowPanel.Height = ModeSectionLayoutPolicy.CalculateContentPanelHeight(
+            modesFlowPanel.Padding,
+            preferredSize.Height,
+            placeholder.Margin);
+        UpdateModeSectionHeight();
+    }
+
+
+    private void UpdateModeSectionHeight()
+    {
+        modeGroupBox.Height = ModeSectionLayoutPolicy.CalculateSectionHeight(
+            modeSectionCaptionLabel.PreferredHeight,
+            modeSectionCaptionLabel.Margin,
+            modesFlowPanel.Height);
     }
 
 
@@ -134,7 +182,7 @@ public partial class MainForm
             BackColor = Color.Transparent,
             Margin = new Padding(0)
         };
-        modesFlowPanel.Controls.Add(label);
+        AddModePlaceholder(label);
         EnsureMinimumUsableWidth();
         ScheduleContentFit();
     }
@@ -151,7 +199,7 @@ public partial class MainForm
             BackColor = Color.Transparent,
             Margin = new Padding(0)
         };
-        modesFlowPanel.Controls.Add(label);
+        AddModePlaceholder(label);
         EnsureMinimumUsableWidth();
         ScheduleContentFit();
     }

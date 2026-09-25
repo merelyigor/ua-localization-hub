@@ -220,6 +220,93 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task ModeSectionHeight_TracksLoadingFailureEmptyAndRebuiltCards()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateModesApiHandler(401, 4),
+            gamePatch: 401);
+
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.CountModeCards(form) == 4
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+
+        var tallSectionHeight = fixture.Form.ModeSectionHeightForTest;
+        var tallFormHeight = fixture.Form.ClientSize.Height;
+        var cards = MainFormTestFixture.FindModeCards(fixture.Form);
+        Assert.NotEqual(cards[0].Bounds.Top, cards[3].Bounds.Top);
+
+        await fixture.ShowModePlaceholderAsync("ShowModeLoadingPlaceholder");
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.FindControlText(form, text => text == "Завантаження доступних режимів...") != null
+            && MainFormTestFixture.CountModeCards(form) == 0
+            && form.ModeSectionHeightForTest < tallSectionHeight
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+        var compactPlaceholderHeight = fixture.Form.ModeSectionHeightForTest;
+        Assert.True(fixture.Form.ClientSize.Height < tallFormHeight);
+
+        await fixture.ApplyFeedCandidateAsync(CreateModesFeed(4));
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.CountModeCards(form) == 4
+            && form.ModeSectionHeightForTest > compactPlaceholderHeight
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+
+        var rebuiltSectionHeight = fixture.Form.ModeSectionHeightForTest;
+        await fixture.ShowModePlaceholderAsync("ShowModeFailurePlaceholder");
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.FindControlText(form, text => text == "Не вдалося завантажити режими.") != null
+            && MainFormTestFixture.CountModeCards(form) == 0
+            && form.ModeSectionHeightForTest < rebuiltSectionHeight
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+        var failurePlaceholderHeight = fixture.Form.ModeSectionHeightForTest;
+
+        await fixture.ApplyFeedCandidateAsync(CreateModesFeed(4));
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.CountModeCards(form) == 4
+            && form.ModeSectionHeightForTest > failurePlaceholderHeight
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+        var cardsSectionHeight = fixture.Form.ModeSectionHeightForTest;
+
+        await fixture.ApplyFeedCandidateAsync(CreateModesFeed(0));
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.CountModeCards(form) == 0
+            && MainFormTestFixture.FindControlText(form, text =>
+                text == "Наразі немає доступних режимів."
+                || text.StartsWith("Для патча 401", StringComparison.Ordinal)) != null
+            && form.ModeSectionHeightForTest < cardsSectionHeight
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+        var emptyStateHeight = fixture.Form.ModeSectionHeightForTest;
+
+        await fixture.ApplyFeedCandidateAsync(CreateModesFeed(4));
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.CountModeCards(form) == 4
+            && form.ModeSectionHeightForTest > emptyStateHeight
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+    }
+
+    private static ReleasesResponse CreateModesFeed(int modeCount)
+        => JsonSerializer.Deserialize<ReleasesResponse>(
+            MainFormTestFixture.CreateFeedJson(401, modeCount))!;
+
+    [Fact]
+    public async Task UserVerticalResize_DoesNotTriggerContentFitLoop()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateModesApiHandler(401, 4),
+            gamePatch: 401);
+
+        await fixture.WaitForAsync(form =>
+            MainFormTestFixture.CountModeCards(form) == 4
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+
+        var initialHeight = fixture.Form.ClientSize.Height;
+        var previousFitTarget = fixture.Form.LastContentFitTargetSizeForTest;
+        var resized = await fixture.ResizeVerticallyAndReadAfterLayoutAsync(80);
+
+        Assert.Equal(initialHeight + 80, resized.ClientSize.Height);
+        Assert.Equal(previousFitTarget, resized.LastFitTarget);
+    }
+
+    [Fact]
     public async Task Startup_UnknownSelectedGameFallsBackAndPreservesApplicationSettings()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
@@ -718,6 +805,28 @@ internal sealed class MainFormTestFixture : IDisposable
         await completion.Task.WaitAsync(Timeout);
     }
 
+    internal async Task ShowModePlaceholderAsync(string methodName)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(() =>
+        {
+            try
+            {
+                var method = typeof(MainForm).GetMethod(
+                    methodName,
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.NotNull(method);
+                method!.Invoke(Form, null);
+                completion.TrySetResult(null);
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
     internal async Task SetClientWidthAsync(int width)
     {
         var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -734,6 +843,25 @@ internal sealed class MainFormTestFixture : IDisposable
             }
         });
         await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task<(Size ClientSize, Size LastFitTarget)> ResizeVerticallyAndReadAfterLayoutAsync(int delta)
+    {
+        var completion = new TaskCompletionSource<(Size, Size)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(() =>
+        {
+            try
+            {
+                Form.ClientSize = new Size(Form.ClientSize.Width, Form.ClientSize.Height + delta);
+                Form.BeginInvoke(new Action(() => completion.TrySetResult(
+                    (Form.ClientSize, Form.LastContentFitTargetSizeForTest))));
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        });
+        return await completion.Task.WaitAsync(Timeout);
     }
 
     internal async Task<string?> SelectGameAsync(string id)

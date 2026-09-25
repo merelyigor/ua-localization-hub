@@ -387,6 +387,7 @@ public partial class MainForm : Form
     internal string TrayTooltipText => _notifyIcon.Text;
     internal Size LastContentFitTargetSizeForTest => _lastContentFitTargetSize;
     internal int InitialClientHeightForTest => _initialClientHeight;
+    internal int ModeSectionHeightForTest => modeGroupBox.Height;
 
     private void InitializeGameSelector()
     {
