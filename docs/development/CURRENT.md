@@ -8,9 +8,9 @@
 
 Стабільний реліз: **v1.2.8**. Публічний stable release опубліковано з tag v1.2.8; canonical application bundle містить один ZIP-asset. Offline/degraded release-feed implementation завершено та прийнято зовнішнім Architect.
 
-Поточна наступна дія: зовнішній Architect review та Owner visual smoke для Stage 8C.
+Поточна наступна дія: **OWNER DECISION REQUIRED**. Stage 8C завершено; подальшу роботу не авторизовано.
 
-Owner approved and explicitly activated the PRIMARY roadmap `localization-hub-multigame` for the `Хаб Українізаторів BDO - WWM` multi-game transition. v1.2.7 external release acceptance is complete; Stages 0–8A are reviewed/accepted. Stage 8C updates visible branding and adaptive window height; external Architect review and Owner visual smoke are pending. Stage 8B remains optional/not started, Stage 9 awaits Where Winds Meet / Winds4UA technical integration data, and Stage 10 has not started.
+Owner approved and explicitly activated the PRIMARY roadmap `localization-hub-multigame` for the `Хаб Українізаторів BDO - WWM` multi-game transition. v1.2.7 external release acceptance is complete; Stages 0–8A and Stage 8C are **REVIEWED / ACCEPTED**. Stage 8C external Architect review found BLOCKER `0` and IMPORTANT `0`; Owner native/visual smoke accepted the branding, target projects, adaptive height, tray behavior and BDO UI. Stage 8B remains optional/not started, Stage 9 awaits Where Winds Meet / Winds4UA technical integration data, and Stage 10 has not started. No further implementation stage is authorized; next action is **OWNER DECISION REQUIRED**.
 
 ## Architecture Summary
 
@@ -125,11 +125,11 @@ Owner approved and explicitly activated the PRIMARY roadmap `localization-hub-mu
 
 - v1.2.3 release cycle is completed and archived.
 - Offline/degraded release-feed mode is completed, reviewed and accepted; `offline-degraded-reliability` is archived.
-- `game-boundary-refactoring` is archived; Stage 1 and Stage 2 are reviewed/accepted. `localization-hub-multigame` is the sole ACTIVE PRIMARY roadmap; Stage 0 through Stage 8A are reviewed/accepted and Stage 8C is implemented/validated pending external review and Owner visual smoke.
+- `game-boundary-refactoring` is archived; Stage 1 and Stage 2 are reviewed/accepted. `localization-hub-multigame` is the sole ACTIVE PRIMARY roadmap; Stage 0 through Stage 8A and Stage 8C are reviewed/accepted. Stage 8B remains optional/not started; Stage 9 awaits technical integration data; no next implementation stage is authorized.
 - v1.2.5 release cycle completed; public Release verified and `NEXT.json` reset for the next cycle.
 - v15.64/v15.65 — **REVIEWED / ACCEPTED; OWNER VISUAL SMOKE ACCEPTED**: для трьох і більше режимів локалізації додано компактний minimum window width і збережено його під час semantic rebuild; single-mode global status width збережено.
 - v1.2.7 — **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**: public Release ID `391117230` опубліковано на tag `v1.2.7`, який вказує на exact approved RC SHA `b21118d1ec8e6d0342fb0e47544e911fcb875739`; canonical ZIP і внутрішні hashes повторно перевірено, Owner native smoke exact RC прийнято.
 - v1.2.8 — **RELEASED / PUBLIC VERIFIED**: public Release ID `391585430` опубліковано на tag `v1.2.8`, який вказує на exact RC SHA `7cb740d55bc7baeb5aa9f91365114e68bb88eff9`; public asset повторно завантажено й перевірено. Owner live legacy update accepted.
-- `localization-hub-multigame` — **ACTIVE / PRIMARY**: Stage 0 complete; Stages 1–8A — **REVIEWED / ACCEPTED**; Stage 8C — **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW / OWNER VISUAL SMOKE PENDING**. Stage 8B remains **OPTIONAL / NOT STARTED**; Stage 9 remains **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**.
-- Next action: external Architect review + Owner visual smoke for Stage 8C.
-- Stage 8C validation: Release build — 0 warnings / 0 errors; focused content-fit/MainForm/GameCatalog/session-host — 37 passed; full Release suite — 1003 passed / 0 failed / 0 skipped; release-note generator — 24 assertions and resolver — 13 passed; `git diff --check` passed.
+- `localization-hub-multigame` — **ACTIVE / PRIMARY**: Stage 0 complete; Stages 1–8A and Stage 8C — **REVIEWED / ACCEPTED**. Stage 8C Architect review: BLOCKER `0`, IMPORTANT `0`; Owner native/visual smoke accepted, including the corrective empty/loading/failure mode-section sizing. Stage 8B remains **OPTIONAL / NOT STARTED**; Stage 9 remains **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**.
+- Next action: **OWNER DECISION REQUIRED**; Stage 8C is complete and no further implementation stage is authorized.
+- Stage 8C final validation: CI #229 / run `36106040918` SUCCESS for `d726c939e0e6365ea2efd631e60cdf13528e836e`; Release build — 0 warnings / 0 errors; focused content-fit/MainForm/GameCatalog/session-host — 76 passed; full Release suite — 1008 passed / 0 failed / 0 skipped; release-note generator — 24 assertions and resolver — 13 passed; `git diff --check` passed.

@@ -4,8 +4,8 @@ Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
 Implementation authorization: **YES**
-Current phase: Stage 8C — Visible brand wording + adaptive window height
-Next action: external Architect review + Owner visual smoke
+Current phase: Stage 8C complete; no further authorized implementation work
+Next action: OWNER DECISION REQUIRED
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -133,7 +133,7 @@ Current state: **REVIEWED / ACCEPTED**. External Architect review accepted the i
 
 Apply the Owner-approved visible identity `Хаб Українізаторів BDO - WWM` and subtitle `Українські локалізації для ігор BDO - WWM`. Make the main window fit content bidirectionally: shrink when content becomes shorter, grow when it becomes taller, and clamp to the screen working area while retaining vertical scrolling. Preserve the target-project rows and BDO-only runtime behavior.
 
-Current state: **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW / OWNER VISUAL SMOKE PENDING**. This stage changes visible branding and bounded content-height fitting only; no WWM runtime contract or behavior was added.
+Current state: **REVIEWED / ACCEPTED**. External Architect review: BLOCKER `0`, IMPORTANT `0`; Owner native/visual smoke accepted. Acceptance includes the corrective sizing for empty/loading/failure mode states so the localization section and form shrink after tall card layouts. No WWM runtime contract or behavior was added.
 
 ### Stage 8B — Optional physical EXE/package/autostart migration
 
@@ -174,4 +174,4 @@ The roadmap depends on v1.2.7 release completion and explicit Owner activation. 
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stage 1 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 2 is **REVIEWED / ACCEPTED** after external pre-commit Architect review, commit and CI success. Stage 3 is **REVIEWED / ACCEPTED**; Stage 4 is **REVIEWED / ACCEPTED**; Stage 5 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 6 is **REVIEWED / ACCEPTED** after external pre-commit Architect review. Stage 7 is **REVIEWED / ACCEPTED** after final external Architect review of the post-rename normalization. Stage 8A is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 8C is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW / OWNER VISUAL SMOKE PENDING**. Stage 8B is **OPTIONAL / NOT STARTED**; Stage 9 is **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stage 1 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 2 is **REVIEWED / ACCEPTED** after external pre-commit Architect review, commit and CI success. Stage 3 is **REVIEWED / ACCEPTED**; Stage 4 is **REVIEWED / ACCEPTED**; Stage 5 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 6 is **REVIEWED / ACCEPTED** after external pre-commit Architect review. Stage 7 is **REVIEWED / ACCEPTED** after final external Architect review of the post-rename normalization. Stage 8A is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 8C is **REVIEWED / ACCEPTED** after external Architect review (BLOCKER `0`, IMPORTANT `0`) and Owner native/visual smoke, including the empty/loading/failure sizing correction. Stage 8B is **OPTIONAL / NOT STARTED**; Stage 9 is **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**. Stage 8C is complete; no further implementation stage is authorized. Next action: **OWNER DECISION REQUIRED**.
