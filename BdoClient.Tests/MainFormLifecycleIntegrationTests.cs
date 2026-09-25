@@ -197,10 +197,10 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal(fixture.GameRoot, startup.GamePath);
         Assert.True(startup.ApiRequestCount >= 1);
         Assert.True(startup.GitHubRequestCount >= 1);
-        Assert.Equal("Хаб українізаторів", fixture.Form.Text);
-        Assert.Equal("Хаб українізаторів", MainFormTestFixture.FindControlText(fixture.Form, text => text == "Хаб українізаторів"));
-        Assert.Equal("Хаб українізаторів", fixture.Form.HeaderTitle);
-        Assert.Equal("Українські локалізації для Black Desert Online та Where Winds Meet", fixture.Form.HeaderSubtitle);
+        Assert.Equal("Хаб Українізаторів BDO - WWM", fixture.Form.Text);
+        Assert.Equal("Хаб Українізаторів BDO - WWM", MainFormTestFixture.FindControlText(fixture.Form, text => text == "Хаб Українізаторів BDO - WWM"));
+        Assert.Equal("Хаб Українізаторів BDO - WWM", fixture.Form.HeaderTitle);
+        Assert.Equal("Українські локалізації для ігор BDO - WWM", fixture.Form.HeaderSubtitle);
         Assert.Equal("Цільові проєкти", fixture.Form.TargetProjectsCaption);
         Assert.Equal("Black Desert Online — BDO UA Translate", fixture.Form.BdoTargetProject);
         Assert.Equal("Доступно", fixture.Form.BdoTargetStatus);
@@ -211,8 +211,12 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal("Black Desert Online", fixture.Form.GameSelector.Text);
         Assert.Equal("Black Desert Online", fixture.Form.GameSectionCaption);
         Assert.Equal("Як видалити застосунок?", fixture.Form.UninstallHelpText);
-        Assert.Equal("Хаб українізаторів", fixture.Form.TrayTooltipText);
+        Assert.Equal("Хаб Українізаторів BDO - WWM", fixture.Form.TrayTooltipText);
         Assert.False(fixture.Form.GameSelector.Enabled);
+        await fixture.WaitForAsync(form => form.LastContentFitTargetSizeForTest.Height > 0
+            && form.ClientSize == form.LastContentFitTargetSizeForTest);
+        Assert.True(fixture.Form.ClientSize.Height < fixture.Form.InitialClientHeightForTest,
+            "Startup fitting should reduce the actual initial client height when content is shorter.");
     }
 
     [Fact]

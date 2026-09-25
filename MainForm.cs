@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Drawing;
 using System.Windows.Forms;
 using BdoClient.Api;
 using BdoClient.Logging;
@@ -53,7 +54,7 @@ public partial class MainForm : Form
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private const string UninstallInstructions =
-        "«Хаб українізаторів» — portable-застосунок. Він не встановлюється через Windows Installer і не має окремого деінсталятора у Windows." +
+        "«" + ApplicationBrand.DisplayName + "» — portable-застосунок. Він не встановлюється через Windows Installer і не має окремого деінсталятора у Windows." +
         "\n\n" +
         "Звичайне видалення:\n" +
         "1. Якщо увімкнено автозапуск, вимкніть його в меню трея «Запускати разом із Windows».\n" +
@@ -95,6 +96,8 @@ public partial class MainForm : Form
     private volatile bool _updateHandoffInProgress;
     private bool _contentFitScheduled;
     private bool _contentFitInProgress;
+    private Size _lastContentFitTargetSize;
+    private int _initialClientHeight;
 
     public MainForm(
         ApplicationConfigStore applicationConfigStore,
@@ -135,6 +138,7 @@ public partial class MainForm : Form
         _updateLifecycle = new UpdateLifecycleService(_updateSessionStore, appPaths, logger);
 
         InitializeComponent();
+        _initialClientHeight = ClientSize.Height;
         InitializeTray();
         rootScrollPanel.Resize += RootScrollPanel_Resize;
         ApplyTheme();
@@ -381,6 +385,8 @@ public partial class MainForm : Form
     internal string GameSectionCaption => gameSectionCaptionLabel.Text;
     internal string UninstallHelpText => uninstallHelpLink.Text;
     internal string TrayTooltipText => _notifyIcon.Text;
+    internal Size LastContentFitTargetSizeForTest => _lastContentFitTargetSize;
+    internal int InitialClientHeightForTest => _initialClientHeight;
 
     private void InitializeGameSelector()
     {

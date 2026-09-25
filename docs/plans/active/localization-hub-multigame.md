@@ -4,13 +4,13 @@ Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
 Implementation authorization: **YES**
-Current phase: Stage 8A complete — no further authorized implementation work
-Next action: OWNER DECISION REQUIRED
+Current phase: Stage 8C — Visible brand wording + adaptive window height
+Next action: external Architect review + Owner visual smoke
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
 
-Перетворити BDO-UA Client на один Windows launcher/hub для кількох незалежних ігор із локалізаціями. Майбутня публічна назва застосунку — `Хаб українізаторів`. На початку production catalog містить лише Black Desert Online; друга гра не вигадується без реального продуктового та API-контракту.
+Перетворити BDO-UA Client на один Windows launcher/hub для кількох незалежних ігор із локалізаціями. Поточна публічна назва застосунку — `Хаб Українізаторів BDO - WWM`. Production catalog містить лише Black Desert Online; Where Winds Meet не реєструється без реального продуктового та API-контракту.
 
 ## Product targets
 
@@ -129,6 +129,12 @@ Make the application visibly communicate both target projects without pretending
 
 Current state: **REVIEWED / ACCEPTED**. External Architect review accepted the implementation with BLOCKER `0` and IMPORTANT `0`; Owner visual smoke accepted the target-project presentation and layout. The main shell names both target games and projects, while the production runtime catalog remains BDO-only and the active-game selector remains a disabled one-item selector.
 
+### Stage 8C — Visible brand wording + adaptive window height
+
+Apply the Owner-approved visible identity `Хаб Українізаторів BDO - WWM` and subtitle `Українські локалізації для ігор BDO - WWM`. Make the main window fit content bidirectionally: shrink when content becomes shorter, grow when it becomes taller, and clamp to the screen working area while retaining vertical scrolling. Preserve the target-project rows and BDO-only runtime behavior.
+
+Current state: **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW / OWNER VISUAL SMOKE PENDING**. This stage changes visible branding and bounded content-height fitting only; no WWM runtime contract or behavior was added.
+
 ### Stage 8B — Optional physical EXE/package/autostart migration
 
 Only if still desired: support legacy and new artifact identities, migrate autostart add-new/verify/remove-old, and test updates from a legacy EXE. Do not automatically rename LocalAppData.
@@ -147,7 +153,7 @@ Current state: **NOT STARTED**.
 
 ## Acceptance criteria
 
-- Public application identity is `Хаб українізаторів`, while BDO is one registered game rather than the application identity.
+- Public application identity is `Хаб Українізаторів BDO - WWM`, while BDO is one registered runtime game rather than the application identity.
 - Selected-game state persists safely with BDO fallback and bounded session lifetime.
 - Switching cannot leak stale async results or cross-game path/state/backups/cache/modes/patch/notifications/monitor data.
 - Application-global self-update, tray and autostart remain stable.
@@ -168,4 +174,4 @@ The roadmap depends on v1.2.7 release completion and explicit Owner activation. 
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stage 1 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 2 is **REVIEWED / ACCEPTED** after external pre-commit Architect review, commit and CI success. Stage 3 is **REVIEWED / ACCEPTED**; Stage 4 is **REVIEWED / ACCEPTED**; Stage 5 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 6 is **REVIEWED / ACCEPTED** after external pre-commit Architect review. Stage 7 is **REVIEWED / ACCEPTED** after final external Architect review of the post-rename normalization. Stage 8A is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 8B is **OPTIONAL / NOT STARTED**; Stage 9 is **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**. No further implementation stage is authorized; the next action is **OWNER DECISION REQUIRED**.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stage 1 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 2 is **REVIEWED / ACCEPTED** after external pre-commit Architect review, commit and CI success. Stage 3 is **REVIEWED / ACCEPTED**; Stage 4 is **REVIEWED / ACCEPTED**; Stage 5 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 6 is **REVIEWED / ACCEPTED** after external pre-commit Architect review. Stage 7 is **REVIEWED / ACCEPTED** after final external Architect review of the post-rename normalization. Stage 8A is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 8C is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW / OWNER VISUAL SMOKE PENDING**. Stage 8B is **OPTIONAL / NOT STARTED**; Stage 9 is **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**.

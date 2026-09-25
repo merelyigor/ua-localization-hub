@@ -13,6 +13,7 @@ public partial class MainForm
     private const int CompactMultiModeMinimumClientWidth = 820;
     private const int MinimumModeCardWidth = 240;
     private const int ModeCardGap = 16;
+    private const int ContentFitSafetyMargin = 16;
 
     private void ApplyTheme()
     {
@@ -76,9 +77,11 @@ public partial class MainForm
 
     private void RootScrollPanel_Resize(object? sender, EventArgs e)
     {
+        var previousContentWidth = mainLayoutPanel.Width;
         EnsureMinimumUsableWidth();
         mainLayoutPanel.Width = Math.Max(0, rootScrollPanel.ClientSize.Width);
-        ScheduleContentFit();
+        if (mainLayoutPanel.Width != previousContentWidth)
+            ScheduleContentFit();
     }
 
     private void EnsureMinimumUsableWidth()
@@ -124,16 +127,26 @@ public partial class MainForm
 
             var preferredHeight = mainLayoutPanel.GetPreferredSize(
                 new Size(rootScrollPanel.ClientSize.Width, 0)).Height;
-            var formChromeHeight = Height - ClientSize.Height;
+            var formChromeHeight = Math.Max(0, Height - ClientSize.Height);
             var workingArea = Screen.FromControl(this).WorkingArea;
-            var safetyMargin = 16;
-            var maxClientHeight = Math.Max(
-                MinimumSize.Height,
-                workingArea.Height - formChromeHeight - safetyMargin);
-            var requiredClientHeight = Math.Min(maxClientHeight, preferredHeight);
+            var minimumClientHeight = Math.Max(0, MinimumSize.Height - formChromeHeight);
+            var maximumClientHeight = Math.Max(
+                0,
+                workingArea.Height - formChromeHeight - ContentFitSafetyMargin);
+            var targetClientSize = ContentFitHeightPolicy.CalculateTargetClientSize(
+                ClientSize,
+                preferredHeight,
+                minimumClientHeight,
+                maximumClientHeight);
+            _lastContentFitTargetSize = targetClientSize;
 
-            if (ClientSize.Height < requiredClientHeight)
-                ClientSize = new Size(ClientSize.Width, requiredClientHeight);
+            if (ClientSize != targetClientSize)
+                ClientSize = targetClientSize;
+
+            var maximumTop = Math.Max(workingArea.Top, workingArea.Bottom - Height);
+            var targetTop = Math.Clamp(Top, workingArea.Top, maximumTop);
+            if (Top != targetTop)
+                Top = targetTop;
         }
         finally
         {
@@ -284,6 +297,8 @@ public partial class MainForm
             else if (state == OperationState.Idle)
                 progressBar.Value = 0;
         }
+
+        ScheduleContentFit();
     }
 
     private void OnDownloadProgress(DownloadProgress progress)

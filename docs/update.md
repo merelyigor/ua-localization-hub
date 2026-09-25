@@ -1,4 +1,4 @@
-# Self-update Хабу українізаторів (Stage 13)
+# Self-update Хабу Українізаторів BDO - WWM (Stage 13)
 
 Механізм оновлення самого застосунку. Джерело — публічні GitHub Releases канонічного репозиторію `merelyigor/ua-localization-hub`. Legacy slug `merelyigor/bdo-ua-client` зберігається лише як compatibility fallback. Без custom backend, без GitHub token, без HTTP (тільки HTTPS).
 

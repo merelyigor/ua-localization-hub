@@ -8,9 +8,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>BdoClient</RootNamespace>
     <AssemblyName>BdoClient</AssemblyName>
-    <AssemblyTitle>Хаб українізаторів</AssemblyTitle>
-    <Product>Хаб українізаторів</Product>
-    <Description>Windows-хаб для українських локалізацій ігор.</Description>
+    <AssemblyTitle>Хаб Українізаторів BDO - WWM</AssemblyTitle>
+    <Product>Хаб Українізаторів BDO - WWM</Product>
+    <Description>Windows-застосунок для BDO UA Translate та Winds4UA (W4U). BDO інтегровано; WWM — у плані інтеграції.</Description>
     <ApplicationIcon>assets\bdo-ua-icon.ico</ApplicationIcon>
   </PropertyGroup>
 

@@ -34,6 +34,7 @@ public partial class MainForm
             SetControlsDuringOperation(true);
             if (!_closing && IsCurrentGameSession(_gameSessionGeneration, _activeGameSession))
                 _poller.Start(_apiResponse);
+            ScheduleContentFit();
             _startupCompletion.TrySetResult(null);
         }
     }

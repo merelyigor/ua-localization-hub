@@ -3,14 +3,14 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 8A complete — no further authorized implementation work
-**Next:** OWNER DECISION REQUIRED
+**Current phase:** Stage 8C — Visible brand wording + adaptive window height
+**Next:** external Architect review + Owner visual smoke
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8A complete — no further authorized implementation work | OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8C — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW / OWNER VISUAL SMOKE PENDING | external Architect review + Owner visual smoke |
 
 ## Backlog
 

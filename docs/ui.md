@@ -6,7 +6,7 @@
 
 - **ClientSize:** 1040×720; minimum usable client width is dynamic: 960px for up to two modes and 820px for three or more modes, so three cards fit at their compact minimum width without weakening the single-mode global status layout.
 - Стартова позиція — центр екрана
-- Контент-driven висота: форма динамічно підганяє висоту під вміст; якщо контент не вміщується — вертикальний скрол (`rootScrollPanel`, `AutoScroll = true`)
+- Контент-driven висота: форма підганяє висоту в обидва боки до фактичного вмісту; висота обмежена мінімальним розміром і робочою областю екрана. Якщо вміст вищий за доступну область — вертикальний скрол (`rootScrollPanel`, `AutoScroll = true`). Підгонка запускається після зміни контенту та ширини, а зміна висоти користувачем не спричиняє повторної підгонки.
 - Custom window chrome через `WindowChromeHelper` (внутрішній static class)
 
 ## Тема (UiTheme)
@@ -41,9 +41,10 @@
 
 ## Header
 
-- **headerTitleLabel** — «Хаб українізаторів», Segoe UI 20pt Bold.
-- **headerSubtitleLabel** — «Українські локалізації для ігор».
-- **gameSelectorComboBox** — native `DropDownList` selector «Гра»; production catalog currently contains only «Black Desert Online», so the selector is disabled until real game switching is implemented.
+- **headerTitleLabel** — «Хаб Українізаторів BDO - WWM», Segoe UI 20pt Bold.
+- **headerSubtitleLabel** — «Українські локалізації для ігор BDO - WWM».
+- Блок **«Цільові проєкти»** показує Black Desert Online / BDO UA Translate зі статусом «Доступно» та Where Winds Meet / Winds4UA (W4U) зі статусом «Інтеграція готується».
+- **gameSelectorComboBox** — native `DropDownList` selector «Активна гра»; production catalog містить лише «Black Desert Online», тому selector вимкнений, доки не з'явиться друга реальна runtime session.
 - **headerAccentLine** — акцентна лінія 2px.
 - **rightUtilityPanel** (праворуч):
   - **updateButton** — «Оновити до vX.Y.Z». Прихований за замовчуванням; з'являється, коли знайдено candidate оновлення застосунку. Стани обчислюються через `UpdateButtonState.Compute(...)`; під час localization-операцій оновлення заблоковане (взаємовиключність, AGENTS §41.9).
