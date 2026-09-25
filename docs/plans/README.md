@@ -4,15 +4,15 @@
 
 **Primary:** `localization-hub-multigame`
 **Current phase:** Stage 8C complete; no further authorized implementation work
-**Next:** Owner live self-update from public v1.2.8 to v1.2.9
+**Next:** OWNER DECISION REQUIRED
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8C — REVIEWED / ACCEPTED; no further authorized implementation stage | Owner live v1.2.8 → v1.2.9 self-update |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8C — REVIEWED / ACCEPTED; no further authorized implementation stage | OWNER DECISION REQUIRED |
 
-Release cycle: `v1.2.9 RELEASED / PUBLIC VERIFIED / LIVE v1.2.8 → v1.2.9 UPDATE PENDING`.
+Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
 ## Backlog
 

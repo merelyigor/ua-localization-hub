@@ -3,7 +3,7 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **YES**
+Implementation authorization: **NO — OWNER DECISION REQUIRED**
 Current phase: Stage 8C complete; no further authorized implementation work
 Next action: OWNER DECISION REQUIRED
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
@@ -178,4 +178,4 @@ Roadmap approved by Owner and activated after v1.2.7 external release acceptance
 
 ### v1.2.9 release cycle
 
-**RELEASED / PUBLIC VERIFIED / LIVE v1.2.8 → v1.2.9 UPDATE PENDING.** Release Candidate #37 / run `36166009527` succeeded from exact source SHA `5c2c3a71fac3f0b57405c3494db4327f2a02295d`; Owner native smoke was accepted and Architect authorized publication. Stable Release ID `396873313` was published at `2026-09-25T19:29:42Z` using annotated tag `v1.2.9`, which peels to that exact RC source. Actions artifact ID `10878006746`; public asset ID `589080502`, name `BDO-UA-Client-v1.2.9-win-x64.zip`, size `67,905,336` bytes, SHA-256 `c43ae054a3a349158607d5de69f923df216a8f4db9ade06c61545e178400b298`. Fresh public download and four-file bundle verification passed; manifest, EXE hash/metadata, SHA256SUMS and exact RC release body were verified. Public latest/release discovery resolves to v1.2.9. The actual live v1.2.8 → v1.2.9 client self-update has not yet been performed; it remains the next Owner gate. Release evidence is archived in [`docs/releases/v1.2.9.md`](../../releases/v1.2.9.md). `NEXT.json` has been reset to empty schema-v1.
+**v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED.** Release Candidate #37 / run `36166009527` succeeded from exact source SHA `5c2c3a71fac3f0b57405c3494db4327f2a02295d`; Owner native smoke was accepted and Architect authorized publication. Stable Release ID `396873313` was published at `2026-09-25T19:29:42Z` using annotated tag `v1.2.9`, which peels to that exact RC source. Actions artifact ID `10878006746`; public asset ID `589080502`, name `BDO-UA-Client-v1.2.9-win-x64.zip`, size `67,905,336` bytes, SHA-256 `c43ae054a3a349158607d5de69f923df216a8f4db9ade06c61545e178400b298`. Fresh public download and four-file bundle verification passed; manifest, EXE hash/metadata, SHA256SUMS and exact RC release body were verified. Public latest/release discovery resolves to v1.2.9. Owner live self-update from public v1.2.8 to public v1.2.9: **PASS / ACCEPTED**. Final Architect release review: **ACCEPTED**, BLOCKER `0`, IMPORTANT `0`. Release evidence is archived in [`docs/releases/v1.2.9.md`](../../releases/v1.2.9.md). `NEXT.json` remains canonical empty schema-v1.
