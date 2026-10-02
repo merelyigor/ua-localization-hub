@@ -191,7 +191,7 @@ UI → Application/Services → API Client → Game Detection
 
 Base URL: `https://bdo-ua.com.ua/api/public/v1`
 
-**GET /releases** — єдиний endpoint. Клієнт не повинен сам вирішувати, яка локалізація актуальна.
+**GET /releases** — основний агрегований feed застосунку. Окремий latest endpoint повертає свіжі metadata одного режиму; клієнт не повинен сам вирішувати, яка локалізація актуальна.
 
 §11.1 Структура відповіді:
 ```json
@@ -254,6 +254,20 @@ Base URL: `https://bdo-ua.com.ua/api/public/v1`
 - `english-items` — українські тексти з англійськими назвами предметів
 
 §11.9 Статуси history: `superseded` / `withdrawn` ( `current` ніколи не з'являється в history ).
+
+### Per-mode latest endpoint
+
+`GET /api/public/v1/releases/latest/{slug}` призначений для свіжих metadata одного режиму та майбутньої перевірки актуальності перед встановленням/оновленням. Він не замінює агрегований `/releases`, що залишається основним джерелом списку режимів, progress, detection hints, restore metadata та polling.
+
+Успіх `200` має envelope `{ "success": true, "generated_at": "...", "data": { "official_patch": ..., "filename": "...", "install_guide_url": "...", "mode": { "slug": "...", "public_name": "..." }, "current": ... } }`. `current` повторно використовує структуру `modes[].current` і може бути `null`: це валідний стан без доступного актуального релізу.
+
+- `304` повертається для відповідного `If-None-Match`; використати попередні latest metadata. Сам статус не означає, що локально встановлений реліз актуальний.
+- `404`: `{"success":false,"error":"unknown_mode","allowed":[...]}`; запитаний slug невідомий.
+- `503`: `Retry-After` у секундах і тіло на кшталт `{"success":false,"error":"official_patch_unconfirmed","message":"..."}`; офіційний патч ще не підтверджений. Не виконувати автоматичний retry у клієнті.
+
+### Permanent latest download link
+
+`GET /download/latest/{slug}` перенаправляє `302` на поточний `current.download_url`; коли поточного файлу немає, невідомий slug або patch не підтверджено — на `/download`. Hub installer продовжує завантажувати immutable `current.download_url` з перевіркою розміру/SHA-256, а не рухоме `/download/latest/{slug}`, щоб metadata та bytes належали тому самому релізу.
 
 ---
 

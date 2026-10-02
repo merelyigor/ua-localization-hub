@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NO — OWNER DECISION REQUIRED**
-Current phase: Stage 8C complete; no further authorized implementation work
-Next action: OWNER DECISION REQUIRED
+Implementation authorization: **YES — Stage 8D.1 only**
+Current phase: Stage 8D.1 — BDO latest-release API client readiness
+Next action: external Architect review of Stage 8D.1
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -141,6 +141,20 @@ Only if still desired: support legacy and new artifact identities, migrate autos
 
 Current state: **OPTIONAL / NOT STARTED**.
 
+### Stage 8D — BDO latest-release API integration
+
+Adopt the public per-mode latest-release API without replacing the aggregate `/releases` feed. The aggregate remains the primary application feed for startup, mode listing, progress, detection hints, restore metadata, polling and offline cache. The per-mode endpoint supplies fresh metadata for one requested mode and is intended to support a future pre-install/update freshness gate.
+
+#### Stage 8D.1 — Client contract/readiness support
+
+**IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW.** Added bounded client support for `GET /api/public/v1/releases/latest/{slug}`, minimal response DTOs reusing `CurrentRelease`, explicit endpoint outcomes, per-slug process/session-local ETag metadata, and deterministic contract tests. Handles `200` including valid `current: null`, conditional `304`, `404 unknown_mode` with documented `allowed` values, `503 official_patch_unconfirmed` with optional seconds-based `Retry-After`, and transport/API failures. No persistence/schema migration and no runtime install activation.
+
+Do not create a release for readiness-only work.
+
+#### Stage 8D.2 — Production activation
+
+**WAITING ON PROD API DEPLOYMENT.** Separately verify the live production contract and obtain Owner/Architect authorization before wiring the latest query into the pre-install/update gate. On `200` with a release, re-evaluate compatibility, local installation state and action policy against the returned `CurrentRelease` as the transaction target. `current: null`, `503`, `404`, and transport/API failures must block before file mutation with meaningful diagnostics; on `304`, use cached latest metadata and compare its `public_id` with local installation state rather than inferring up-to-date from the HTTP status. Keep aggregate `/releases` for normal feed use, and continue downloading the immutable `current.download_url` with size/hash verification. This is future contract only; do not activate it in Stage 8D.1.
+
 ### Stage 9 — Where Winds Meet integration contract analysis
 
 WAITING ON TECHNICAL INTEGRATION DATA. Perform read-only analysis of the actual Where Winds Meet / Winds4UA (W4U) detection, API, install, patch, restore and backup contract. No assumptions or implementation.
@@ -174,7 +188,7 @@ The roadmap depends on v1.2.7 release completion and explicit Owner activation. 
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stage 1 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 2 is **REVIEWED / ACCEPTED** after external pre-commit Architect review, commit and CI success. Stage 3 is **REVIEWED / ACCEPTED**; Stage 4 is **REVIEWED / ACCEPTED**; Stage 5 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 6 is **REVIEWED / ACCEPTED** after external pre-commit Architect review. Stage 7 is **REVIEWED / ACCEPTED** after final external Architect review of the post-rename normalization. Stage 8A is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 8C is **REVIEWED / ACCEPTED** after external Architect review (BLOCKER `0`, IMPORTANT `0`) and Owner native/visual smoke, including the empty/loading/failure sizing correction. Stage 8B is **OPTIONAL / NOT STARTED**; Stage 9 is **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**. Stage 8C is complete; no further implementation stage is authorized. Next implementation action: **OWNER DECISION REQUIRED**.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stage 1 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 2 is **REVIEWED / ACCEPTED** after external pre-commit Architect review, commit and CI success. Stage 3 is **REVIEWED / ACCEPTED**; Stage 4 is **REVIEWED / ACCEPTED**; Stage 5 is **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 6 is **REVIEWED / ACCEPTED** after external pre-commit Architect review. Stage 7 is **REVIEWED / ACCEPTED** after final external Architect review of the post-rename normalization. Stage 8A and Stage 8C are **REVIEWED / ACCEPTED** after external Architect review and Owner visual smoke. Stage 8B is **OPTIONAL / NOT STARTED**. Stage 8D.1 is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW**; Stage 8D.2 is **WAITING ON PROD API DEPLOYMENT**. Stage 9 is **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 is **NOT STARTED**. Stage 8D.1 awaits external Architect review; Stage 8D.2, Stage 8B, Stage 9 and Stage 10 have not been started.
 
 ### v1.2.9 release cycle
 

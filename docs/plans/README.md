@@ -3,14 +3,14 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 8C complete; no further authorized implementation work
-**Next:** OWNER DECISION REQUIRED
+**Current phase:** Stage 8D.1 — BDO latest-release API client readiness
+**Next:** external Architect review of Stage 8D.1
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8C — REVIEWED / ACCEPTED; no further authorized implementation stage | OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8D.1 — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW | external Architect review |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
