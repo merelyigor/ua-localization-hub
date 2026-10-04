@@ -389,6 +389,7 @@ public partial class MainForm : Form
     internal int InitialClientHeightForTest => _initialClientHeight;
     internal int ModeSectionHeightForTest => modeGroupBox.Height;
     internal Func<CurrentRelease, bool>? GameTestConfirmationForTest { get; set; }
+    internal OperationState OperationStateForTest => _operationState;
     internal Task HandleInstallForTestAsync() => HandleInstallAsync();
 
     private void InitializeGameSelector()

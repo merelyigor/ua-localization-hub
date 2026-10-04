@@ -82,6 +82,8 @@ public partial class MainForm
                 return;
             }
 
+            SetOperationState(OperationState.Idle);
+
             // Keep fresh transaction metadata isolated from the aggregate feed and its UI cards.
             var transactionMode = new LocalizationMode
             {

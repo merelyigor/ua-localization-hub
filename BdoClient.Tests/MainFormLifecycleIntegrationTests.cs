@@ -741,6 +741,7 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01FRESHB"));
         Assert.Equal(installedBytes, await File.ReadAllBytesAsync(
             BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+        Assert.Equal(OperationState.Idle, fixture.Form.OperationStateForTest);
     }
 
     [Theory]
@@ -783,6 +784,8 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal(FileLoadStatus.Missing, new InstallationStateStore(
             fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
             new MainFormTestFixture.TestLogger()).Load().Status);
+        if (scenario == "incompatible")
+            Assert.Equal(OperationState.Idle, fixture.Form.OperationStateForTest);
     }
 
     [Fact]
