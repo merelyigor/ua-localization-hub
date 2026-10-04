@@ -673,6 +673,259 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Null(fixture.HostException);
         Assert.False(fixture.IsHostAlive);
     }
+
+    [Fact]
+    public async Task Install_UsesFreshLatestReleaseAsTransactionTarget()
+    {
+        var previouslyInstalledBytes = Encoding.UTF8.GetBytes("installed aggregate release A");
+        var installedBytes = Encoding.UTF8.GetBytes("fresh release B");
+        var latestJson = CreateLatestJson("01FRESHB", installedBytes, "verified");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01STALEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, latestJson, "\"latest-b\"")]),
+            installedBytes);
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => MainFormTestFixture.CountModeCards(form) == 1);
+        var gameFile = BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot);
+        var backupStore = new BackupStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger());
+        var originalSnapshot = await backupStore.CreateOriginalSnapshotAsync(fixture.GameRoot, trustedGamePatch: 395);
+        Assert.True(originalSnapshot.IsSuccess);
+        await File.WriteAllBytesAsync(gameFile, previouslyInstalledBytes);
+        await new InstallationStateStore(
+                fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+                new MainFormTestFixture.TestLogger())
+            .SaveAsync(new InstallationMetadata
+            {
+                ModeSlug = "english-items",
+                PublicId = "01STALEA",
+                Version = 1,
+                GamePatch = 395,
+                Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(previouslyInstalledBytes)).ToLowerInvariant(),
+                InstalledAt = DateTimeOffset.UtcNow
+            });
+
+        await fixture.InstallForTestAsync();
+
+        Assert.Equal(installedBytes, await File.ReadAllBytesAsync(gameFile));
+        var state = new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load();
+        Assert.Equal(FileLoadStatus.Valid, state.Status);
+        Assert.Equal("01FRESHB", state.Value!.PublicId);
+        Assert.Contains("/download/releases/01FRESHB", handler.RequestPaths);
+        Assert.DoesNotContain("/download/releases/01STALEA", handler.RequestPaths);
+    }
+
+    [Fact]
+    public async Task Install_304UsesCachedFreshTargetAndDoesNotReinstallExactInstalledRelease()
+    {
+        var installedBytes = Encoding.UTF8.GetBytes("latest release B");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01STALEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01FRESHB", installedBytes, "verified"), "\"latest-b\""),
+                new HttpResponseMessage(HttpStatusCode.NotModified)]),
+            installedBytes);
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => MainFormTestFixture.CountModeCards(form) == 1);
+
+        await fixture.InstallForTestAsync();
+        await fixture.InstallForTestAsync();
+
+        Assert.Equal(2, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
+        Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01FRESHB"));
+        Assert.Equal(installedBytes, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+    }
+
+    [Theory]
+    [InlineData("unknown-mode")]
+    [InlineData("patch-unconfirmed")]
+    [InlineData("server-error")]
+    [InlineData("invalid-json")]
+    [InlineData("current-null")]
+    [InlineData("incompatible")]
+    public async Task Install_LatestFailureBlocksBeforeAnyMutation(string scenario)
+    {
+        var originalBytes = Encoding.UTF8.GetBytes("original game file");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01AGGREGATEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([scenario switch
+            {
+                "unknown-mode" => JsonResponse(HttpStatusCode.NotFound,
+                    "{\"success\":false,\"error\":\"unknown_mode\",\"allowed\":[\"english-items\"]}"),
+                "patch-unconfirmed" => JsonResponse(HttpStatusCode.ServiceUnavailable,
+                    "{\"success\":false,\"error\":\"official_patch_unconfirmed\"}"),
+                "server-error" => JsonResponse(HttpStatusCode.InternalServerError, "server error"),
+                "current-null" => JsonResponse(HttpStatusCode.OK, CreateLatestNoCurrentJson()),
+                "incompatible" => JsonResponse(HttpStatusCode.OK,
+                    CreateLatestJson("01INCOMPATIBLE", Array.Empty<byte>(), "verified", compatible: false)),
+                _ => JsonResponse(HttpStatusCode.OK, "not json")
+            }]),
+            Array.Empty<byte>());
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => MainFormTestFixture.CountModeCards(form) == 1);
+        await File.WriteAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot), originalBytes);
+
+        await fixture.InstallForTestAsync();
+
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+        Assert.DoesNotContain(handler.RequestPaths, path => path.StartsWith("/download/", StringComparison.Ordinal));
+        Assert.Equal(FileLoadStatus.Missing, new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load().Status);
+    }
+
+    [Fact]
+    public async Task Install_DeclinedGameTestWarningBlocksMutationAndAcceptedWarningContinues()
+    {
+        var originalBytes = Encoding.UTF8.GetBytes("original game file");
+        var payload = Encoding.UTF8.GetBytes("release with issues");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01AGGREGATEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01ISSUES", payload, "known_issues"), "\"issues\""),
+                new HttpResponseMessage(HttpStatusCode.NotModified)]),
+            payload);
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => MainFormTestFixture.CountModeCards(form) == 1);
+        await File.WriteAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot), originalBytes);
+
+        await fixture.InstallForTestAsync(_ => false);
+
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+        Assert.DoesNotContain(handler.RequestPaths, path => path.StartsWith("/download/", StringComparison.Ordinal));
+        Assert.Equal(FileLoadStatus.Missing, new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load().Status);
+
+        await fixture.InstallForTestAsync(_ => true);
+
+        Assert.Equal(payload, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+        Assert.Contains("/download/releases/01ISSUES", handler.RequestPaths);
+    }
+
+    private static MainFormTestHttpHandler CreateInstallHandler(
+        string aggregatePublicId,
+        Queue<HttpResponseMessage> latestResponses,
+        byte[] downloadBytes)
+    {
+        return new MainFormTestHttpHandler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/public/v1/releases")
+                return Task.FromResult(JsonResponse(HttpStatusCode.OK, CreateAggregateJson(aggregatePublicId)));
+            if (path == "/api/public/v1/releases/latest/english-items")
+            {
+                if (latestResponses.Count == 0)
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+                return Task.FromResult(latestResponses.Dequeue());
+            }
+            if (path.StartsWith("/download/releases/", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(downloadBytes)
+                });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+    }
+
+    private static string CreateAggregateJson(string publicId) => JsonSerializer.Serialize(new
+    {
+        success = true,
+        data = new
+        {
+            official_patch = 395,
+            official_source_url = "https://bdo-ua.com.ua/original.loc",
+            filename = "languagedata_en.loc",
+            install_guide_url = "https://bdo-ua.com.ua/download",
+            modes = new[]
+            {
+                new
+                {
+                    slug = "english-items",
+                    public_name = "Англійські назви предметів",
+                    description = "Test mode",
+                    audience = "Everyone",
+                    current = new
+                    {
+                        public_id = publicId,
+                        version = 1,
+                        filename = "languagedata_en.loc",
+                        download_url = $"https://bdo-ua.com.ua/download/releases/{publicId}",
+                        size_bytes = 1,
+                        sha256 = new string('a', 64),
+                        patch = 395,
+                        compatible_with_official_patch = true,
+                        game_test = new { state = "verified" }
+                    }
+                }
+            }
+        }
+    });
+
+    private static string CreateLatestJson(string publicId, byte[] bytes, string gameTestState, bool compatible = true) => JsonSerializer.Serialize(new
+    {
+        success = true,
+        generated_at = "2026-10-04T12:00:00+03:00",
+        data = new
+        {
+            official_patch = 395,
+            filename = "languagedata_en.loc",
+            install_guide_url = "https://bdo-ua.com.ua/download",
+            mode = new { slug = "english-items", public_name = "Англійські назви предметів" },
+            current = new
+            {
+                public_id = publicId,
+                version = 2,
+                filename = "languagedata_en.loc",
+                download_url = $"https://bdo-ua.com.ua/download/releases/{publicId}",
+                size_bytes = bytes.Length,
+                sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(),
+                patch = 395,
+                compatible_with_official_patch = compatible,
+                game_test = new { state = gameTestState, label = "Server label", note = "Server note" }
+            }
+        }
+    });
+
+    private static string CreateLatestNoCurrentJson() => JsonSerializer.Serialize(new
+    {
+        success = true,
+        generated_at = "2026-10-04T12:00:00+03:00",
+        data = new
+        {
+            official_patch = 395,
+            filename = "languagedata_en.loc",
+            install_guide_url = "https://bdo-ua.com.ua/download",
+            mode = new { slug = "english-items", public_name = "Англійські назви предметів" },
+            current = (CurrentRelease?)null
+        }
+    });
+
+    private static HttpResponseMessage JsonResponse(HttpStatusCode status, string body, string? etag = null)
+    {
+        var response = new HttpResponseMessage(status)
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
+        };
+        if (etag != null)
+            response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue(etag);
+        return response;
+    }
 }
 
 internal sealed class MainFormTestFixture : IDisposable
@@ -900,6 +1153,25 @@ internal sealed class MainFormTestFixture : IDisposable
         await completion.Task.WaitAsync(Timeout);
     }
 
+    internal async Task InstallForTestAsync(Func<CurrentRelease, bool>? confirmGameTest = null)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(async () =>
+        {
+            try
+            {
+                Form.GameTestConfirmationForTest = confirmGameTest;
+                await Form.HandleInstallForTestAsync();
+                completion.TrySetResult(null);
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
     internal static async Task<MainFormTestFixture> StartAsync(
         MainFormTestHttpHandler bdoHandler,
         bool startInBackground = false,
@@ -985,7 +1257,9 @@ internal sealed class MainFormTestFixture : IDisposable
 
         var snapshot = await WaitForAsync(form =>
         {
-            var gameStatus = FindControlText(form, text => text == "✓ Гру знайдено");
+            var gameStatus = FindControlText(form, text =>
+                text == "✓ Гру знайдено"
+                || text.StartsWith("✓ Гру знайдено • patch ", StringComparison.Ordinal));
             var gamePath = FindControlText(form, text => text == GameRoot);
             var degraded = FindControlText(form, text => text == "Сервер повернув помилку.");
             var cached = FindControlText(form, text => text.StartsWith("Сервер недоступний.", StringComparison.Ordinal));
@@ -1302,6 +1576,7 @@ internal sealed class MainFormTestHttpHandler : HttpMessageHandler
     private readonly HttpStatusCode _statusCode;
     private readonly string _response;
     private readonly bool _waitForRelease;
+    private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? _send;
     private readonly TaskCompletionSource<object?> _requestStarted =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<object?> _release =
@@ -1318,9 +1593,19 @@ internal sealed class MainFormTestHttpHandler : HttpMessageHandler
         _waitForRelease = waitForRelease;
     }
 
+    internal MainFormTestHttpHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send)
+    {
+        _statusCode = HttpStatusCode.OK;
+        _response = string.Empty;
+        _send = send;
+    }
+
     internal HttpStatusCode StatusCode => _statusCode;
 
     internal int RequestCount => Volatile.Read(ref _requestCount);
+
+    internal List<string> RequestPaths { get; } = [];
 
     internal Task RequestStarted => _requestStarted.Task;
 
@@ -1328,6 +1613,7 @@ internal sealed class MainFormTestHttpHandler : HttpMessageHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
+        RequestPaths.Add(request.RequestUri?.AbsolutePath ?? string.Empty);
         if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath.EndsWith("/releases", StringComparison.Ordinal) == true)
         {
             Interlocked.Increment(ref _requestCount);
@@ -1336,6 +1622,9 @@ internal sealed class MainFormTestHttpHandler : HttpMessageHandler
             if (_waitForRelease)
                 await _release.Task.WaitAsync(cancellationToken);
         }
+
+        if (_send != null)
+            return await _send(request, cancellationToken);
 
         return new HttpResponseMessage(_statusCode)
         {

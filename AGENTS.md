@@ -225,7 +225,7 @@ Base URL: `https://bdo-ua.com.ua/api/public/v1`
           "compatible_with_official_patch": bool,
           "published_at": "ISO datetime",
           "game_tested_at": "ISO datetime",
-          "game_test": { "state": "known_issues|ok|...", "label": "...", "note": "string|null" },
+          "game_test": { "state": "verified|known_issues|unverified", "label": "...", "note": "string|null" },
           "stats": { "rows_in_file": int },
           "announcements": { "discord_releases": {"sent": bool, "sent_at": str|null}, "telegram_main": {"sent": bool, "sent_at": str|null} }
         },
@@ -248,26 +248,38 @@ Base URL: `https://bdo-ua.com.ua/api/public/v1`
 
 §11.7 `progress` — глобальний для всіх режимів. `stats.rows_in_file` може відрізнятися від `progress.total_rows`.
 
-§11.8 Доступні режими (slug):
-- `full-ukrainian` — повна українська (Bosia + правки спільноти)
-- `full-ukrainian-bosia` — повна українська лише від Bosia
-- `english-items` — українські тексти з англійськими назвами предметів
+§11.8 Поточні канонічні режими сервера (slug):
+- `full-ukrainian`
+- `full-ukrainian-bosia`
+- `english-items`
+- `english-items-npc`
+- `english-items-npc-world`
+- `english-items-npc-world-pearl`
+- `english-guide`
+- `minimal`
+
+Hub отримує режими динамічно з API і не використовує цей перелік як runtime whitelist. Сервер може сумісно додавати нові режими; невідомі JSON-поля клієнт ігнорує.
+
+`current.game_test.state` має відомі значення `verified`, `known_issues` та `unverified`. Hub встановлює `verified` без додаткового підтвердження; для інших, відсутніх або невідомих майбутніх значень просить явне підтвердження.
 
 §11.9 Статуси history: `superseded` / `withdrawn` ( `current` ніколи не з'являється в history ).
 
 ### Per-mode latest endpoint
 
-`GET /api/public/v1/releases/latest/{slug}` призначений для свіжих metadata одного режиму та майбутньої перевірки актуальності перед встановленням/оновленням. Він не замінює агрегований `/releases`, що залишається основним джерелом списку режимів, progress, detection hints, restore metadata та polling.
+`GET /api/public/v1/releases/latest/{slug}` повертає свіжі metadata одного режиму для перевірки актуальності перед встановленням/оновленням. Він не замінює агрегований `/releases`, що залишається основним джерелом списку режимів, progress, detection hints, restore metadata та polling.
 
 Успіх `200` має envelope `{ "success": true, "generated_at": "...", "data": { "official_patch": ..., "filename": "...", "install_guide_url": "...", "mode": { "slug": "...", "public_name": "..." }, "current": ... } }`. `current` повторно використовує структуру `modes[].current` і може бути `null`: це валідний стан без доступного актуального релізу.
 
-- `304` повертається для відповідного `If-None-Match`; використати попередні latest metadata. Сам статус не означає, що локально встановлений реліз актуальний.
+- Валідний `200` є свіжими авторитетними metadata, навіть якщо перед ним надіслано `If-None-Match`; це не вимагає відповіді `304`.
+- `304` для відповідного `If-None-Match` означає, що можна використати кешовані latest metadata. Сам статус не означає, що локально встановлений реліз актуальний.
 - `404`: `{"success":false,"error":"unknown_mode","allowed":[...]}`; запитаний slug невідомий.
 - `503`: `Retry-After` у секундах і тіло на кшталт `{"success":false,"error":"official_patch_unconfirmed","message":"..."}`; офіційний патч ще не підтверджений. Не виконувати автоматичний retry у клієнті.
 
 ### Permanent latest download link
 
 `GET /download/latest/{slug}` перенаправляє `302` на поточний `current.download_url`; коли поточного файлу немає, невідомий slug або patch не підтверджено — на `/download`. Hub installer продовжує завантажувати immutable `current.download_url` з перевіркою розміру/SHA-256, а не рухоме `/download/latest/{slug}`, щоб metadata та bytes належали тому самому релізу.
+
+Для install/update Hub спершу перевіряє latest metadata для вибраного режиму; збої перевірки блокують операцію без fallback до stale aggregate metadata. `game_test.state == verified` проходить без попередження; усі інші, null або невідомі значення вимагають явного підтвердження.
 
 ---
 
@@ -328,8 +340,8 @@ Base URL: `https://bdo-ua.com.ua/api/public/v1`
 API надає release metadata через `GET /releases`. Клієнт виконує валідовані операції.
 
 §15.1 **Installation Safety Workflow:**
-1. Отримати release з API
-2. Завантажити у cache/temp
+1. Для install/update отримати свіжий latest release вибраного режиму; не використовувати aggregate `current` як fallback при помилці перевірки.
+2. Завантажити immutable `current.download_url` у cache/temp
 3. Перевірити HTTP result
 4. Перевірити `size_bytes` (якщо доступний)
 5. Перевірити SHA-256 (для release files; для official source — ні)

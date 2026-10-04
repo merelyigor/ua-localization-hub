@@ -1,6 +1,6 @@
 # Current Engineering Context
 
-Оновлено: 2026-09-25
+Оновлено: 2026-10-04
 
 ## Project Purpose / Status
 
@@ -8,15 +8,15 @@
 
 Стабільний реліз: **v1.2.9**. Публічний stable release ID `396873313` опубліковано з tag `v1.2.9` на exact RC source SHA `5c2c3a71fac3f0b57405c3494db4327f2a02295d`; canonical application bundle містить один ZIP-asset. Public asset і його байти повторно перевірено. Offline/degraded release-feed implementation завершено та прийнято зовнішнім Architect.
 
-Поточний стан: **Stage 8D.1 — REVIEWED / ACCEPTED**. Стабільний реліз залишається **v1.2.9 — RELEASE REVIEWED / ACCEPTED**.
+Поточний стан: **Stage 8D.2 — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW**. Стабільний реліз залишається **v1.2.9 — RELEASE REVIEWED / ACCEPTED**.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` records Stage 8D.1 client contract/readiness support as **REVIEWED / ACCEPTED** (Architect BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`); the canonical website `PUBLIC_RELEASES_API.md` contract independently matched the implementation. This readiness is not used by the production installation flow: runtime still uses `GET /api/public/v1/releases` for startup/feed/poller, and the new per-mode endpoint is not called by install/update behavior. Stage 8D.2 remains **WAITING ON PROD API DEPLOYMENT** and requires live PROD verification plus explicit Owner/Architect authorization. Stable release remains `v1.2.9 — RELEASE REVIEWED / ACCEPTED`.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` records Stage 8D.1 client contract/readiness support as **REVIEWED / ACCEPTED** (Architect BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`); the canonical API contract independently matched that implementation. Stage 8D.2 activates the per-mode latest endpoint as a mandatory pre-install/update freshness gate. Read-only PROD verification confirmed latest HTTP 200 for `english-items`, matching aggregate/current metadata and an ETag; a conditional request also returned a valid HTTP 200, which the Hub correctly accepts as fresh authoritative metadata. HTTP 304 remains an optimization supported by the client, not an activation prerequisite. The server-side conditional-response behavior is handled independently outside this repository. `GET /api/public/v1/releases` remains the startup/feed/poller source. Fresh metadata is transaction-local; latest failures cannot fall back to aggregate metadata. `game_test=verified` proceeds normally; other, missing or unknown states require explicit confirmation. Stage 8D.2 awaits external Architect review. Stable release remains `v1.2.9 — RELEASE REVIEWED / ACCEPTED`.
 
 ## Architecture Summary
 
 - `Program.cs` є manual composition root без DI-контейнера.
 - `MainForm` координує UI та application services; довгі HTTP/file operations виконуються async.
-- `Api/BdoUaApiClient` володіє API-запитами до `/releases`.
+- `Api/BdoUaApiClient` володіє агрегованим `/releases` та per-mode `/releases/latest/{slug}`; останній є обов'язковою свіжою перевіркою перед install/update.
 - `Services/LocalizationInstaller` відповідає за download, retry, checksum та timeout локалізації.
 - `Storage` відповідає за config, installation state, original snapshot і restore points.
 - `Update` містить GitHub Release discovery, schema-2 bundle validation, staging, replacement helper, rollback та startup maintenance.
@@ -125,14 +125,14 @@ Owner-approved PRIMARY roadmap `localization-hub-multigame` records Stage 8D.1 c
 
 - v1.2.3 release cycle is completed and archived.
 - Offline/degraded release-feed mode is completed, reviewed and accepted; `offline-degraded-reliability` is archived.
-- `game-boundary-refactoring` is archived; Stage 1 and Stage 2 are reviewed/accepted. `localization-hub-multigame` is the sole ACTIVE PRIMARY roadmap; Stage 0 through Stage 8A and Stage 8C are reviewed/accepted. Stage 8B remains optional/not started; Stage 9 awaits technical integration data; no next implementation stage is authorized.
+- `game-boundary-refactoring` is archived; Stage 1 and Stage 2 are reviewed/accepted. `localization-hub-multigame` is the sole ACTIVE PRIMARY roadmap; Stage 0 through Stage 8A, Stage 8C and Stage 8D.1 are reviewed/accepted. Stage 8D.2 is implemented/validated and pending external Architect review. Stage 8B remains optional/not started; Stage 9 awaits technical integration data; Stage 10 is not started.
 - v1.2.5 release cycle completed; public Release verified and `NEXT.json` reset for the next cycle.
 - v15.64/v15.65 — **REVIEWED / ACCEPTED; OWNER VISUAL SMOKE ACCEPTED**: для трьох і більше режимів локалізації додано компактний minimum window width і збережено його під час semantic rebuild; single-mode global status width збережено.
 - v1.2.7 — **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**: public Release ID `391117230` опубліковано на tag `v1.2.7`, який вказує на exact approved RC SHA `b21118d1ec8e6d0342fb0e47544e911fcb875739`; canonical ZIP і внутрішні hashes повторно перевірено, Owner native smoke exact RC прийнято.
 - v1.2.8 — **RELEASED / PUBLIC VERIFIED**: public Release ID `391585430` опубліковано на tag `v1.2.8`, який вказує на exact RC SHA `7cb740d55bc7baeb5aa9f91365114e68bb88eff9`; public asset повторно завантажено й перевірено. Owner live legacy update accepted.
-- `localization-hub-multigame` — **ACTIVE / PRIMARY**: Stage 0 complete; Stages 1–8A, 8C and 8D.1 are **REVIEWED / ACCEPTED**. Stage 8D.1 external review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; the canonical website API contract matched. Stage 8D.2 — **WAITING ON PROD API DEPLOYMENT**; Stage 8B — **OPTIONAL / NOT STARTED**; Stage 9 — **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 — **NOT STARTED**.
-- Next action: Stage 8D.2 remains **WAITING ON PROD API DEPLOYMENT**; no client implementation is currently authorized. Activation requires PROD deployment, live contract verification and explicit Owner/Architect authorization. The v1.2.9 release lifecycle is complete.
+- `localization-hub-multigame` — **ACTIVE / PRIMARY**: Stage 0 complete; Stages 1–8A, 8C and 8D.1 are **REVIEWED / ACCEPTED**. Stage 8D.2 — **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW**; Stage 8B — **OPTIONAL / NOT STARTED**; Stage 9 — **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 — **NOT STARTED**.
+- Next action: external Architect review of Stage 8D.2. No further implementation stage is currently authorized. The v1.2.9 release lifecycle is complete; this task creates no release/tag.
 - Stage 8C final validation: CI #229 / run `36106040918` SUCCESS for `d726c939e0e6365ea2efd631e60cdf13528e836e`; Release build — 0 warnings / 0 errors; focused content-fit/MainForm/GameCatalog/session-host — 76 passed; full Release suite — 1008 passed / 0 failed / 0 skipped; release-note generator — 24 assertions and resolver — 13 passed; `git diff --check` passed.
 - v1.2.9: Release ID `396873313`, published `2026-09-25T19:29:42Z`; annotated tag peels to exact RC source `5c2c3a71fac3f0b57405c3494db4327f2a02295d`. RC #37 / run `36166009527`, artifact ID `10878006746`; public asset ID `589080502`, ZIP 67,905,336 bytes / SHA-256 `c43ae054a3a349158607d5de69f923df216a8f4db9ade06c61545e178400b298`. Internal EXE SHA-256 `610329b4b59eef49092a9a721d88e4b4919aff914764c82cd2221d3584f9910d`, FileVersion `1.2.9.0`, ProductVersion `1.2.9`; Owner RC smoke accepted, public re-download and exact bundle verification passed. Release archive: [`docs/releases/v1.2.9.md`](../releases/v1.2.9.md).
 - v1.2.9 lifecycle: **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**. Owner live self-update from public v1.2.8 to public v1.2.9: **PASS / ACCEPTED**. Final Architect release review: **ACCEPTED**, BLOCKER `0`, IMPORTANT `0`. `NEXT.json` remains canonical empty schema-v1 after archiving the released copy.
-- Stage 8D.1 readiness: add per-mode `GET /api/public/v1/releases/latest/{slug}` support with endpoint-specific 200/304/404/503 outcomes and per-slug in-memory ETag caching. Aggregate `/releases` remains the primary runtime feed; installer continues using immutable `current.download_url`. New endpoint is not yet on PROD and is not called by install/update behavior.
+- Stage 8D.1 readiness: per-mode `GET /api/public/v1/releases/latest/{slug}` support has endpoint-specific 200/304/404/503 outcomes and per-slug in-memory ETag caching. Stage 8D.2 uses it before every install/update while the aggregate endpoint remains the primary runtime feed; installer uses immutable `current.download_url`.

@@ -128,6 +128,36 @@ public class BdoUaApiClientLatestTests
     }
 
     [Fact]
+    public async Task GetLatestReleaseAsync_CachedEtagThen200_AcceptsFreshBodyAsModified()
+    {
+        var requestCount = 0;
+        var handler = new RecordingHandler((_, _) =>
+        {
+            requestCount++;
+            var publicId = requestCount == 1
+                ? "01ABCDEF0123456789ABCDEFGH"
+                : "01NEWDEF0123456789ABCDEFGH";
+            var body = LatestJson(Slug).Replace(
+                "01ABCDEF0123456789ABCDEFGH", publicId, StringComparison.Ordinal);
+            var response = JsonResponse(HttpStatusCode.OK, body);
+            response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue(
+                requestCount == 1 ? "\"feed-v1\"" : "\"feed-v2\"");
+            return Task.FromResult(response);
+        });
+        using var httpClient = new HttpClient(handler);
+        var client = new BdoUaApiClient(httpClient, new NullLogger());
+
+        var initial = await client.GetLatestReleaseAsync(Slug);
+        var refreshed = await client.GetLatestReleaseAsync(Slug);
+
+        Assert.Equal(LatestReleaseOutcome.Modified, initial.Outcome);
+        Assert.Equal(LatestReleaseOutcome.Modified, refreshed.Outcome);
+        Assert.Equal("01NEWDEF0123456789ABCDEFGH", refreshed.Data!.Current!.PublicId);
+        Assert.Equal("\"feed-v1\"", Assert.Single(handler.Requests[1].IfNoneMatch));
+        Assert.Equal("\"feed-v2\"", refreshed.ETag);
+    }
+
+    [Fact]
     public async Task GetLatestReleaseAsync_EtagCacheIsPerSlug()
     {
         var handler = new RecordingHandler((request, _) =>

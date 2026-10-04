@@ -3,15 +3,15 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 8D.1 — REVIEWED / ACCEPTED
-**Next:** Stage 8D.2 — WAITING ON PROD API DEPLOYMENT
-**Implementation authorization:** None; Stage 8D.2 requires PROD deployment, live verification and explicit Owner/Architect authorization.
+**Current phase:** Stage 8D.2 — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW
+**Next:** External Architect review of Stage 8D.2
+**Implementation authorization:** None; Stage 8D.2 implementation is complete and awaiting review.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8D.1 — REVIEWED / ACCEPTED | Stage 8D.2 — WAITING ON PROD API DEPLOYMENT |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8D.2 — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW | External Architect review |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 

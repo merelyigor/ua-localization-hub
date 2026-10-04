@@ -25,6 +25,9 @@ public partial class MainForm
             SetOperationState(OperationState.Idle);
             SetActionsEnabled(false);
             SetControlsDuringOperation(false);
+            _operationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                _gameSessionCts?.Token ?? CancellationToken.None);
+            var cancellationToken = _operationCts.Token;
 
             if (_gameRoot == null)
             {
@@ -39,13 +42,56 @@ public partial class MainForm
             }
 
             var mode = GetSelectedApiMode();
-            if (mode?.Current == null)
+            if (mode == null || string.IsNullOrWhiteSpace(mode.Slug))
             {
-                finalMessage = "Актуальний реліз відсутній.";
+                finalMessage = "Не вдалося визначити режим локалізації.";
                 return;
             }
 
-            var current = mode.Current;
+            SetOperationState(OperationState.LoadingApi);
+            var latest = await _apiClient.GetLatestReleaseAsync(mode.Slug, cancellationToken);
+            if (_exitAfterOperation || _closing || cancellationToken.IsCancellationRequested)
+                throw new OperationCanceledException(cancellationToken);
+
+            if (latest.Outcome is not (LatestReleaseOutcome.Modified or LatestReleaseOutcome.NotModified))
+            {
+                SetOperationState(latest.ErrorKind == ApiErrorKind.Cancelled
+                    ? OperationState.Cancelled
+                    : OperationState.Failed);
+                _logger.Warning(
+                    $"Install blocked by latest-release check: mode={mode.Slug}, outcome={latest.Outcome}, " +
+                    $"error={latest.ErrorKind}, detail={latest.ErrorMessage}, " +
+                    $"allowed={string.Join(",", latest.AllowedSlugs ?? Array.Empty<string>())}");
+                finalMessage = latest.Outcome switch
+                {
+                    LatestReleaseOutcome.UnknownMode =>
+                        "Режим локалізації більше не підтримується сервером. Оберіть інший режим або оновіть програму.",
+                    LatestReleaseOutcome.PatchUnconfirmed =>
+                        "Офіційний патч гри ще не підтверджено. Спробуйте пізніше.",
+                    _ when latest.ErrorKind == ApiErrorKind.Cancelled => "Встановлення скасовано.",
+                    _ => "Не вдалося перевірити актуальний реліз. Встановлення не виконано. Перевірте з'єднання та спробуйте ще раз."
+                };
+                return;
+            }
+
+            var current = latest.Data?.Current;
+            if (current == null)
+            {
+                SetOperationState(OperationState.Failed);
+                finalMessage = "Актуальний реліз для цього режиму зараз відсутній.";
+                return;
+            }
+
+            // Keep fresh transaction metadata isolated from the aggregate feed and its UI cards.
+            var transactionMode = new LocalizationMode
+            {
+                Slug = mode.Slug,
+                PublicName = mode.PublicName,
+                Description = mode.Description,
+                Audience = mode.Audience,
+                Current = current,
+                History = mode.History
+            };
 
             var compatResult = _compatService.Check(current);
             if (!compatResult.IsAllowed)
@@ -64,18 +110,25 @@ public partial class MainForm
             {
                 installedModeSlug = installedLoad.Value.ModeSlug;
                 installedPublicId = installedLoad.Value.PublicId;
-                var installedApiMode = _apiResponse?.Data?.Modes?
-                    .FirstOrDefault(m => string.Equals(m.Slug, installedModeSlug, StringComparison.Ordinal));
-                installedModeCurrent = installedApiMode?.Current;
+                if (string.Equals(installedModeSlug, mode.Slug, StringComparison.Ordinal))
+                {
+                    installedModeCurrent = current;
+                }
+                else
+                {
+                    var installedApiMode = _apiResponse?.Data?.Modes?
+                        .FirstOrDefault(m => string.Equals(m.Slug, installedModeSlug, StringComparison.Ordinal));
+                    installedModeCurrent = installedApiMode?.Current;
+                }
             }
 
             var gameLocPath = _gameDefinition.GetLocalizationFilePath(_gameRoot);
-            var factualState = await _stateService.ResolveAsync(installedModeCurrent, gameLocPath, gameRoot: _gameRoot);
+            var factualState = await _stateService.ResolveAsync(
+                installedModeCurrent, gameLocPath, cancellationToken, gameRoot: _gameRoot);
 
-            // Abort before any install transaction if a real application shutdown
-            // became pending while awaiting factual-state resolution (the operation
-            // CTS does not exist yet, so cancellation could not have been requested).
-            if (_exitAfterOperation || _closing)
+            // Do not cross the mutation boundary when shutdown/session cancellation
+            // arrives while resolving the installed file's factual state.
+            if (_exitAfterOperation || _closing || cancellationToken.IsCancellationRequested)
             {
                 _logger.Info("Install aborted before transaction start because application shutdown is pending.");
                 return;
@@ -83,7 +136,7 @@ public partial class MainForm
 
             var policy = InstallActionPolicy.Evaluate(
                 factualState.State, installedModeSlug, installedPublicId,
-                mode, current, compatResult, operationInProgress: false);
+                transactionMode, current, compatResult, operationInProgress: false);
 
             if (!policy.CanInstall)
             {
@@ -94,11 +147,31 @@ public partial class MainForm
                 return;
             }
 
+            if (GameTestInstallPolicy.RequiresConfirmation(current.GameTest))
+            {
+                var confirmation = GameTestInstallPolicy.BuildConfirmationMessage(current.GameTest);
+                var accepted = GameTestConfirmationForTest?.Invoke(current)
+                    ?? MessageBox.Show(
+                        this,
+                        confirmation,
+                        ApplicationBrand.DisplayName,
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+                if (!accepted)
+                {
+                    SetOperationState(OperationState.Cancelled);
+                    finalMessage = "Встановлення скасовано.";
+                    return;
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
             SetMessage("Встановлення локалізації...");
             SetProgress(0);
             SetOperationState(OperationState.Downloading);
 
-            _operationCts = new CancellationTokenSource();
             cancelButton.Visible = true;
             cancelButton.Enabled = true;
             UpdateCancelButtonVisibility(_operationState);
@@ -109,7 +182,7 @@ public partial class MainForm
             var progress = new Progress<DownloadProgress>(OnDownloadProgress);
 
             var result = await service.InstallReleaseAsync(
-                mode.Slug!, current, progress, _operationCts.Token);
+                transactionMode.Slug!, current, progress, cancellationToken);
 
             if (result.IsSuccess)
             {
