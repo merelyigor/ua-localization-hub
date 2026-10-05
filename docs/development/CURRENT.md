@@ -1,6 +1,6 @@
 # Current Engineering Context
 
-Оновлено: 2026-10-04
+Оновлено: 2026-10-05
 
 ## Project Purpose / Status
 
@@ -8,9 +8,9 @@
 
 Стабільний реліз: **v1.2.9**. Публічний stable release ID `396873313` опубліковано з tag `v1.2.9` на exact RC source SHA `5c2c3a71fac3f0b57405c3494db4327f2a02295d`; canonical application bundle містить один ZIP-asset. Public asset і його байти повторно перевірено. Offline/degraded release-feed implementation завершено та прийнято зовнішнім Architect.
 
-Поточний стан: **Stage 8D.2 — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW**. Стабільний реліз залишається **v1.2.9 — RELEASE REVIEWED / ACCEPTED**.
+Поточний стан: **Stage 8D.2 — REVIEWED / ACCEPTED; Owner final native smoke — ACCEPTED**. Стабільний реліз залишається **v1.2.9 — RELEASE REVIEWED / ACCEPTED**. Stage 8D.2 є прийнятою, але ще не випущеною зміною, що лишається у `docs/releases/NEXT.json`.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` records Stage 8D.1 client contract/readiness support as **REVIEWED / ACCEPTED** (Architect BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`); the canonical API contract independently matched that implementation. Stage 8D.2 activates the per-mode latest endpoint as a mandatory pre-install/update freshness gate. Read-only PROD verification confirmed latest HTTP 200 for `english-items`, matching aggregate/current metadata and an ETag; a conditional request also returned a valid HTTP 200, which the Hub correctly accepts as fresh authoritative metadata. HTTP 304 remains an optimization supported by the client, not an activation prerequisite. The server-side conditional-response behavior is handled independently outside this repository. `GET /api/public/v1/releases` remains the startup/feed/poller source. Fresh metadata is transaction-local; latest failures cannot fall back to aggregate metadata. `game_test=verified` proceeds normally; other, missing or unknown states require explicit confirmation. Stage 8D.2 awaits external Architect review. Stable release remains `v1.2.9 — RELEASE REVIEWED / ACCEPTED`.
+Owner-approved PRIMARY roadmap `localization-hub-multigame`: Stage 8D.1 and Stage 8D.2 are **REVIEWED / ACCEPTED**; Stage 8D.2 final Architect review has BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. Owner final smoke accepted the v15.95 custom neutral dark/gold confirmation dialog and v15.96 waiting-card presentation. During confirmation the card shows `Очікує підтвердження`; decline returns to factual state without mutation. Owner smoke also observed a real conditional latest request resolving as `Not Modified; cached metadata retained`. Valid 200 remains authoritative fresh metadata; 304 uses cache, and latest failures cannot fall back to aggregate metadata. `GET /api/public/v1/releases` remains the startup/feed/poller source. The Stage 8D.2 change is not in stable v1.2.9 and remains unreleased in NEXT. Stable release remains `v1.2.9 — RELEASE REVIEWED / ACCEPTED`.
 
 ## Architecture Summary
 
@@ -118,20 +118,20 @@ Owner-approved PRIMARY roadmap `localization-hub-multigame` records Stage 8D.1 c
 - [`docs/plans/archive/release-experience-polish.md`](../plans/archive/release-experience-polish.md) — completed archived plan
 - [`docs/ai-workflow/README.md`](../ai-workflow/README.md) — canonical orchestration, prompt, review та handoff contract
 - [`docs/plans/archive/code-quality-ux-improvements.md`](../plans/archive/code-quality-ux-improvements.md) — completed archived roadmap
-- [`docs/releases/v1.2.8.md`](../releases/v1.2.8.md) — current stable release archive
-- [`history/2026-09.md`](history/2026-09.md) — recent engineering journal
+- [`docs/releases/v1.2.9.md`](../releases/v1.2.9.md) — current stable release archive
+- [`history/2026-10.md`](history/2026-10.md) — current engineering journal
 
 ## Current Task Handoff
 
 - v1.2.3 release cycle is completed and archived.
 - Offline/degraded release-feed mode is completed, reviewed and accepted; `offline-degraded-reliability` is archived.
-- `game-boundary-refactoring` is archived; Stage 1 and Stage 2 are reviewed/accepted. `localization-hub-multigame` is the sole ACTIVE PRIMARY roadmap; Stage 0 through Stage 8A, Stage 8C and Stage 8D.1 are reviewed/accepted. Stage 8D.2 is implemented/validated and pending external Architect review. Stage 8B remains optional/not started; Stage 9 awaits technical integration data; Stage 10 is not started.
+- `game-boundary-refactoring` is archived; Stage 1 and Stage 2 are reviewed/accepted. `localization-hub-multigame` remains the sole ACTIVE PRIMARY roadmap; Stage 8D.1 and Stage 8D.2 are **REVIEWED / ACCEPTED**, and Owner final smoke for 8D.2 is accepted. Stage 8B remains OPTIONAL / NOT STARTED; Stage 9 awaits real Where Winds Meet / Winds4UA technical integration data; Stage 10 is NOT STARTED.
 - v1.2.5 release cycle completed; public Release verified and `NEXT.json` reset for the next cycle.
 - v15.64/v15.65 — **REVIEWED / ACCEPTED; OWNER VISUAL SMOKE ACCEPTED**: для трьох і більше режимів локалізації додано компактний minimum window width і збережено його під час semantic rebuild; single-mode global status width збережено.
 - v1.2.7 — **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**: public Release ID `391117230` опубліковано на tag `v1.2.7`, який вказує на exact approved RC SHA `b21118d1ec8e6d0342fb0e47544e911fcb875739`; canonical ZIP і внутрішні hashes повторно перевірено, Owner native smoke exact RC прийнято.
 - v1.2.8 — **RELEASED / PUBLIC VERIFIED**: public Release ID `391585430` опубліковано на tag `v1.2.8`, який вказує на exact RC SHA `7cb740d55bc7baeb5aa9f91365114e68bb88eff9`; public asset повторно завантажено й перевірено. Owner live legacy update accepted.
-- `localization-hub-multigame` — **ACTIVE / PRIMARY**: Stage 0 complete; Stages 1–8A, 8C and 8D.1 are **REVIEWED / ACCEPTED**. Stage 8D.2 — **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW**; Stage 8B — **OPTIONAL / NOT STARTED**; Stage 9 — **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 — **NOT STARTED**.
-- Next action: external Architect review of Stage 8D.2. No further implementation stage is currently authorized. The v1.2.9 release lifecycle is complete; this task creates no release/tag.
+- `localization-hub-multigame` — **ACTIVE / PRIMARY**: Stage 0 complete; Stages 1–8A, 8C, 8D.1 and 8D.2 are **REVIEWED / ACCEPTED**. Stage 8D.2 Owner final smoke accepted. Stage 8B — **OPTIONAL / NOT STARTED**; Stage 9 — **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U); Stage 10 — **NOT STARTED**.
+- No implementation is currently authorized: **WORK CYCLE COMPLETE / OWNER DECISION REQUIRED**. Owner may provide real WWM/Winds4UA technical integration data for Stage 9, explicitly authorize optional Stage 8B, or define a new bounded task. The v1.2.9 release lifecycle is complete; Stage 8D.2 remains unreleased in NEXT.
 - Stage 8C final validation: CI #229 / run `36106040918` SUCCESS for `d726c939e0e6365ea2efd631e60cdf13528e836e`; Release build — 0 warnings / 0 errors; focused content-fit/MainForm/GameCatalog/session-host — 76 passed; full Release suite — 1008 passed / 0 failed / 0 skipped; release-note generator — 24 assertions and resolver — 13 passed; `git diff --check` passed.
 - v1.2.9: Release ID `396873313`, published `2026-09-25T19:29:42Z`; annotated tag peels to exact RC source `5c2c3a71fac3f0b57405c3494db4327f2a02295d`. RC #37 / run `36166009527`, artifact ID `10878006746`; public asset ID `589080502`, ZIP 67,905,336 bytes / SHA-256 `c43ae054a3a349158607d5de69f923df216a8f4db9ade06c61545e178400b298`. Internal EXE SHA-256 `610329b4b59eef49092a9a721d88e4b4919aff914764c82cd2221d3584f9910d`, FileVersion `1.2.9.0`, ProductVersion `1.2.9`; Owner RC smoke accepted, public re-download and exact bundle verification passed. Release archive: [`docs/releases/v1.2.9.md`](../releases/v1.2.9.md).
 - v1.2.9 lifecycle: **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**. Owner live self-update from public v1.2.8 to public v1.2.9: **PASS / ACCEPTED**. Final Architect release review: **ACCEPTED**, BLOCKER `0`, IMPORTANT `0`. `NEXT.json` remains canonical empty schema-v1 after archiving the released copy.
