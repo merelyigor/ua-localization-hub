@@ -18,6 +18,7 @@ internal sealed class LocalizationModeCard : Control
     public event EventHandler? SelectionRequested;
     public bool IsSelected { get => _selected; set { if (_selected != value) { _selected = value; Invalidate(); } } }
     public bool IsInstalled { get => _installed; set { if (_installed != value) { _installed = value; Invalidate(); } } }
+    internal string? StateTextForTest => _presentation.StateText;
 
     public LocalizationModeCard(LocalizationMode mode)
     {

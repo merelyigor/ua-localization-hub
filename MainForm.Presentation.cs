@@ -351,18 +351,21 @@ public partial class MainForm
     private void ApplyModeCardPresentations(
         LocalizationState factualState,
         string? installedModeSlug,
-        string? installedPublicId)
+        string? installedPublicId,
+        bool? operationInProgressOverride = null)
     {
+        var operationInProgress = operationInProgressOverride ?? _operationInProgress;
         var selectedSlug = GetSelectedModeSlug();
         foreach (var card in modesFlowPanel.Controls.OfType<LocalizationModeCard>())
         {
             var compatibility = _compatService.Check(card.Mode.Current);
             card.ApplyPresentation(ModeCardPresentationPolicy.Create(
                 factualState, installedModeSlug, installedPublicId, card.Mode, compatibility,
-                _operationInProgress,
-                _operationInProgress && string.Equals(selectedSlug, card.ModeSlug, StringComparison.Ordinal),
+                operationInProgress,
+                operationInProgress && string.Equals(selectedSlug, card.ModeSlug, StringComparison.Ordinal),
                 allowWriteActions: _releaseFeedSource == ReleaseFeedSource.Live
-                    && AllowsLocalizationWriteActions()));
+                    && AllowsLocalizationWriteActions(),
+                awaitingConfirmation: _awaitingGameTestConfirmation));
         }
         RefreshModeCardLayout();
     }

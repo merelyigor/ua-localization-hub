@@ -78,6 +78,7 @@ public partial class MainForm : Form
     private bool _initializing;
     private bool _suppressModeChanged;
     private volatile bool _operationInProgress;
+    private bool _awaitingGameTestConfirmation;
     private volatile bool _closing;
     private bool _exitAfterOperation;
     private LocalizationState _lastResolvedState;
@@ -389,6 +390,10 @@ public partial class MainForm : Form
     internal int InitialClientHeightForTest => _initialClientHeight;
     internal int ModeSectionHeightForTest => modeGroupBox.Height;
     internal Func<CurrentRelease, bool>? GameTestConfirmationForTest { get; set; }
+    internal string? SelectedModeCardStateTextForTest => modesFlowPanel.Controls
+        .OfType<LocalizationModeCard>()
+        .FirstOrDefault(card => string.Equals(card.ModeSlug, GetSelectedModeSlug(), StringComparison.Ordinal))?
+        .StateTextForTest;
     internal OperationState OperationStateForTest => _operationState;
     internal Task HandleInstallForTestAsync() => HandleInstallAsync();
 

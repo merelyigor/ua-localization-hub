@@ -24,7 +24,8 @@ internal static class ModeCardPresentationPolicy
         CompatibilityResult compatibility,
         bool operationInProgress,
         bool activeTarget,
-        bool allowWriteActions = true)
+        bool allowWriteActions = true,
+        bool awaitingConfirmation = false)
     {
         var current = mode.Current;
         if (current == null)
@@ -39,7 +40,9 @@ internal static class ModeCardPresentationPolicy
 
         if (operationInProgress)
         {
-            return new(activeTarget ? "Виконується операція" : StateTextForExisting(exact, sameMode, factualState),
+            return new(activeTarget
+                    ? awaitingConfirmation ? "Очікує підтвердження" : "Виконується операція"
+                    : StateTextForExisting(exact, sameMode, factualState),
                 activeTarget ? ModeCardTone.Busy : exact ? ModeCardTone.Success : ModeCardTone.Neutral,
                 activeTarget ? null : ActionTextFor(sameMode, factualState), false, exact, activeTarget, null);
         }

@@ -805,7 +805,15 @@ public sealed class MainFormLifecycleIntegrationTests
         await File.WriteAllBytesAsync(
             BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot), originalBytes);
 
-        await fixture.InstallForTestAsync(_ => false);
+        string? stateDuringConfirmation = null;
+        await fixture.InstallForTestAsync(_ =>
+        {
+            stateDuringConfirmation = fixture.Form.SelectedModeCardStateTextForTest;
+            return false;
+        });
+
+        Assert.Equal("Очікує підтвердження", stateDuringConfirmation);
+        Assert.Null(fixture.Form.SelectedModeCardStateTextForTest);
 
         Assert.Equal(originalBytes, await File.ReadAllBytesAsync(
             BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));

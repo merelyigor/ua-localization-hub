@@ -151,8 +151,16 @@ public partial class MainForm
 
             if (GameTestInstallPolicy.RequiresConfirmation(current.GameTest))
             {
+                _awaitingGameTestConfirmation = true;
+                ApplyModeCardPresentations(_lastResolvedState, _lastInstalledModeSlug, _lastInstalledPublicId);
                 var accepted = GameTestConfirmationForTest?.Invoke(current)
                     ?? GameTestConfirmationDialog.ShowConfirmation(this, current.GameTest);
+                _awaitingGameTestConfirmation = false;
+                ApplyModeCardPresentations(
+                    _lastResolvedState,
+                    _lastInstalledModeSlug,
+                    _lastInstalledPublicId,
+                    operationInProgressOverride: accepted);
                 if (!accepted)
                 {
                     SetOperationState(OperationState.Cancelled);
@@ -214,6 +222,7 @@ public partial class MainForm
             cancelButton.Enabled = false;
             _operationCts?.Dispose();
             _operationCts = null;
+            _awaitingGameTestConfirmation = false;
             _operationInProgress = false;
             SetControlsDuringOperation(true);
 

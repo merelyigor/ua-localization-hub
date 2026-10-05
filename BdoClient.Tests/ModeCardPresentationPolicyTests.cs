@@ -124,7 +124,21 @@ public sealed class ModeCardPresentationPolicyTests
     {
         var presentation = Create(LocalizationState.NotInstalled, null, null, Mode("full", "A"), operation: true, activeTarget: true);
         Assert.True(presentation.IsBusy);
+        Assert.Equal("Виконується операція", presentation.StateText);
         Assert.False(presentation.ActionEnabled);
+    }
+
+    [Fact]
+    public void Operation_TargetAwaitingConfirmation_ShowsNeutralWaitingStateAndDisablesAction()
+    {
+        var presentation = ModeCardPresentationPolicy.Create(
+            LocalizationState.NotInstalled, null, null, Mode("full", "A"), CompatibilityResult.Allowed(),
+            operationInProgress: true, activeTarget: true, awaitingConfirmation: true);
+
+        Assert.Equal("Очікує підтвердження", presentation.StateText);
+        Assert.Equal(ModeCardTone.Busy, presentation.Tone);
+        Assert.False(presentation.ActionEnabled);
+        Assert.Null(presentation.ActionText);
     }
 
     [Fact]
@@ -139,8 +153,8 @@ public sealed class ModeCardPresentationPolicyTests
         Assert.False(presentation.ActionEnabled);
     }
 
-    private static ModeCardPresentation Create(LocalizationState state, string? installedSlug, string? installedId, LocalizationMode mode, CompatibilityResult? compatibility = null, bool operation = false, bool activeTarget = false) =>
-        ModeCardPresentationPolicy.Create(state, installedSlug, installedId, mode, compatibility ?? CompatibilityResult.Allowed(), operation, activeTarget);
+    private static ModeCardPresentation Create(LocalizationState state, string? installedSlug, string? installedId, LocalizationMode mode, CompatibilityResult? compatibility = null, bool operation = false, bool activeTarget = false, bool awaitingConfirmation = false) =>
+        ModeCardPresentationPolicy.Create(state, installedSlug, installedId, mode, compatibility ?? CompatibilityResult.Allowed(), operation, activeTarget, awaitingConfirmation: awaitingConfirmation);
 
     private static LocalizationMode Mode(string slug, string id) => new()
     {
