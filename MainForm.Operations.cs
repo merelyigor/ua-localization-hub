@@ -151,15 +151,8 @@ public partial class MainForm
 
             if (GameTestInstallPolicy.RequiresConfirmation(current.GameTest))
             {
-                var confirmation = GameTestInstallPolicy.BuildConfirmationMessage(current.GameTest);
                 var accepted = GameTestConfirmationForTest?.Invoke(current)
-                    ?? MessageBox.Show(
-                        this,
-                        confirmation,
-                        ApplicationBrand.DisplayName,
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Warning,
-                        MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+                    ?? GameTestConfirmationDialog.ShowConfirmation(this, current.GameTest);
                 if (!accepted)
                 {
                     SetOperationState(OperationState.Cancelled);
