@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NO — WORK CYCLE COMPLETE / OWNER DECISION REQUIRED**
-Current phase: Stage 8D.2 — REVIEWED / ACCEPTED; Owner final smoke accepted
-Next action: Owner decision required: provide real WWM/Winds4UA technical integration data for Stage 9, explicitly authorize optional Stage 8B, or define a new bounded task.
+Implementation authorization: **NO — STAGE 9 PENDING EXTERNAL ARCHITECT REVIEW; STAGE 10 NOT AUTHORIZED**
+Current phase: Stage 9 — ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW
+Next action: external Architect review; before Stage 10, obtain Owner/Winds4UA decision on identical `english-items` / `english-terms` payloads.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -17,7 +17,7 @@ Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 - `Black Desert Online` — localization project `BDO UA Translate`, [bdo-ua.com.ua](https://bdo-ua.com.ua/), **INTEGRATED / AVAILABLE**.
 - `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **PLANNED / INTEGRATION PENDING**.
 
-Where Winds Meet is a known product target, not a registered runtime game. Its API, detection, install, patch, restore, backup and compatibility contract are not yet available and must not be invented.
+Where Winds Meet is a known product target, not a registered runtime game. Stage 9 has documented public API, Steam detection, archive and pre-Hub restore contracts. Owner-approved stable ID is `where-winds-meet`; initial future scope is Steam-first. The identical `english-items` / `english-terms` payload decision blocks Stage 10; compatibility remains unconfirmed by API and must not be invented.
 
 ## Context
 
@@ -57,7 +57,7 @@ Existing game-scoped config/state/backups remain isolated. Before multiple live 
 
 ### API boundary
 
-BDO API DTOs and `/releases` contract remain BDO implementation detail until the real Where Winds Meet / Winds4UA contract exists. At that point compare the concrete APIs and extract only proven common application-facing semantics; do not invent universal DTOs or a feed framework.
+BDO API DTOs and `/releases` contract remain BDO implementation detail. The observed Where Winds Meet / Winds4UA API is documented in Stage 9, but restore-original and game-build compatibility are unresolved; compare concrete contracts only after Stage 9 is resolved, and extract only proven common application-facing semantics. Do not invent universal DTOs or a feed framework.
 
 ### Visible rebrand
 
@@ -77,7 +77,7 @@ Visible rebrand and technical EXE/package/autostart rename are separate. First u
 
 ### Second-game onboarding gate
 
-Before Where Winds Meet implementation, Owner must supply actual stable game id, launchers and Steam App ID if applicable, registry/detection facts, validation markers, target files, patch/version detection, API endpoints and JSON schema, modes/releases, public ids/version/hash/size/download metadata, compatibility semantics, restore-original strategy, backup/rollback requirements and selector assets. No architecture decision for WWM is made from assumptions.
+Before Stage 10, retain the Owner-approved stable ID `where-winds-meet`, Steam-first scope, pre-Hub restore semantics and neutral confirmation for compatibility not confirmed by API. Official launcher remains deferred. The remaining required external decision is whether the v2.9 `english-items` / `english-terms` artifacts are intentionally equivalent, need correction, or should be represented by one mode temporarily. No architecture decision for WWM is made from assumptions.
 
 ## Roadmap
 
@@ -159,11 +159,11 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 ### Stage 9 — Where Winds Meet integration contract analysis
 
-WAITING ON TECHNICAL INTEGRATION DATA. Perform read-only analysis of the actual Where Winds Meet / Winds4UA (W4U) detection, API, install, patch, restore and backup contract. No assumptions or implementation.
+**ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW.** Read-only evidence and final Owner decisions are recorded in [Where Winds Meet integration contract](../../design/where-winds-meet-integration-contract.md): approved stable ID `where-winds-meet`, Steam-first AppID `3564740`, two-file pre-Hub restore semantics, Official launcher deferred, and no hard compatibility claim. External ETag and stale download-page observations are non-blocking. **Stage 10 is blocked until Owner/Winds4UA resolves whether the identical `english-items` / `english-terms` payloads are intentional, corrected, or should temporarily expose only one mode.** No production WWM registration or game-file operation occurred.
 
 ### Stage 10 — Real Where Winds Meet implementation
 
-Register and implement Where Winds Meet / Winds4UA (W4U) through the proven runtime boundary only after Stage 9 supplies its real contract, then validate selector behavior, BDO ↔ WWM ↔ BDO lifecycle, cross-game isolation and game-file rollback safety.
+**NOT STARTED / NOT AUTHORIZED / BLOCKED ON EXTERNAL MODE CONTRACT DECISION.** Do not register or implement Where Winds Meet / Winds4UA (W4U) until the Owner/Winds4UA mode-content decision is recorded and Owner explicitly authorizes Stage 10. Initial scope is Steam-first; Official launcher is deferred. Any multi-file install/backup/rollback design requires **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**.
 
 Current state: **NOT STARTED**.
 
@@ -186,11 +186,11 @@ Current state: **NOT STARTED**.
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-The roadmap depends on v1.2.7 release completion and explicit Owner activation. Stage 9 is blocked on real Where Winds Meet / Winds4UA technical integration data.
+The roadmap depends on v1.2.7 release completion and explicit Owner activation. Stage 9 has partial real Where Winds Meet / Winds4UA data but remains blocked on the original/restore and compatibility contracts documented in the Stage 9 analysis.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stages 1–8A, 8C, 8D.1 and 8D.2 are **REVIEWED / ACCEPTED**. Stage 8D.2 external Architect review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; Owner final native smoke is accepted. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 remains **WAITING ON TECHNICAL INTEGRATION DATA** for Where Winds Meet / Winds4UA (W4U), and Stage 10 is **NOT STARTED**. No implementation is currently authorized: **WORK CYCLE COMPLETE / OWNER DECISION REQUIRED**. Stage 9 requires real Owner-supplied WWM/Winds4UA integration data.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stages 1–8A, 8C, 8D.1 and 8D.2 are **REVIEWED / ACCEPTED**. Stage 8D.2 external Architect review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; Owner final native smoke is accepted. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 is **ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW** with Owner decisions recorded: `where-winds-meet`, Steam-first, pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 remains **NOT STARTED / NOT AUTHORIZED / BLOCKED ON EXTERNAL MODE CONTRACT DECISION** for the identical `english-items` / `english-terms` payloads. **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Implementation authorization: **NO — PENDING STAGE 9 EXTERNAL REVIEW AND MODE DECISION**.
 
 ### v1.2.9 release cycle
 

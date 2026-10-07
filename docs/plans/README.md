@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 8D.2 — REVIEWED / ACCEPTED; OWNER FINAL SMOKE ACCEPTED
-**Next:** WORK CYCLE COMPLETE / OWNER DECISION REQUIRED
-**Implementation authorization:** None.
+**Current phase:** Stage 9 — ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW
+**Next:** External Architect review; Stage 10 awaits the external mode-content decision
+**Implementation authorization:** None — Stage 10 is NOT AUTHORIZED.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 8D.2 — REVIEWED / ACCEPTED; Owner final smoke accepted | WORK CYCLE COMPLETE / OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 9 — ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW | External review; Stage 10 blocked on mode-content decision |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
-Owner next decision: provide real Where Winds Meet / Winds4UA technical integration data for Stage 9, explicitly authorize optional Stage 8B, or define a new bounded task. The plan remains ACTIVE / PRIMARY; no stage is currently authorized.
+Stage 9 read-only evidence and Owner decisions are recorded in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY; no implementation is authorized. Before Stage 10, Owner/Winds4UA must decide how to handle the identical `english-items` / `english-terms` v2.9 payloads. Stage 8B remains OPTIONAL / NOT STARTED.
 
 ## Backlog
 
