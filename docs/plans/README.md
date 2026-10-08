@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 9 — ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW
-**Next:** External Architect review; Stage 10 awaits the external mode-content decision
-**Implementation authorization:** None — Stage 10 is NOT AUTHORIZED.
+**Current phase:** Stage 9 — REVIEWED / ACCEPTED
+**Next:** Stage 10 Where Winds Meet Steam-first implementation as a separate bounded task, with HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED
+**Implementation authorization:** None in this documentation task; Stage 10 requires its own explicit implementation authorization.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 9 — ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW | External review; Stage 10 blocked on mode-content decision |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 9 — REVIEWED / ACCEPTED | Stage 10 Steam-first implementation task; high-risk pre-commit review |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
-Stage 9 read-only evidence and Owner decisions are recorded in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY; no implementation is authorized. Before Stage 10, Owner/Winds4UA must decide how to handle the identical `english-items` / `english-terms` v2.9 payloads. Stage 8B remains OPTIONAL / NOT STARTED.
+Stage 9 read-only evidence, current 2026-10-08 Winds4UA production API/package facts, Owner decisions, and external Architect acceptance are recorded in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10 is NOT STARTED and requires a separate explicit task authorization; its multi-file mutation requires high-risk pre-commit Architect review. The current API marks `english-items` and `english-terms` unavailable, so the historical v2.9 identical-payload observation is no longer a blocker. Stage 8B remains OPTIONAL / NOT STARTED.
 
 ## Backlog
 

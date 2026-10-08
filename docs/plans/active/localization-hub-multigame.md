@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NO — STAGE 9 PENDING EXTERNAL ARCHITECT REVIEW; STAGE 10 NOT AUTHORIZED**
-Current phase: Stage 9 — ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW
-Next action: external Architect review; before Stage 10, obtain Owner/Winds4UA decision on identical `english-items` / `english-terms` payloads.
+Implementation authorization: **NO — STAGE 9 REVIEWED / ACCEPTED; STAGE 10 REQUIRES A SEPARATE BOUNDED TASK AUTHORIZATION**
+Current phase: Stage 9 — REVIEWED / ACCEPTED
+Next action: prepare a separate Stage 10 Steam-first implementation task using HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -17,7 +17,7 @@ Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 - `Black Desert Online` — localization project `BDO UA Translate`, [bdo-ua.com.ua](https://bdo-ua.com.ua/), **INTEGRATED / AVAILABLE**.
 - `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **PLANNED / INTEGRATION PENDING**.
 
-Where Winds Meet is a known product target, not a registered runtime game. Stage 9 has documented public API, Steam detection, archive and pre-Hub restore contracts. Owner-approved stable ID is `where-winds-meet`; initial future scope is Steam-first. The identical `english-items` / `english-terms` payload decision blocks Stage 10; compatibility remains unconfirmed by API and must not be invented.
+Where Winds Meet is a known product target, not a registered runtime game. Stage 9 is reviewed and accepted with current production API, Steam detection, package, and pre-Hub restore evidence. Owner-approved stable ID is `where-winds-meet`; initial future scope is Steam-first. Modes are dynamic and installable only when the API marks them available and supplies the selected package. Compatibility remains unconfirmed by API and must not be invented.
 
 ## Context
 
@@ -77,7 +77,7 @@ Visible rebrand and technical EXE/package/autostart rename are separate. First u
 
 ### Second-game onboarding gate
 
-Before Stage 10, retain the Owner-approved stable ID `where-winds-meet`, Steam-first scope, pre-Hub restore semantics and neutral confirmation for compatibility not confirmed by API. Official launcher remains deferred. The remaining required external decision is whether the v2.9 `english-items` / `english-terms` artifacts are intentionally equivalent, need correction, or should be represented by one mode temporarily. No architecture decision for WWM is made from assumptions.
+For Stage 10, retain the Owner-approved stable ID `where-winds-meet`, Steam-first scope, exact pre-Hub restore semantics, and neutral confirmation because compatibility is not confirmed by API. Official launcher remains deferred. The current API marks `english-items` and `english-terms` unavailable and provides no installable artifacts for them; do not infer equivalence or expose them as installable. Stage 9's historical v2.9 content observation is not a current blocker. No architecture decision for WWM is made from assumptions.
 
 ## Roadmap
 
@@ -159,11 +159,11 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 ### Stage 9 — Where Winds Meet integration contract analysis
 
-**ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW.** Read-only evidence and final Owner decisions are recorded in [Where Winds Meet integration contract](../../design/where-winds-meet-integration-contract.md): approved stable ID `where-winds-meet`, Steam-first AppID `3564740`, two-file pre-Hub restore semantics, Official launcher deferred, and no hard compatibility claim. External ETag and stale download-page observations are non-blocking. **Stage 10 is blocked until Owner/Winds4UA resolves whether the identical `english-items` / `english-terms` payloads are intentional, corrected, or should temporarily expose only one mode.** No production WWM registration or game-file operation occurred.
+**REVIEWED / ACCEPTED.** External Architect review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. Read-only evidence and final Owner decisions are recorded in [Where Winds Meet integration contract](../../design/where-winds-meet-integration-contract.md): approved stable ID `where-winds-meet`, Steam-first AppID `3564740`, current production `/api/public/v1/releases/latest` contract, verified v2.6.2 two-file package, exact pre-Hub restore semantics, Official launcher deferred, and no hard compatibility claim. Current API exposes only `ukrainian/default` as available; `english-items` and `english-terms` are unavailable and have no current package. Their older v2.9 identical-content observation is not a Stage 10 blocker and does not imply mode interchangeability. No production WWM registration or game-file operation occurred.
 
 ### Stage 10 — Real Where Winds Meet implementation
 
-**NOT STARTED / NOT AUTHORIZED / BLOCKED ON EXTERNAL MODE CONTRACT DECISION.** Do not register or implement Where Winds Meet / Winds4UA (W4U) until the Owner/Winds4UA mode-content decision is recorded and Owner explicitly authorizes Stage 10. Initial scope is Steam-first; Official launcher is deferred. Any multi-file install/backup/rollback design requires **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**.
+**NOT STARTED.** The obsolete identical-mode blocker is removed: the authoritative current API marks the two English modes unavailable, so only API-available packages are install candidates. Stage 10 still requires a separate bounded implementation task and explicit authorization. Initial scope is Steam-first; Official launcher is deferred. Any multi-file install/backup/rollback design requires **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED** before commit.
 
 Current state: **NOT STARTED**.
 
@@ -186,11 +186,11 @@ Current state: **NOT STARTED**.
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-The roadmap depends on v1.2.7 release completion and explicit Owner activation. Stage 9 has partial real Where Winds Meet / Winds4UA data but remains blocked on the original/restore and compatibility contracts documented in the Stage 9 analysis.
+The roadmap depends on v1.2.7 release completion and explicit Owner activation. Stage 9 has established and externally accepted the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 remains a separate high-risk implementation task; do not infer stock restore or game-build compatibility.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stages 1–8A, 8C, 8D.1 and 8D.2 are **REVIEWED / ACCEPTED**. Stage 8D.2 external Architect review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; Owner final native smoke is accepted. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 is **ANALYZED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW** with Owner decisions recorded: `where-winds-meet`, Steam-first, pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 remains **NOT STARTED / NOT AUTHORIZED / BLOCKED ON EXTERNAL MODE CONTRACT DECISION** for the identical `english-items` / `english-terms` payloads. **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Implementation authorization: **NO — PENDING STAGE 9 EXTERNAL REVIEW AND MODE DECISION**.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8D.2 Owner final native smoke is accepted. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. The current API exposes only the Ukrainian mode as installable; the old v2.9 English-mode payload observation no longer blocks Stage 10. Stage 10 remains **NOT STARTED** and requires a separate bounded task authorization. Its multi-file install/backup/rollback requires **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Implementation authorization: **NO — awaiting a separate Stage 10 task prompt**.
 
 ### v1.2.9 release cycle
 
