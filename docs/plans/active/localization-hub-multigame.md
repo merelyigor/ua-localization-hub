@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NO FURTHER PRODUCT-CODE CHANGES — CORRECTIVE COMMIT/PUSH AUTHORIZED**
-Current phase: Stage 10 corrective — IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE
-Next action: corrective commit and exact-SHA CI, then final external Architect acceptance; Owner acceptance remains pending.
+Implementation authorization: **CORRECTIVE IMPLEMENTATION AUTHORIZED — HIGH-RISK PRE-COMMIT REVIEW REQUIRED**
+Current phase: Stage 10 real install/rollback corrective — IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW
+Next action: external review of this corrective patch; real-game recovery/install/restore remains unauthorized until a separate Owner gate.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -77,7 +77,7 @@ Visible rebrand and technical EXE/package/autostart rename are separate. First u
 
 ### Second-game onboarding gate
 
-Stage 10 implements the Owner-approved stable ID `where-winds-meet`, Steam-first detection, exact pre-Hub restore semantics, and neutral confirmation because compatibility is not confirmed by API. Official launcher remains deferred. Current API availability controls mode actions; `english-items` and `english-terms` stay unavailable until matching current artifacts are provided. The historical v2.9 content observation is not a current blocker.
+Stage 10 implements the Owner-approved stable ID `where-winds-meet`, Steam-first detection, exact pre-Hub restore semantics, and neutral confirmation because compatibility is not confirmed by API. Official launcher remains deferred. Current API availability controls mode actions; unavailable or unresolvable modes are hidden. Exact-current installation shows `✓ Встановлено` without an Update action; a changed package for that same mode alone offers `Оновити`; another installable mode offers `Встановити`. The restore button is labeled `Відновити оригінал`, but restores the trusted initial pre-Hub baseline, not proven stock Steam bytes; invalid/missing baseline disables it. `english-items` and `english-terms` stay unavailable until matching current artifacts are provided. The historical v2.9 content observation is not a current blocker.
 
 ## Roadmap
 
@@ -163,7 +163,9 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 ### Stage 10 — Real Where Winds Meet Steam-first integration
 
-**IMPLEMENTED / VALIDATED; CORRECTIVE NATIVE SMOKE PASS; PENDING FINAL ARCHITECT ACCEPTANCE.** Base implementation pre-commit review was accepted: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; reviewed full patch SHA-256 `be91c371ecd78d180303274bc0b9b22dba42d8c2dd386ab970b1b79edb85045e`. Added WWM as the second production game while preserving BDO-specific API/install/storage boundaries. Steam detection is manifest/library based with WWM EXE + locale markers. Dedicated latest API/DTO/package resolution keeps modes dynamic and requires a fresh available package before every mutation. ZIP outer size/SHA and strict two-target allow-list are verified in staging. `WwmInstallService` journals two-file transactions, keeps separate pre-Hub and per-operation snapshots, verifies writes, rolls back both files plus state, recovers interrupted transactions, and restores exact pre-Hub bytes/deletes previously absent files. Build ID is only a snapshot-staleness guard; API does not confirm compatibility, so mutation requires neutral confirmation. WWM state is game-scoped and versioned. Official launcher remains deferred. Corrective native smoke verified that the transient game-switch loading message is retired and operation state settles to `Idle` after BDO→WWM and WWM→BDO→WWM; API/recovery messages remain preserved. Owner acceptance and final Architect review remain pending; Stage 10 is unreleased.
+**IMPLEMENTED / VALIDATED; NEEDS CORRECTION.** The base implementation pre-commit review was accepted, and the earlier switch-presentation correction passed native smoke. Owner's real install attempt exposed a ReadOnly-target replacement failure; the failed journal, operation backups, and pre-Hub snapshot are preserved. The current correction adds phase-aware transaction diagnostics, preserves/restores target attributes while safely replacing ReadOnly files, distinguishes temp preparation from target mutation, serializes per-config load/save and uses unique config temp names, and shows WWM as `Доступно`. This correction is validated on synthetic fixtures only and awaits external pre-commit review. No real-game recovery/install/restore was performed during this task; that E2E gate requires separate Owner authorization. Stage 10 remains unreleased.
+
+Owner UX addendum: unavailable modes are omitted, saved unavailable selection falls back to the first installable card, exact-current packages show `✓ Встановлено` without an action, and only a different package for the installed mode shows `Доступне оновлення` / `Оновити`. The restore button says `Відновити оригінал` while its validated data contract remains exact initial pre-Hub baseline—not asserted Steam stock. The action requires valid managed state, snapshot cycle ownership/integrity, unchanged targets and build-safety checks.
 
 No real game install/restore was performed. This is high-risk multi-file mutation; the required external pre-commit Architect review of the base implementation is accepted. The switch-loading presentation correction passed local native smoke; final Architect acceptance remains pending. Owner acceptance is not claimed. Stage 10 remains unreleased.
 
@@ -186,11 +188,11 @@ No real game install/restore was performed. This is high-risk multi-file mutatio
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 established the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implements the bounded Steam-only runtime. The base implementation pre-commit review is accepted (BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0); the corrective switch-presentation change is locally validated and native-smoked. Next: corrective exact-SHA CI, then final external Architect acceptance; Owner acceptance remains pending.
+Stage 9 established the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. The bounded Stage 10 runtime has a real install/rollback blocker under correction. Current corrective patch remains uncommitted and requires external pre-commit Architect review. After review, the real failed transaction recovery and install/verify/restore E2E scenario still requires a separate explicit Owner authorization.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 corrective switch-presentation change is **IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE**; Owner acceptance remains pending. Stable public release remains v1.2.9; this implementation is unreleased.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW** for the real install/rollback correction; real-game recovery/E2E install/restore remains unauthorized. Stable public release remains v1.2.9; Stage 10 is unreleased.
 
 ### v1.2.9 release cycle
 

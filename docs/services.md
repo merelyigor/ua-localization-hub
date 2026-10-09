@@ -700,4 +700,4 @@ WWM session використовує окремі bounded компоненти:
 - `WwmInstallService` — зберігає pre-Hub snapshot і per-operation prior state, веде game-scoped transaction journal, замінює/створює обидва файли, верифікує їх і відновлює обидва targets/state при rollback. Startup recovery розрізняє завершений commit від незавершеної транзакції.
 - `WwmReleaseFeedPoller` — WWM-specific polling без перетворення feed у BDO `ReleasesResponse`.
 
-WWM compatibility із конкретним Steam build не підтверджується API; перед кожним install/update потрібне нейтральне explicit confirmation. Restore означає повернення до точного pre-Hub стану (`Відновити попередній стан`), не до гарантованих stock bytes. При зміні Steam build stale pre-Hub restore блокується.
+WWM compatibility із конкретним Steam build не підтверджується API; перед кожним install/update потрібне нейтральне explicit confirmation. Кнопка має UX-назву `Відновити оригінал`, але операція повертає лише точний довірений початковий pre-Hub стан поточного циклу, не гарантовані stock bytes. Без валідного snapshot/ownership/build або при змінених target-файлах відновлення заблоковане.

@@ -32,6 +32,8 @@ public sealed class WwmInstallService
     internal Action<int>? AfterTargetAppliedForTest { get; set; }
     internal Action? BeforeStateSaveForTest { get; set; }
     internal Action? BeforeRestoreJournalForTest { get; set; }
+    internal Action<string, string>? BeforeGameTempWriteForTest { get; set; }
+    internal Action<string, string>? BeforeTargetReplaceForTest { get; set; }
 
     public WwmInstallService(HttpClient httpClient, GamePersistencePaths persistencePaths, WwmStateStore store, ILogger logger,
         WwmGameDefinition? definition = null)
@@ -158,6 +160,32 @@ public sealed class WwmInstallService
         return await RestoreSnapshotTransactionAsync(gameRoot, currentBuildId, snapshot, token).ConfigureAwait(false);
     }
 
+    public async Task<(bool IsAvailable, string? Message)> CheckRestoreAvailabilityAsync(
+        string gameRoot, string? currentBuildId, CancellationToken token = default)
+    {
+        if (!_definition.ValidateGameRoot(gameRoot))
+            return (false, "Відновлення оригіналу неможливе: перевірену теку гри не знайдено.");
+
+        var state = _store.Load(out var stateError);
+        if (stateError != null)
+            return (false, "Відновлення оригіналу неможливе: збережений стан WWM пошкоджено.");
+        if (state == null)
+            return (false, Directory.Exists(_store.SnapshotDirectory)
+                ? "Відновлення оригіналу неможливе: початковий знімок не пов'язаний із довіреним станом встановлення."
+                : "Відновлення оригіналу неможливе: початковий знімок ще не створено.");
+        if (!await MatchesManifestAsync(gameRoot, state.Targets, token).ConfigureAwait(false))
+            return (false, "Керовані файли WWM змінені поза Хабом. Безпечне відновлення заблоковано.");
+
+        var snapshot = LoadPreHubSnapshot(out var snapshotError);
+        if (snapshot == null || !string.Equals(snapshot.CycleOperationId, state.PreHubSnapshotCycleId, StringComparison.Ordinal))
+            return (false, $"Відновлення оригіналу неможливе: початковий знімок відсутній, пошкоджений або не належить цій установці.{(string.IsNullOrWhiteSpace(snapshotError) ? string.Empty : $" Деталі: {snapshotError}")}");
+        if (string.IsNullOrWhiteSpace(snapshot.GameBuildId) || string.IsNullOrWhiteSpace(currentBuildId)
+            || !string.Equals(snapshot.GameBuildId, currentBuildId, StringComparison.Ordinal))
+            return (false, "Steam build відрізняється від build початкового знімка. Відновлення заблоковано, щоб не замінити файли новішої гри.");
+
+        return (true, null);
+    }
+
     public async Task<WwmInstalledStateResult> ResolveStateAsync(string gameRoot, WwmApiPackage? current, CancellationToken token = default)
     {
         var state = _store.Load(out var error);
@@ -191,6 +219,9 @@ public sealed class WwmInstallService
         var operationDir = Path.Combine(_store.TransactionDirectory, operationId);
         WwmTransactionJournal? journal = null;
         var mutationStarted = false;
+        var targetMutationOccurred = false;
+        var phase = "prepare_transaction";
+        string? activeTarget = null;
         try
         {
             Directory.CreateDirectory(operationDir);
@@ -221,28 +252,53 @@ public sealed class WwmInstallService
                 ExpectedStateSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stateJson))).ToLowerInvariant(),
                 GameBuildId = buildId
             };
+            phase = "write_journal";
             await _store.WriteJournalAsync(journal, token).ConfigureAwait(false);
 
             var appliedTargets = 0;
             foreach (var item in staged.Targets)
             {
                 token.ThrowIfCancellationRequested();
-                mutationStarted = true;
+                activeTarget = item.RelativePath;
                 var source = SafeCombine(Path.Combine(staged.WorkDirectory, "staged"), item.RelativePath);
                 var target = SafeGameTarget(gameRoot, item.RelativePath);
+                phase = "create_target_directory";
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                phase = "prepare_game_temp";
                 var replacement = PrepareGameTemp(gameRoot, item.RelativePath, operationId, ".hub-");
+                phase = "write_game_temp";
+                BeforeGameTempWriteForTest?.Invoke(item.RelativePath, replacement);
                 await CopyVerifiedAsync(source, replacement, item, token).ConfigureAwait(false);
-                if (File.Exists(target)) File.Replace(replacement, target, null);
-                else File.Move(replacement, target);
+                var previousAttributes = previous.Single(record => record.RelativePath == item.RelativePath).Attributes;
+                if (File.Exists(target))
+                {
+                    phase = "replace_target";
+                    mutationStarted = true;
+                    BeforeTargetReplaceForTest?.Invoke(item.RelativePath, target);
+                    ReplaceManagedTarget(replacement, target, previousAttributes,
+                        () => targetMutationOccurred = true, nextPhase => phase = nextPhase);
+                }
+                else
+                {
+                    phase = "move_new_target";
+                    mutationStarted = true;
+                    File.Move(replacement, target);
+                    targetMutationOccurred = true;
+                }
+                phase = "verify_target";
                 await VerifyFileAsync(target, item, token).ConfigureAwait(false);
+                phase = "post_replace_hook";
                 AfterTargetAppliedForTest?.Invoke(++appliedTargets);
             }
 
+            activeTarget = null;
+            phase = "save_installation_state";
             BeforeStateSaveForTest?.Invoke();
             await _store.SaveAsync(newState, token).ConfigureAwait(false);
+            phase = "verify_committed_outcome";
             if (!await MatchesExpectedOutcomeAsync(gameRoot, journal, token).ConfigureAwait(false))
                 throw new IOException("WWM transaction post-commit verification failed.");
+            phase = "cleanup_game_temps";
             if (!CleanupGameTemps(gameRoot, operationId))
                 throw new IOException("WWM transaction temporary-file cleanup failed.");
             await _store.RetireJournalAsync(CancellationToken.None).ConfigureAwait(false);
@@ -253,7 +309,7 @@ public sealed class WwmInstallService
         {
             if (!mutationStarted || journal == null)
             {
-                if (journal != null && !await RetireUnmutatedTransactionAsync(operationDir, createdPreHubSnapshot, operationId).ConfigureAwait(false))
+                if (journal != null && !await RetireUnmutatedTransactionAsync(gameRoot, operationDir, createdPreHubSnapshot, operationId).ConfigureAwait(false))
                     return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Підготовку скасовано, але тимчасові дані WWM ще потребують відновлення.");
                 if (journal == null)
                 {
@@ -263,18 +319,29 @@ public sealed class WwmInstallService
                 }
                 return WwmMutationResult.Failure(WwmMutationError.Cancelled, "Операцію скасовано.");
             }
+            if (!targetMutationOccurred)
+            {
+                if (await MatchesPreviousOutcomeAsync(gameRoot, journal, CancellationToken.None).ConfigureAwait(false))
+                {
+                    var retired = await RetireUnmutatedTransactionAsync(gameRoot, operationDir, createdPreHubSnapshot, operationId).ConfigureAwait(false);
+                    return WwmMutationResult.Failure(retired ? WwmMutationError.Cancelled : WwmMutationError.RecoveryRequired,
+                        retired ? "Операцію скасовано до зміни файлів гри." : "Операцію скасовано; безпечне очищення транзакції буде повторено під час наступного запуску.");
+                }
+                CleanupGameTemps(gameRoot, operationId);
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан файлів WWM змінився до підтвердженої заміни; журнал і резервні дані збережено.");
+            }
             var rolledBack = await CompleteRollbackAsync(gameRoot, journal, operationDir).ConfigureAwait(false);
             return WwmMutationResult.Failure(rolledBack ? WwmMutationError.Cancelled : WwmMutationError.RollbackFailed,
                 rolledBack ? "Операцію скасовано; попередній стан відновлено." : "Критична помилка: не вдалося відкотити файли WWM.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            _logger.Error($"WWM transaction failed: {ex.Message}");
+            LogTransactionFailure(journal?.OperationId ?? "unassigned", "install", activeTarget, phase, ex);
             if (!mutationStarted || journal == null)
             {
                 if (journal != null)
                 {
-                    if (!await RetireUnmutatedTransactionAsync(operationDir, createdPreHubSnapshot, operationId).ConfigureAwait(false))
+                    if (!await RetireUnmutatedTransactionAsync(gameRoot, operationDir, createdPreHubSnapshot, operationId).ConfigureAwait(false))
                         return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Підготовка WWM не завершилась; безпечне очищення буде повторено під час відновлення.");
                 }
                 else
@@ -283,18 +350,31 @@ public sealed class WwmInstallService
                     if (createdPreHubSnapshot && !RetireCreatedSnapshot(operationId))
                         return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Підготовка WWM не завершилась; новий знімок не вдалося безпечно прибрати.");
                 }
-                return WwmMutationResult.Failure(WwmMutationError.Mutation, "Операцію WWM не вдалося підготувати; файли гри не змінено.");
+                return WwmMutationResult.Failure(WwmMutationError.Mutation,
+                    GetFilesystemFailureMessage(ex, "Операцію WWM не вдалося підготувати; файли гри не змінено."));
+            }
+            if (!targetMutationOccurred)
+            {
+                if (await MatchesPreviousOutcomeAsync(gameRoot, journal, CancellationToken.None).ConfigureAwait(false))
+                {
+                    var retired = await RetireUnmutatedTransactionAsync(gameRoot, operationDir, createdPreHubSnapshot, operationId).ConfigureAwait(false);
+                    return WwmMutationResult.Failure(retired ? WwmMutationError.Mutation : WwmMutationError.RecoveryRequired,
+                    retired ? GetFilesystemFailureMessage(ex, "Не вдалося підготувати заміну; файли гри не змінено.") : "Підготовка не завершилася; безпечне очищення буде повторено під час наступного запуску.");
+                }
+                CleanupGameTemps(gameRoot, operationId);
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан файлів WWM змінився до підтвердженої заміни; журнал і резервні дані збережено.");
             }
             var rolledBack = await CompleteRollbackAsync(gameRoot, journal, operationDir).ConfigureAwait(false);
             return WwmMutationResult.Failure(rolledBack ? WwmMutationError.Mutation : WwmMutationError.RollbackFailed,
-                rolledBack ? "Не вдалося встановити пакет; попередній стан відновлено." : "Критична помилка: відкат WWM не завершився. Дані відновлення збережено.");
+                rolledBack ? GetFilesystemFailureMessage(ex, "Не вдалося встановити пакет; попередній стан відновлено.") : "Критична помилка: відкат WWM не завершився. Дані відновлення збережено.");
         }
     }
 
-    private async Task<bool> RetireUnmutatedTransactionAsync(string operationDir, bool createdPreHubSnapshot, string operationId)
+    private async Task<bool> RetireUnmutatedTransactionAsync(string gameRoot, string operationDir, bool createdPreHubSnapshot, string operationId)
     {
         try
         {
+            if (!CleanupGameTemps(gameRoot, operationId)) return false;
             await _store.RetireJournalAsync(CancellationToken.None).ConfigureAwait(false);
             DeleteDirectoryBestEffort(operationDir);
             if (Directory.Exists(operationDir)) return false;
@@ -356,7 +436,10 @@ public sealed class WwmInstallService
         var dir = Path.Combine(_store.TransactionDirectory, id);
         WwmTransactionJournal? journal = null;
         var mutationStarted = false;
+        var targetMutationOccurred = false;
         var committed = false;
+        var phase = "prepare_restore";
+        string? activeTarget = null;
         try
         {
             token.ThrowIfCancellationRequested();
@@ -390,33 +473,59 @@ public sealed class WwmInstallService
                 ExpectedStateSha256 = "absent"
             };
             BeforeRestoreJournalForTest?.Invoke();
+            phase = "write_journal";
             await _store.WriteJournalAsync(journal, token).ConfigureAwait(false);
 
             foreach (var item in snapshot.Targets)
             {
                 token.ThrowIfCancellationRequested();
+                activeTarget = item.RelativePath;
                 var target = SafeGameTarget(gameRoot, item.RelativePath);
                 if (!item.Existed)
                 {
                     if (File.Exists(target))
                     {
+                        phase = "delete_target";
                         mutationStarted = true;
-                        File.Delete(target);
+                        DeleteManagedTarget(target, nextPhase => phase = nextPhase);
+                        targetMutationOccurred = true;
                     }
                     continue;
                 }
                 var expected = restoredTargets.Single(entry => entry.RelativePath == item.RelativePath);
+                phase = "prepare_game_temp";
                 var replacement = PrepareGameTemp(gameRoot, item.RelativePath, id, ".hub-");
+                phase = "write_game_temp";
+                BeforeGameTempWriteForTest?.Invoke(item.RelativePath, replacement);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                mutationStarted = true;
                 await CopyVerifiedAsync(SafeCombine(_store.SnapshotDirectory, item.BackupFile!), replacement, expected, token).ConfigureAwait(false);
-                if (File.Exists(target)) File.Replace(replacement, target, null); else File.Move(replacement, target);
+                if (File.Exists(target))
+                {
+                    phase = "replace_target";
+                    mutationStarted = true;
+                    BeforeTargetReplaceForTest?.Invoke(item.RelativePath, target);
+                    ReplaceManagedTarget(replacement, target, item.Attributes,
+                        () => targetMutationOccurred = true, nextPhase => phase = nextPhase);
+                }
+                else
+                {
+                    phase = "move_restored_target";
+                    mutationStarted = true;
+                    File.Move(replacement, target);
+                    targetMutationOccurred = true;
+                    if (item.Attributes is { } attributes) File.SetAttributes(target, (FileAttributes)attributes);
+                }
+                phase = "verify_target";
                 await VerifyFileAsync(target, expected, token).ConfigureAwait(false);
             }
+            activeTarget = null;
+            phase = "clear_installation_state";
             await _store.ClearAsync(token).ConfigureAwait(false);
+            phase = "verify_committed_outcome";
             if (!await MatchesExpectedOutcomeAsync(gameRoot, journal, token).ConfigureAwait(false))
                 throw new IOException("WWM restore verification failed.");
             committed = true;
+            phase = "cleanup_game_temps";
             if (!CleanupGameTemps(gameRoot, id))
                 return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Попередній стан відновлено, але тимчасові файли ще потрібно прибрати; відновлення повториться під час наступного запуску.");
             if (!TryDeleteDirectory(_store.SnapshotDirectory))
@@ -433,9 +542,20 @@ public sealed class WwmInstallService
             {
                 var cleaned = journal == null
                     ? CleanupUnmutatedOperationDirectory(dir)
-                    : await RetireUnmutatedTransactionAsync(dir, createdPreHubSnapshot: false, id).ConfigureAwait(false);
+                    : await RetireUnmutatedTransactionAsync(gameRoot, dir, createdPreHubSnapshot: false, id).ConfigureAwait(false);
                 return WwmMutationResult.Failure(cleaned ? WwmMutationError.Cancelled : WwmMutationError.RecoveryRequired,
                     cleaned ? "Операцію відновлення скасовано до зміни файлів." : "Відновлення скасовано; безпечне очищення буде повторено.");
+            }
+            if (journal != null && !targetMutationOccurred)
+            {
+                if (await MatchesPreviousOutcomeAsync(gameRoot, journal, CancellationToken.None).ConfigureAwait(false))
+                {
+                    var cleaned = await RetireUnmutatedTransactionAsync(gameRoot, dir, createdPreHubSnapshot: false, id).ConfigureAwait(false);
+                    return WwmMutationResult.Failure(cleaned ? WwmMutationError.Cancelled : WwmMutationError.RecoveryRequired,
+                        cleaned ? "Операцію відновлення скасовано до зміни файлів." : "Відновлення скасовано; безпечне очищення буде повторено.");
+                }
+                CleanupGameTemps(gameRoot, id);
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан файлів WWM змінився до підтвердженої заміни; журнал і резервні дані збережено.");
             }
             var rollback = journal != null && await CompleteRollbackAsync(gameRoot, journal, dir).ConfigureAwait(false);
             return WwmMutationResult.Failure(rollback ? WwmMutationError.Cancelled : WwmMutationError.RollbackFailed,
@@ -443,20 +563,31 @@ public sealed class WwmInstallService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
         {
-            _logger.Error($"WWM pre-Hub restore failed: {ex.Message}");
+            LogTransactionFailure(journal?.OperationId ?? id, "restore", activeTarget, phase, ex);
             if (committed)
                 return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Попередній стан уже відновлено, але очищення транзакції не завершилося. Відновлення повториться під час наступного запуску.");
             if (!mutationStarted)
             {
                 var cleaned = journal == null
                     ? CleanupUnmutatedOperationDirectory(dir)
-                    : await RetireUnmutatedTransactionAsync(dir, createdPreHubSnapshot: false, id).ConfigureAwait(false);
+                    : await RetireUnmutatedTransactionAsync(gameRoot, dir, createdPreHubSnapshot: false, id).ConfigureAwait(false);
                 return WwmMutationResult.Failure(cleaned ? WwmMutationError.Snapshot : WwmMutationError.RecoveryRequired,
-                    cleaned ? "Не вдалося підготувати відновлення; файли гри не змінено." : "Підготовка не завершилася; безпечне очищення буде повторено.");
+                    cleaned ? GetFilesystemFailureMessage(ex, "Не вдалося підготувати відновлення; файли гри не змінено.") : "Підготовка не завершилася; безпечне очищення буде повторено.");
+            }
+            if (journal != null && !targetMutationOccurred)
+            {
+                if (await MatchesPreviousOutcomeAsync(gameRoot, journal, CancellationToken.None).ConfigureAwait(false))
+                {
+                    var cleaned = await RetireUnmutatedTransactionAsync(gameRoot, dir, createdPreHubSnapshot: false, id).ConfigureAwait(false);
+                    return WwmMutationResult.Failure(cleaned ? WwmMutationError.Mutation : WwmMutationError.RecoveryRequired,
+                        cleaned ? "Не вдалося підготувати відновлення; файли гри не змінено." : "Підготовка не завершилася; безпечне очищення буде повторено.");
+                }
+                CleanupGameTemps(gameRoot, id);
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан файлів WWM змінився до підтвердженої заміни; журнал і резервні дані збережено.");
             }
             var rollback = journal != null && await CompleteRollbackAsync(gameRoot, journal, dir).ConfigureAwait(false);
             return WwmMutationResult.Failure(rollback ? WwmMutationError.Mutation : WwmMutationError.RollbackFailed,
-                rollback ? "Не вдалося відновити попередній стан; файли повернуто до стану перед операцією." : "Критична помилка відновлення WWM; журнал збережено.");
+                rollback ? GetFilesystemFailureMessage(ex, "Не вдалося відновити попередній стан; файли повернуто до стану перед операцією.") : "Критична помилка відновлення WWM; журнал збережено.");
         }
     }
 
@@ -503,7 +634,15 @@ public sealed class WwmInstallService
                 await CopyFileAsync(path, temp, token).ConfigureAwait(false);
                 var size = new FileInfo(temp).Length;
                 var sha = await HashHelper.ComputeFileSha256Async(temp, token).ConfigureAwait(false);
-                targets.Add(new WwmPreviousTarget { RelativePath = relative, Existed = true, SizeBytes = size, Sha256 = sha, BackupFile = name });
+                targets.Add(new WwmPreviousTarget
+                {
+                    RelativePath = relative,
+                    Existed = true,
+                    SizeBytes = size,
+                    Sha256 = sha,
+                    BackupFile = name,
+                    Attributes = (int)File.GetAttributes(path)
+                });
                 temporaryFiles.Add((temp, final));
                 index++;
             }
@@ -617,25 +756,37 @@ public sealed class WwmInstallService
             var backupName = i + ".bin";
             var backupPath = Path.Combine(operationDir, backupName);
             await CopyFileAsync(target, backupPath, token).ConfigureAwait(false);
-            result.Add(new WwmPreviousTarget { RelativePath = relative, Existed = true, SizeBytes = new FileInfo(backupPath).Length,
-                Sha256 = await HashHelper.ComputeFileSha256Async(backupPath, token).ConfigureAwait(false), BackupFile = backupName });
+            result.Add(new WwmPreviousTarget
+            {
+                RelativePath = relative,
+                Existed = true,
+                SizeBytes = new FileInfo(backupPath).Length,
+                Sha256 = await HashHelper.ComputeFileSha256Async(backupPath, token).ConfigureAwait(false),
+                BackupFile = backupName,
+                Attributes = (int)File.GetAttributes(target)
+            });
         }
         return result;
     }
 
     private async Task<bool> RollbackAsync(string root, WwmTransactionJournal journal, string operationDir, CancellationToken token)
     {
+        var phase = "prepare_rollback";
+        string? activeTarget = null;
         try
         {
             foreach (var item in journal.PreviousTargets)
             {
                 token.ThrowIfCancellationRequested();
+                activeTarget = item.RelativePath;
                 var target = SafeGameTarget(root, item.RelativePath);
                 if (!item.Existed)
                 {
-                    if (File.Exists(target)) File.Delete(target);
+                    phase = "delete_created_target";
+                    if (File.Exists(target)) DeleteManagedTarget(target, nextPhase => phase = nextPhase);
                     continue;
                 }
+                phase = "validate_rollback_backup";
                 var backup = SafeCombine(operationDir, item.BackupFile!);
                 if (!File.Exists(backup) || new FileInfo(backup).Length != item.SizeBytes
                     || !string.Equals(HashHelper.ComputeFileSha256(backup), item.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -643,10 +794,23 @@ public sealed class WwmInstallService
                     _logger.Error($"WWM rollback backup failed integrity validation: {item.RelativePath}");
                     return false;
                 }
+                phase = "prepare_rollback_temp";
                 var temp = PrepareGameTemp(root, item.RelativePath, journal.OperationId, ".rollback-");
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                phase = "write_rollback_temp";
                 await CopyFileAsync(backup, temp, token).ConfigureAwait(false);
-                if (File.Exists(target)) File.Replace(temp, target, null); else File.Move(temp, target);
+                if (File.Exists(target))
+                {
+                    phase = "replace_target_from_rollback";
+                    ReplaceManagedTarget(temp, target, item.Attributes, setPhase: nextPhase => phase = nextPhase);
+                }
+                else
+                {
+                    phase = "restore_absent_target_from_rollback";
+                    File.Move(temp, target);
+                    if (item.Attributes is { } attributes) File.SetAttributes(target, (FileAttributes)attributes);
+                }
+                phase = "verify_rollback_target";
                 if (new FileInfo(target).Length != item.SizeBytes
                     || !string.Equals(await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), item.Sha256, StringComparison.OrdinalIgnoreCase))
                 {
@@ -654,13 +818,16 @@ public sealed class WwmInstallService
                     return false;
                 }
             }
+            activeTarget = null;
+            phase = "restore_previous_state";
             var oldState = journal.PreviousStateExisted ? Convert.FromBase64String(journal.PreviousStateBase64) : null;
             await RestoreStateBytesAsync(oldState, token).ConfigureAwait(false);
+            phase = "cleanup_game_temps";
             return CleanupGameTemps(root, journal.OperationId);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException or FormatException)
         {
-            _logger.Error($"WWM rollback failed: {ex.Message}");
+            LogTransactionFailure(journal.OperationId, "rollback", activeTarget, phase, ex);
             CleanupGameTemps(root, journal.OperationId);
             return false;
         }
@@ -685,11 +852,11 @@ public sealed class WwmInstallService
     private bool CleanupGameTemps(string root, string operationId)
     {
         if (!Guid.TryParseExact(operationId, "N", out _)) return false;
-        try
+        foreach (var relativePath in _definition.ManagedRelativePaths)
         {
-            foreach (var relativePath in _definition.ManagedRelativePaths)
+            foreach (var kind in new[] { ".hub-", ".rollback-" })
             {
-                foreach (var kind in new[] { ".hub-", ".rollback-" })
+                try
                 {
                     var target = SafeGameTarget(root, relativePath);
                     var temp = Path.GetFullPath(target + kind + operationId + ".tmp");
@@ -697,15 +864,88 @@ public sealed class WwmInstallService
                         throw new InvalidDataException("WWM game-temp path escaped the managed target directory.");
                     DeleteOwnedGameTemp(temp);
                 }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+                {
+                    LogTransactionFailure(operationId, "cleanup", relativePath, "cleanup_game_temp", ex);
+                    return false;
+                }
             }
-            return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        return true;
+    }
+
+    private static void ReplaceManagedTarget(string replacement, string target, int? attributesToRestore,
+        Action? afterReplace = null, Action<string>? setPhase = null)
+    {
+        setPhase?.Invoke("inspect_target_attributes");
+        var originalAttributes = File.GetAttributes(target);
+        var finalAttributes = attributesToRestore is { } stored
+            ? (FileAttributes)stored
+            : originalAttributes;
+        if ((originalAttributes & FileAttributes.ReadOnly) != 0)
         {
-            _logger.Warning($"WWM operation temp cleanup deferred: {ex.Message}");
-            return false;
+            setPhase?.Invoke("clear_readonly_attribute");
+            File.SetAttributes(target, originalAttributes & ~FileAttributes.ReadOnly);
+        }
+        setPhase?.Invoke("File.Replace");
+        try
+        {
+            File.Replace(replacement, target, null);
+            afterReplace?.Invoke();
+        }
+        catch
+        {
+            if (File.Exists(target) && (originalAttributes & FileAttributes.ReadOnly) != 0)
+            {
+                setPhase?.Invoke("restore_attributes_after_replace_failure");
+                File.SetAttributes(target, originalAttributes);
+            }
+            throw;
+        }
+        setPhase?.Invoke("restore_target_attributes");
+        File.SetAttributes(target, finalAttributes);
+    }
+
+    private static void DeleteManagedTarget(string target, Action<string>? setPhase = null)
+    {
+        setPhase?.Invoke("inspect_target_attributes");
+        var attributes = File.GetAttributes(target);
+        if ((attributes & FileAttributes.ReadOnly) != 0)
+        {
+            setPhase?.Invoke("clear_readonly_attribute");
+            File.SetAttributes(target, attributes & ~FileAttributes.ReadOnly);
+        }
+        try
+        {
+            setPhase?.Invoke("File.Delete");
+            File.Delete(target);
+        }
+        catch
+        {
+            if (File.Exists(target) && (attributes & FileAttributes.ReadOnly) != 0)
+            {
+                setPhase?.Invoke("restore_attributes_after_delete_failure");
+                File.SetAttributes(target, attributes);
+            }
+            throw;
         }
     }
+
+    private void LogTransactionFailure(string operationId, string operation, string? target, string phase, Exception exception)
+    {
+        _logger.Error($"WWM filesystem failure operation_id={operationId} operation={operation} target={target ?? "-"} phase={phase} exception={exception.GetType().Name} hresult=0x{unchecked((uint)exception.HResult):X8}{FormatWin32Error(exception)}");
+    }
+
+    private static string FormatWin32Error(Exception exception)
+    {
+        var hresult = unchecked((uint)exception.HResult);
+        return (hresult & 0xFFFF0000) == 0x80070000 ? $" win32_error={hresult & 0xFFFF}" : string.Empty;
+    }
+
+    private static string GetFilesystemFailureMessage(Exception exception, string fallback)
+        => exception is UnauthorizedAccessException
+            ? "Не вдалося змінити файли Where Winds Meet. Закрийте гру та перевірте права доступу до її теки, а потім повторіть операцію."
+            : fallback;
 
     private static void DeleteOwnedGameTemp(string tempPath)
     {
@@ -725,8 +965,9 @@ public sealed class WwmInstallService
             || snapshot.Targets.Any(item => item == null || !WwmStateStore.IsAllowedPath(item.RelativePath)
                 || (item.Existed
                     ? item.SizeBytes <= 0 || !IsSha(item.Sha256)
+                        || (item.Attributes is { } attributes && (((FileAttributes)attributes) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
                         || item.BackupFile != (Array.IndexOf(_definition.ManagedRelativePaths, item.RelativePath) + ".bin")
-                    : item.SizeBytes != null || item.Sha256 != null || item.BackupFile != null))
+                    : item.SizeBytes != null || item.Sha256 != null || item.BackupFile != null || item.Attributes != null))
             || snapshot.Targets.Select(item => item.RelativePath).Distinct(StringComparer.Ordinal).Count() != _definition.ManagedRelativePaths.Length)
             return false;
 
@@ -780,6 +1021,73 @@ public sealed class WwmInstallService
         }
         return true;
     }
+
+    private async Task<bool> MatchesPreviousOutcomeAsync(string root, WwmTransactionJournal journal, CancellationToken token)
+    {
+        try
+        {
+            if (journal.PreviousStateExisted)
+            {
+                if (!File.Exists(_store.StateFile)
+                    || !File.ReadAllBytes(_store.StateFile).AsSpan().SequenceEqual(Convert.FromBase64String(journal.PreviousStateBase64)))
+                {
+                    LogPreviousOutcomeMismatch(journal, "state", "previous state bytes differ");
+                    return false;
+                }
+            }
+            else if (File.Exists(_store.StateFile))
+            {
+                LogPreviousOutcomeMismatch(journal, "state", "unexpected state file exists");
+                return false;
+            }
+
+            foreach (var previous in journal.PreviousTargets)
+            {
+                token.ThrowIfCancellationRequested();
+                var target = SafeGameTarget(root, previous.RelativePath);
+                FileAttributes? attributes = null;
+                try { attributes = File.GetAttributes(target); }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+
+                if (attributes == null)
+                {
+                    if (previous.Existed)
+                    {
+                        LogPreviousOutcomeMismatch(journal, previous.RelativePath, "previous target is missing");
+                        return false;
+                    }
+                    continue;
+                }
+                if ((attributes.Value & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0 || !previous.Existed)
+                {
+                    LogPreviousOutcomeMismatch(journal, previous.RelativePath, "target type or existence differs");
+                    return false;
+                }
+                if (previous.Attributes is { } expectedAttributes && (int)attributes.Value != expectedAttributes)
+                {
+                    LogPreviousOutcomeMismatch(journal, previous.RelativePath, "target attributes differ");
+                    return false;
+                }
+                var size = new FileInfo(target).Length;
+                if (size != previous.SizeBytes
+                    || !string.Equals(await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), previous.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    LogPreviousOutcomeMismatch(journal, previous.RelativePath, "target size or hash differs");
+                    return false;
+                }
+            }
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or FormatException)
+        {
+            LogTransactionFailure(journal.OperationId, journal.Operation, null, "compare_previous_outcome", ex);
+            return false;
+        }
+    }
+
+    private void LogPreviousOutcomeMismatch(WwmTransactionJournal journal, string target, string reason)
+        => _logger.Error($"WWM transaction stopped operation_id={journal.OperationId} operation={journal.Operation} target={target} phase=compare_previous_outcome reason={reason}");
 
     private async Task<bool> MatchesJournalKnownTargetStatesAsync(string root, WwmTransactionJournal journal, CancellationToken token)
     {

@@ -99,8 +99,9 @@ public sealed class WwmStateStore
                 || journal.PreviousTargets.Count != 2
                 || !journal.PreviousTargets.All(item => item != null && IsAllowedPath(item.RelativePath)
                     && (item.Existed ? item.SizeBytes > 0 && IsSha256(item.Sha256)
+                        && IsSafeAttributes(item.Attributes)
                         && item.BackupFile == (Array.IndexOf(WwmGameDefinition.Default.ManagedRelativePaths, item.RelativePath) + ".bin")
-                    : item.SizeBytes == null && item.Sha256 == null && item.BackupFile == null))
+                    : item.SizeBytes == null && item.Sha256 == null && item.BackupFile == null && item.Attributes == null))
                 || journal.PreviousTargets.Select(item => item.RelativePath).Distinct(StringComparer.Ordinal).Count() != 2
                 || journal.PreviousStateBase64 is null
                 || !ValidateJournalOutcome(journal))
@@ -168,6 +169,8 @@ public sealed class WwmStateStore
 
     private static string NormalizeRelative(string path) => path.Replace('/', '\\');
     private static bool IsSha256(string? value) => value is { Length: 64 } && value.All(Uri.IsHexDigit);
+    private static bool IsSafeAttributes(int? value)
+        => value == null || (((FileAttributes)value.Value) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == 0;
     internal static bool IsAllowedPath(string path)
         => !string.IsNullOrWhiteSpace(path) && WwmGameDefinition.Default.ManagedRelativePaths
             .Contains(NormalizeRelative(path), StringComparer.Ordinal);
@@ -206,6 +209,7 @@ public sealed class WwmPreviousTarget
     [JsonPropertyName("size_bytes")] public long? SizeBytes { get; set; }
     [JsonPropertyName("sha256")] public string? Sha256 { get; set; }
     [JsonPropertyName("backup_file")] public string? BackupFile { get; set; }
+    [JsonPropertyName("attributes")] public int? Attributes { get; set; }
 }
 
 public sealed class WwmPreHubSnapshot

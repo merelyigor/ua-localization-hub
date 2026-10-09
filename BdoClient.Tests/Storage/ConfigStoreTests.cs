@@ -183,6 +183,34 @@ public class ConfigStoreTests : IDisposable
         Assert.False(File.Exists(tempFile));
     }
 
+    [Fact]
+    public async Task ConcurrentStores_SerializeAtomicSavesWithoutTempCollisionsOrCorruptJson()
+    {
+        var stores = Enumerable.Range(0, 6).Select(_ => new ConfigStore(_paths, _logger)).ToArray();
+        var saves = Enumerable.Range(0, 60)
+            .Select(index => stores[index % stores.Length].SaveAsync(new Config
+            {
+                GamePath = $@"C:\Games\Parallel {index}",
+                LastMode = $"mode-{index}"
+            }));
+        var readers = Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+        {
+            for (var attempt = 0; attempt < 30; attempt++)
+            {
+                var result = _store.Load();
+                Assert.NotEqual(FileLoadStatus.Invalid, result.Status);
+            }
+        }));
+
+        await Task.WhenAll(saves.Concat(readers));
+
+        var loaded = _store.Load();
+        Assert.Equal(FileLoadStatus.Valid, loaded.Status);
+        Assert.StartsWith(@"C:\Games\Parallel ", loaded.Value!.GamePath);
+        Assert.StartsWith("mode-", loaded.Value.LastMode);
+        Assert.Empty(Directory.GetFiles(_tempDir, "config.json.*.tmp", SearchOption.AllDirectories));
+    }
+
     private class NullLogger : ILogger
     {
         public void Debug(string message) { }

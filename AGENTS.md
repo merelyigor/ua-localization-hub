@@ -289,7 +289,7 @@ WWM має окремий dynamic contract; не десеріалізувати 
 
 Steam WWM identity — AppID `3564740`; automatic discovery використовує Steam library metadata та `appmanifest_3564740.acf`, а root validation — `Engine/Binaries/Win64r/wwm.exe` і `Package/HD/oversea/locale/`. Steam build ID є observational та snapshot-staleness metadata, не compatibility mapping. Fresh latest feed обов'язковий перед кожною WWM mutation. ZIP дозволено staging після HTTPS/size/SHA verification; приймаються лише дві allow-listed game-root-relative locale files, без direct extraction або script execution.
 
-WWM install state/transaction — окрема game-scoped versioned schema. До першої mutation зберігати pre-Hub existence/bytes/size/SHA кожного target; per-operation journal відновлює обидва targets і попередній state після partial failure. Restore означає exact **pre-Hub state**, не guaranteed stock, і має називатися `Відновити попередній стан`. Official launcher deferred; compatibility із конкретним Steam build API не підтверджує, тому перед mutation потрібне нейтральне явне підтвердження.
+WWM install state/transaction — окрема game-scoped versioned schema. До першої mutation зберігати pre-Hub existence/bytes/size/SHA кожного target; per-operation journal відновлює обидва targets і попередній state після partial failure. UI action називається `Відновити оригінал`, але її точна семантика — відновити довірений перший **pre-Hub baseline** поточного циклу, а не заявляти про гарантовані stock bytes Steam. Без валідного baseline дія недоступна; не створювати snapshot із уже змінених файлів. Official launcher deferred; compatibility із конкретним Steam build API не підтверджує, тому перед mutation потрібне нейтральне явне підтвердження.
 
 ---
 

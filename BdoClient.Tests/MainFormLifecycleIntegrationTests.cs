@@ -111,12 +111,13 @@ public sealed class MainFormLifecycleIntegrationTests
             && form.GameSectionCaption == "Where Winds Meet — Winds4UA / W4U"
             && !form.IsSwitchInProgress
             && form.ActivePersistenceRoot == fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").Root
-            && FindWwmModeCards(form).Count == 3);
+            && FindWwmModeCards(form).Count == 1);
         AssertGameSwitchSettled(fixture.Form);
         Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
         var cards = FindWwmModeCards(fixture.Form);
         Assert.Contains(cards, card => card.ModeSlug == "ukrainian" && card.ActionVisibleForTest && card.ActionEnabledForTest);
-        Assert.Contains(cards, card => card.ModeSlug == "english-items" && !card.ActionEnabledForTest);
+        Assert.DoesNotContain(cards, card => card.ModeSlug == "english-items");
+        Assert.DoesNotContain(cards, card => card.ModeSlug == "english-terms");
 
         await fixture.SelectGameAsync("black-desert-online");
         await fixture.WaitForSwitchCompletionAsync();
@@ -132,8 +133,64 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.WaitForSwitchCompletionAsync();
         await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
             && !form.IsSwitchInProgress
-            && FindWwmModeCards(form).Count == 3);
+            && FindWwmModeCards(form).Count == 1);
         AssertGameSwitchSettled(fixture.Form);
+    }
+
+    [Fact]
+    public async Task WwmModes_HideUnavailableModes()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Count == 1);
+
+        Assert.DoesNotContain(FindWwmModeCards(fixture.Form), card => card.ModeSlug is "english-items" or "english-terms");
+    }
+
+    [Fact]
+    public async Task WwmSavedUnavailableMode_FallsBackToFirstVisibleInstallableMode()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmConfigJson: "{\"last_mode\":\"english-items\",\"last_mode_variant\":\"english_items\"}");
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Count == 1);
+
+        var visibleCard = Assert.Single(FindWwmModeCards(fixture.Form));
+        Assert.Equal("ukrainian", visibleCard.ModeSlug);
+        Assert.True(visibleCard.IsSelected);
+    }
+
+    [Fact]
+    public async Task WwmAvailableModeWithoutMatchingArtifact_IsNotRendered()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(
+                CreateTinyWwmArchive(), omitCurrentArtifact: true));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Count == 0
+            && form.OperationStateForTest == OperationState.Idle);
+
+        Assert.Contains("Наразі немає доступних режимів", fixture.Form.ModePlaceholderTextForTest, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -177,7 +234,7 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.SelectGameAsync("where-winds-meet");
         await fixture.WaitForSwitchCompletionAsync();
         await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
-            && FindWwmModeCards(form).Count == 3);
+            && FindWwmModeCards(form).Count == 1);
 
         var fakeRoot = fixture.WwmGameRoot;
         var targets = WwmGameDefinition.Default.ManagedRelativePaths;
@@ -193,6 +250,16 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.True(File.Exists(Path.Combine(fakeRoot, targets[1])), fixture.Form.OperationMessageForTest + " | " + string.Join(" || ", fixture.Logger.Warnings));
         Assert.True(File.Exists(Path.Combine(fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").StateDir, "wwm-installation.json")), fixture.Form.OperationMessageForTest);
         Assert.Contains(wwmRequests, path => path.EndsWith(".zip", StringComparison.Ordinal));
+        var installedCard = Assert.Single(FindWwmModeCards(fixture.Form));
+        Assert.Equal("✓ Встановлено", installedCard.StateTextForTest);
+        Assert.True(installedCard.InstalledBadgeVisibleForTest);
+        Assert.Equal("✓ Встановлено", installedCard.InstalledBadgeTextForTest);
+        Assert.Equal(UiTheme.Success, installedCard.InstalledBadgeForeColorForTest);
+        Assert.Equal(UiTheme.SuccessSurface, installedCard.InstalledBadgeBackColorForTest);
+        Assert.True(installedCard.IsInstalledForTest);
+        Assert.False(installedCard.StatusLabelVisibleForTest);
+        Assert.False(installedCard.ActionVisibleForTest);
+        Assert.False(installedCard.ActionEnabledForTest);
     }
 
     [Fact]
@@ -217,6 +284,62 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.False(File.Exists(Path.Combine(fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").StateDir, "wwm-installation.json")));
     }
 
+    [Theory]
+    [InlineData(WwmMutationError.RollbackFailed)]
+    [InlineData(WwmMutationError.RecoveryRequired)]
+    [InlineData(WwmMutationError.SnapshotStale)]
+    public async Task WwmInstall_UnresolvedRecoveryResultImmediatelyBlocksCurrentSession(WwmMutationError error)
+    {
+        const string criticalMessage = "Критичний стан транзакції WWM потребує відновлення.";
+        var requests = new List<string>();
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive(), requests));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Any(card => card.ModeSlug == "ukrainian" && card.ActionEnabledForTest));
+
+        await fixture.RunWwmInstallAsync("ukrainian", "default", confirm: true,
+            result: WwmMutationResult.Failure(error, criticalMessage));
+
+        Assert.True(fixture.Form.WwmRecoveryBlockedForTest);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+        Assert.Equal(criticalMessage, fixture.Form.OperationMessageForTest);
+        var card = Assert.Single(FindWwmModeCards(fixture.Form));
+        Assert.Equal("Потрібне відновлення", card.StateTextForTest);
+        Assert.False(card.ActionVisibleForTest);
+        Assert.False(card.ActionEnabledForTest);
+        Assert.DoesNotContain(requests, path => path.EndsWith(".zip", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task WwmInstall_RolledBackMutationFailureDoesNotBlockSession()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Any(card => card.ModeSlug == "ukrainian" && card.ActionEnabledForTest));
+
+        await fixture.RunWwmInstallAsync("ukrainian", "default", confirm: true,
+            result: WwmMutationResult.Failure(WwmMutationError.Mutation, "Зміни безпечно відкотилися."));
+
+        Assert.False(fixture.Form.WwmRecoveryBlockedForTest);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+        var card = Assert.Single(FindWwmModeCards(fixture.Form));
+        Assert.Equal("Встановити", card.ActionTextForTest);
+        Assert.True(card.ActionEnabledForTest);
+    }
+
     [Fact]
     public async Task Startup_PersistedWwmSelectionActivatesWwmSession()
     {
@@ -229,7 +352,7 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.Form.WaitForStartupCompletionForTestAsync().WaitAsync(MainFormTestFixture.Timeout);
         await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
             && form.GameSectionCaption == "Where Winds Meet — Winds4UA / W4U"
-            && FindWwmModeCards(form).Count == 3);
+            && FindWwmModeCards(form).Count == 1);
 
         Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
         var selected = new ApplicationConfigStore(fixture.AppPaths, new MainFormTestFixture.TestLogger()).Load();
@@ -250,7 +373,7 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.WaitForSwitchCompletionAsync();
         await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
             && form.WwmRecoveryBlockedForTest
-            && FindWwmModeCards(form).Count == 3);
+            && FindWwmModeCards(form).Count == 1);
 
         Assert.Equal(OperationState.Idle, fixture.Form.OperationStateForTest);
         Assert.Contains("Журнал відновлення WWM пошкоджено", fixture.Form.OperationMessageForTest, StringComparison.Ordinal);
@@ -403,7 +526,7 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal("Black Desert Online — BDO UA Translate", fixture.Form.BdoTargetProject);
         Assert.Equal("Доступно", fixture.Form.BdoTargetStatus);
         Assert.Equal("Where Winds Meet — Winds4UA (W4U)", fixture.Form.WwmTargetProject);
-        Assert.Equal("Інтеграція готується", fixture.Form.WwmTargetStatus);
+        Assert.Equal("Доступно", fixture.Form.WwmTargetStatus);
         Assert.Equal("Активна гра", fixture.Form.ActiveGameSelectorLabel);
         Assert.Single(fixture.Form.GameSelector.Items.Cast<GameDescriptor>());
         Assert.Equal("Black Desert Online", fixture.Form.GameSelector.Text);
@@ -1177,7 +1300,8 @@ internal sealed class MainFormTestFixture : IDisposable
         bool includeSyntheticSecondGame,
         bool includeWwm,
         Func<HttpMessageHandler>? wwmHandlerFactory,
-        bool seedMalformedWwmJournal)
+        bool seedMalformedWwmJournal,
+        string? wwmConfigJson)
     {
         _bdoHandler = bdoHandler;
         _includeSyntheticSecondGame = includeSyntheticSecondGame;
@@ -1231,7 +1355,9 @@ internal sealed class MainFormTestFixture : IDisposable
             Directory.CreateDirectory(Path.Combine(WwmGameRoot, definition.LocaleRelativePath));
             var wwmPaths = _appPaths.GetGamePersistencePaths(definition.Id);
             wwmPaths.EnsureDirectories();
-            File.WriteAllText(wwmPaths.ConfigFile, JsonSerializer.Serialize(new Config { GamePath = WwmGameRoot }));
+            var wwmConfig = wwmConfigJson == null ? new Config() : JsonSerializer.Deserialize<Config>(wwmConfigJson) ?? new Config();
+            wwmConfig.GamePath ??= WwmGameRoot;
+            File.WriteAllText(wwmPaths.ConfigFile, JsonSerializer.Serialize(wwmConfig));
             if (_seedMalformedWwmJournal)
             {
                 var journal = Path.Combine(wwmPaths.StateDir, "wwm-transaction", "journal.json");
@@ -1423,11 +1549,12 @@ internal sealed class MainFormTestFixture : IDisposable
         bool includeSyntheticSecondGame = false,
         bool includeWwm = false,
         Func<HttpMessageHandler>? wwmHandlerFactory = null,
-        bool seedMalformedWwmJournal = false)
+        bool seedMalformedWwmJournal = false,
+        string? wwmConfigJson = null)
     {
         var fixture = new MainFormTestFixture(
             bdoHandler, startInBackground, exitWhenShown, seedReleaseFeedCache, gamePatch, applicationConfigJson,
-            includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal);
+            includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal, wwmConfigJson);
         fixture._uiThread.Start();
 
         try
@@ -1462,7 +1589,7 @@ internal sealed class MainFormTestFixture : IDisposable
         => new(HttpStatusCode.OK, "[]");
 
     internal static Func<HttpMessageHandler> CreateWwmApiHandlerFactory(byte[]? package = null, List<string>? requests = null,
-        Func<bool>? modeAvailable = null, HttpStatusCode latestStatus = HttpStatusCode.OK)
+        Func<bool>? modeAvailable = null, HttpStatusCode latestStatus = HttpStatusCode.OK, bool omitCurrentArtifact = false)
         => () => new MainFormTestHttpHandler((request, _) =>
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -1471,7 +1598,7 @@ internal sealed class MainFormTestFixture : IDisposable
                 return Task.FromResult(new HttpResponseMessage(latestStatus)
                 {
                     Content = new StringContent(latestStatus == HttpStatusCode.OK
-                        ? CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null)
+                        ? CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null, omitCurrentArtifact)
                         : "{\"success\":false,\"error\":\"temporary_failure\"}", Encoding.UTF8, "application/json")
                 });
             if (path == "/releases/test.zip" && package != null)
@@ -1479,7 +1606,7 @@ internal sealed class MainFormTestFixture : IDisposable
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         });
 
-    private static string CreateWwmLatestJson(byte[]? package, bool modeAvailable)
+    private static string CreateWwmLatestJson(byte[]? package, bool modeAvailable, bool omitCurrentArtifact)
     {
         var bytes = package ?? Array.Empty<byte>();
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
@@ -1493,7 +1620,7 @@ internal sealed class MainFormTestFixture : IDisposable
                 {
                     version = "v-test", published_at = "2026-10-09T00:00:00Z", game_version = (string?)null,
                     game_tested = true, translated_rows = (long?)null, status = "current",
-                    files = modeAvailable
+                    files = modeAvailable && !omitCurrentArtifact
                         ? new object[] { new { variant = "default", slug = "ukrainian", label = "Українська",
                             download_url = "https://winds4ua.com.ua/releases/test.zip", size_bytes = bytes.Length, sha256 = hash } }
                         : Array.Empty<object>()
@@ -1615,12 +1742,13 @@ internal sealed class MainFormTestFixture : IDisposable
         await form.WaitForSwitchCompletionForTestAsync().WaitAsync(Timeout);
     }
 
-    internal async Task RunWwmInstallAsync(string slug, string variant, bool confirm)
+    internal async Task RunWwmInstallAsync(string slug, string variant, bool confirm, WwmMutationResult? result = null)
     {
         var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         PostToUi(async () =>
         {
             Form.WwmCompatibilityConfirmationForTest = () => confirm;
+            Form.WwmInstallResultForTest = result == null ? null : _ => Task.FromResult(result);
             try
             {
                 await Form.HandleWwmInstallForTestAsync(slug, variant);

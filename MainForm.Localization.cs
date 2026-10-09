@@ -58,10 +58,12 @@ public partial class MainForm
     private void BuildWwmModes()
     {
         ClearModeControls();
-        var modes = _wwmFeed?.Data?.Modes ?? new List<WwmMode>();
+        var modes = WwmPackageResolver.GetInstallableModes(_wwmFeed);
         if (modes.Count == 0)
         {
-            AddModePlaceholder(new Label { Text = "Не вдалося завантажити режими Winds4UA.", AutoSize = true,
+            AddModePlaceholder(new Label { Text = _wwmFeed?.Success == true
+                    ? "Наразі немає доступних режимів локалізації."
+                    : "Не вдалося завантажити режими Winds4UA.", AutoSize = true,
                 ForeColor = UiTheme.SecondaryText, BackColor = Color.Transparent, Margin = new Padding(0) });
         }
         else
@@ -102,7 +104,8 @@ public partial class MainForm
             SetActionsEnabled(false);
             SetMessage("Гру не знайдено. Натисніть «Знайти автоматично» або оберіть папку.");
             foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
-                card.Present(card.Mode.Available ? "Доступно" : "Готується", card.Mode.Available ? "Встановити" : null, false);
+                card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
+                    stateTrusted: true, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: false, operationInProgress: _operationInProgress));
             ScheduleContentFit();
             return;
         }
@@ -113,9 +116,14 @@ public partial class MainForm
             SetMessage("Збережений стан WWM пошкоджено. Встановлення та відновлення заблоковано.");
             SetActionsEnabled(false);
         }
-        var restore = installed != null && Directory.Exists(session.StateStore.SnapshotDirectory);
-        restoreOriginalButton.Text = "Відновити попередній стан";
-        SetActionsEnabled(restore && stateError == null);
+        restoreOriginalButton.Text = "Відновити оригінал";
+        var restoreAvailability = stateError != null
+            ? (IsAvailable: false, Message: (string?)null)
+            : await session.InstallService.CheckRestoreAvailabilityAsync(_gameRoot, session.SteamBuildId, cancellationToken).ConfigureAwait(true);
+        if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
+        SetActionsEnabled(restoreAvailability.IsAvailable && !_operationInProgress);
+        if (!restoreAvailability.IsAvailable && !string.IsNullOrWhiteSpace(restoreAvailability.Message))
+            SetMessage(restoreAvailability.Message);
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
         {
             var hasPackage = WwmPackageResolver.TryResolve(_wwmFeed, card.ModeSlug, card.ModeVariant, out var package, out _);
@@ -123,18 +131,10 @@ public partial class MainForm
                 ? new WwmInstalledStateResult(WwmInstalledStateKind.Unknown)
                 : await session.InstallService.ResolveStateAsync(_gameRoot, hasPackage ? package : null, cancellationToken).ConfigureAwait(true);
             if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
-            var status = !card.Mode.Available || !hasPackage ? "Недоступно"
-                : state.State switch
-                {
-                    WwmInstalledStateKind.Current when installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant => "Встановлено",
-                    WwmInstalledStateKind.UpdateAvailable when stateError == null => "Доступне оновлення",
-                    WwmInstalledStateKind.Modified => "Файли змінені",
-                    _ => "Доступно"
-                };
-            var canWrite = hasPackage && state.State != WwmInstalledStateKind.Modified && stateError == null && !_operationInProgress;
-            card.Present(status, card.Mode.Available ?
-                installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant ? "Оновити" : "Встановити" : null,
-                canWrite);
+            var sameMode = installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant;
+            var presentation = WwmModeCardPresentation.Create(sameMode, state.State,
+                stateTrusted: stateError == null, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: true, operationInProgress: _operationInProgress);
+            card.Present(presentation);
         }
         var overallState = installed == null
             ? new WwmInstalledStateResult(WwmInstalledStateKind.Unknown)
@@ -152,13 +152,28 @@ public partial class MainForm
     private void ApplyWwmRecoveryBlockedPresentation()
     {
         DisposeWwmFileMonitor();
-        restoreOriginalButton.Text = "Відновити попередній стан";
+        restoreOriginalButton.Text = "Відновити оригінал";
         SetActionsEnabled(false);
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
-            card.Present("Потрібне відновлення", null, false);
+            card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
+                stateTrusted: false, recoveryBlocked: true, gameDetected: false, operationInProgress: _operationInProgress));
         SetMessage(_wwmRecoveryMessage ?? "Не вдалося безпечно відновити незавершену операцію WWM.");
         ScheduleContentFit();
     }
+
+    private void EnterWwmRecoveryBlockedState(string? message)
+    {
+        _wwmRecoveryBlocked = true;
+        _wwmRecoveryMessage = string.IsNullOrWhiteSpace(message)
+            ? "Критична помилка відновлення WWM. Подальші зміни заблоковано."
+            : message;
+        ApplyWwmRecoveryBlockedPresentation();
+    }
+
+    private static bool RequiresWwmRecoveryBlock(WwmMutationResult result) =>
+        !result.IsSuccess && result.Error is WwmMutationError.RollbackFailed
+            or WwmMutationError.RecoveryRequired
+            or WwmMutationError.SnapshotStale;
 
     private void SetWwmGamePresentation(WwmDetectionResult result)
     {
@@ -223,9 +238,19 @@ public partial class MainForm
             SetOperationState(OperationState.Downloading);
             cancelButton.Visible = true;
             cancelButton.Enabled = true;
-            var result = await session.InstallService.InstallAsync(_gameRoot, session.SteamBuildId, package!, token);
+            var result = WwmInstallResultForTest != null
+                ? await WwmInstallResultForTest(token)
+                : await session.InstallService.InstallAsync(_gameRoot, session.SteamBuildId, package!, token);
             SetOperationState(result.IsSuccess ? OperationState.Completed : OperationState.Failed);
-            SetMessage(result.IsSuccess ? "Локалізацію Winds4UA успішно встановлено." : result.Message ?? "Операцію Winds4UA не виконано.");
+            if (RequiresWwmRecoveryBlock(result))
+            {
+                _logger.Error($"WWM install left unresolved recovery evidence: {result.Error}: {result.Message}");
+                EnterWwmRecoveryBlockedState(result.Message);
+            }
+            else
+            {
+                SetMessage(result.IsSuccess ? "Локалізацію Winds4UA успішно встановлено." : result.Message ?? "Операцію Winds4UA не виконано.");
+            }
             _wwmFeed = latest.Feed;
         }
         catch (OperationCanceledException)
@@ -270,7 +295,15 @@ public partial class MainForm
         {
             var result = await session.InstallService.RestorePreHubAsync(_gameRoot, session.SteamBuildId, token);
             SetOperationState(result.IsSuccess ? OperationState.Completed : OperationState.Failed);
-            SetMessage(result.IsSuccess ? "Попередній стан файлів відновлено." : result.Message ?? "Відновлення не виконано.");
+            if (RequiresWwmRecoveryBlock(result))
+            {
+                _logger.Error($"WWM restore left unresolved recovery evidence: {result.Error}: {result.Message}");
+                EnterWwmRecoveryBlockedState(result.Message);
+            }
+            else
+            {
+                SetMessage(result.IsSuccess ? "Попередній стан файлів відновлено." : result.Message ?? "Відновлення не виконано.");
+            }
             return result;
         }
         catch (OperationCanceledException)
@@ -283,8 +316,9 @@ public partial class MainForm
         {
             _logger.Error($"WWM restore failed: {ex.Message}");
             SetOperationState(OperationState.Failed);
-            SetMessage("Не вдалося безпечно відновити попередній стан WWM.");
-            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Не вдалося безпечно відновити попередній стан WWM.");
+            const string recoveryMessage = "Не вдалося безпечно відновити попередній стан WWM.";
+            EnterWwmRecoveryBlockedState(recoveryMessage);
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, recoveryMessage);
         }
         finally
         {

@@ -202,7 +202,7 @@ public partial class MainForm : Form
             _configStore = wwm.ConfigStore;
             _gameRoot = wwm.GameRoot;
             gameSectionCaptionLabel.Text = "Where Winds Meet — Winds4UA / W4U";
-            restoreOriginalButton.Text = "Відновити попередній стан";
+            restoreOriginalButton.Text = "Відновити оригінал";
         }
         else throw new InvalidOperationException($"Unsupported game session type: {session.GetType().Name}");
 
@@ -470,6 +470,8 @@ public partial class MainForm : Form
     internal string WwmTargetStatus => wwmTargetStatusLabel.Text;
     internal bool WwmRecoveryBlockedForTest => _wwmRecoveryBlocked;
     internal bool WwmRestoreEnabledForTest => restoreOriginalButton.Enabled;
+    internal string WwmRestoreTextForTest => restoreOriginalButton.Text;
+    internal string? ModePlaceholderTextForTest => modesFlowPanel.Controls.OfType<Label>().FirstOrDefault()?.Text;
     internal string ActiveGameSelectorLabel => gameSelectorLabel.Text;
     internal string GameSectionCaption => gameSectionCaptionLabel.Text;
     internal string UninstallHelpText => uninstallHelpLink.Text;
@@ -479,6 +481,7 @@ public partial class MainForm : Form
     internal int ModeSectionHeightForTest => modeGroupBox.Height;
     internal Func<CurrentRelease, bool>? GameTestConfirmationForTest { get; set; }
     internal Func<bool>? WwmCompatibilityConfirmationForTest { get; set; }
+    internal Func<CancellationToken, Task<WwmMutationResult>>? WwmInstallResultForTest { get; set; }
     internal string? SelectedModeCardStateTextForTest => modesFlowPanel.Controls
         .OfType<LocalizationModeCard>()
         .FirstOrDefault(card => string.Equals(card.ModeSlug, GetSelectedModeSlug(), StringComparison.Ordinal))?

@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 10 corrective — IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE
-**Next:** Commit/push correction, exact-SHA CI, then final Architect acceptance; Owner acceptance remains pending
-**Implementation authorization:** No further product-code changes; corrective commit/push is authorized.
+**Current phase:** Stage 10 real install/rollback corrective — IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW
+**Next:** External review of corrective patch; real-game recovery/E2E install/restore requires a separate Owner authorization
+**Implementation authorization:** Current corrective patch is complete; no commit/push before external pre-commit review.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 corrective — IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE | Exact-SHA CI, then final Architect acceptance; Owner acceptance remains pending |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 real install/rollback corrective — IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW | External review; real-game recovery/E2E install/restore requires separate Owner authorization |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
-Stage 9 read-only evidence and external acceptance plus Stage 10 implementation details are in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10 corrective switch-presentation fix is implemented and validated; native Windows smoke passed for BDO↔WWM switching and tray restore. Final Architect acceptance and Owner acceptance remain pending. Stage 8B remains OPTIONAL / NOT STARTED; Stage 9 remains REVIEWED / ACCEPTED. Stable release is v1.2.9; Stage 10 is unreleased.
+Stage 9 read-only evidence and external acceptance plus Stage 10 implementation details are in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10's real install/rollback correction is validated on synthetic fixtures and awaits external pre-commit review. The preserved real transaction must not be touched until a separate Owner authorization. Stage 8B remains OPTIONAL / NOT STARTED; Stage 9 remains REVIEWED / ACCEPTED. Stable release is v1.2.9; Stage 10 is unreleased.
 
 ## Backlog
 

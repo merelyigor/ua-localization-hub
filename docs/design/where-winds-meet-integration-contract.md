@@ -161,4 +161,8 @@ The package service validates HTTPS, declared outer size and SHA-256, limits arc
 
 The versioned WWM state and pre-Hub snapshot are isolated under `games/where-winds-meet`. Restore is only to the exact pre-Hub state, with absent files deleted; it is blocked for changed managed bytes, invalid/missing snapshot, or changed/missing Steam build evidence. Official launcher support remains deferred. API does not map release compatibility to a Steam build, so neutral confirmation remains mandatory. No real game installation/restore was performed.
 
+#### Owner UX correction — current Stage 10 presentation
+
+Only API modes with `available=true` and a valid matching current package are rendered. An exact-current installed mode shows `✓ Встановлено` without an Update action; a different current package for the same installed mode shows `Доступне оновлення` / `Оновити`; another installable mode shows `Доступно` / `Встановити`. The WWM action label is `Відновити оригінал`, while its safety contract remains the trusted first pre-Hub baseline of the management cycle—not independently verified Steam stock. Missing/invalid baseline, mismatched cycle/build, modified targets or unresolved recovery keep restore disabled.
+
 This is **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Owner native smoke remains pending; no commit, push, RC, tag or release was created.

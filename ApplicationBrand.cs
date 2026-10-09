@@ -8,5 +8,5 @@ internal static class ApplicationBrand
     public const string BdoTargetProject = "Black Desert Online — BDO UA Translate";
     public const string BdoTargetStatus = "Доступно";
     public const string WwmTargetProject = "Where Winds Meet — Winds4UA (W4U)";
-    public const string WwmTargetStatus = "Інтеграція готується";
+    public const string WwmTargetStatus = "Доступно";
 }

@@ -9,6 +9,18 @@ namespace BdoClient.Services;
 
 public static class WwmPackageResolver
 {
+    public static IReadOnlyList<WwmMode> GetInstallableModes(WwmReleaseFeed? feed)
+    {
+        var result = new List<WwmMode>();
+        foreach (var mode in feed?.Data?.Modes?.AsEnumerable() ?? Enumerable.Empty<WwmMode>())
+        {
+            if (!string.IsNullOrWhiteSpace(mode.Slug) && !string.IsNullOrWhiteSpace(mode.Variant)
+                && TryResolve(feed, mode.Slug, mode.Variant, out _, out _))
+                result.Add(mode);
+        }
+        return result;
+    }
+
     public static bool TryResolve(WwmReleaseFeed? feed, string slug, string variant, out WwmApiPackage? package, out string? error)
     {
         package = null;

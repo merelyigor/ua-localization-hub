@@ -262,7 +262,9 @@ public sealed class WwmStage10Tests
         CreateGameMarkers(root);
         var targets = WwmGameDefinition.Default.ManagedRelativePaths;
         var original = new byte[] { 3, 4, 5 };
-        File.WriteAllBytes(Path.Combine(root, targets[0]), original);
+        var originalTarget = Path.Combine(root, targets[0]);
+        File.WriteAllBytes(originalTarget, original);
+        File.SetAttributes(originalTarget, File.GetAttributes(originalTarget) | FileAttributes.ReadOnly);
         var packageBytes = CreatePackage();
         var package = CreatePackageMetadata(packageBytes);
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(packageBytes) });
@@ -276,15 +278,43 @@ public sealed class WwmStage10Tests
         Assert.True(File.Exists(Path.Combine(root, targets[1])));
         Assert.NotNull(store.Load(out var error));
         Assert.Null(error);
+        var restoreAvailability = await service.CheckRestoreAvailabilityAsync(root, "42");
+        Assert.True(restoreAvailability.IsAvailable, restoreAvailability.Message);
 
         var restored = await service.RestorePreHubAsync(root, "42");
         Assert.True(restored.IsSuccess, restored.Message);
-        Assert.Equal(original, await File.ReadAllBytesAsync(Path.Combine(root, targets[0])));
+        Assert.Equal(original, await File.ReadAllBytesAsync(originalTarget));
+        Assert.True((File.GetAttributes(originalTarget) & FileAttributes.ReadOnly) != 0);
         Assert.False(File.Exists(Path.Combine(root, targets[1])));
         Assert.Null(store.Load(out error));
         Assert.False(Directory.Exists(store.SnapshotDirectory));
         Assert.Null(store.LoadJournal(out error));
         Assert.Null(error);
+        Assert.False((await service.CheckRestoreAvailabilityAsync(root, "42")).IsAvailable);
+    }
+
+    [Fact]
+    public async Task RestoreAvailability_RequiresValidOwnedInitialSnapshot()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "Where Winds Meet");
+        CreateGameMarkers(root);
+        File.WriteAllBytes(Path.Combine(root, WwmGameDefinition.Default.ManagedRelativePaths[0]), new byte[] { 21, 22, 23 });
+        var archive = CreatePackage();
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
+        var paths = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
+        paths.EnsureDirectories();
+        var store = new WwmStateStore(paths);
+        var service = new WwmInstallService(client, paths, store, Logger);
+        var installed = await service.InstallAsync(root, "42", CreatePackageMetadata(archive));
+        Assert.True(installed.IsSuccess, installed.Message);
+
+        File.Delete(Path.Combine(store.SnapshotDirectory, "0.bin"));
+        var unavailable = await service.CheckRestoreAvailabilityAsync(root, "42");
+
+        Assert.False(unavailable.IsAvailable);
+        Assert.Contains("Відновлення оригіналу неможливе", unavailable.Message, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(root, WwmGameDefinition.Default.ManagedRelativePaths[0])));
     }
 
     [Fact]
@@ -331,6 +361,11 @@ public sealed class WwmStage10Tests
         var secondOriginal = new byte[] { 4, 5, 6 };
         File.WriteAllBytes(Path.Combine(root, targets[0]), firstOriginal);
         File.WriteAllBytes(Path.Combine(root, targets[1]), secondOriginal);
+        foreach (var relative in targets)
+        {
+            var target = Path.Combine(root, relative);
+            File.SetAttributes(target, File.GetAttributes(target) | FileAttributes.ReadOnly);
+        }
         var archive = CreatePackage();
         var package = CreatePackageMetadata(archive);
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
@@ -348,11 +383,112 @@ public sealed class WwmStage10Tests
         Assert.Equal(WwmMutationError.Mutation, result.Error);
         Assert.Equal(firstOriginal, await File.ReadAllBytesAsync(Path.Combine(root, targets[0])));
         Assert.Equal(secondOriginal, await File.ReadAllBytesAsync(Path.Combine(root, targets[1])));
+        Assert.All(targets, relative => Assert.True((File.GetAttributes(Path.Combine(root, relative)) & FileAttributes.ReadOnly) != 0));
         Assert.Null(store.Load(out _));
         Assert.Null(store.LoadJournal(out var journalError));
         Assert.Null(journalError);
         Assert.False(Directory.Exists(store.SnapshotDirectory));
         AssertNoGameTemps(root);
+    }
+
+    [Fact]
+    public async Task Install_GameTempWriteFailureDoesNotAttemptRollbackAndLogsExactPhase()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "Where Winds Meet");
+        CreateGameMarkers(root);
+        var targets = WwmGameDefinition.Default.ManagedRelativePaths;
+        var originals = new[] { new byte[] { 11, 12 }, new byte[] { 13, 14 } };
+        for (var i = 0; i < targets.Length; i++) File.WriteAllBytes(Path.Combine(root, targets[i]), originals[i]);
+        var archive = CreatePackage();
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
+        var paths = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
+        paths.EnsureDirectories();
+        var store = new WwmStateStore(paths);
+        var logger = new NullLogger();
+        var service = new WwmInstallService(client, paths, store, logger)
+        {
+            BeforeGameTempWriteForTest = (_, path) =>
+            {
+                File.WriteAllBytes(path, new byte[] { 99 });
+                throw new UnauthorizedAccessException("Injected temp preparation denial.");
+            }
+        };
+
+        var result = await service.InstallAsync(root, "42", CreatePackageMetadata(archive));
+
+        Assert.Equal(WwmMutationError.Mutation, result.Error);
+        for (var i = 0; i < targets.Length; i++)
+            Assert.Equal(originals[i], await File.ReadAllBytesAsync(Path.Combine(root, targets[i])));
+        AssertNoGameTemps(root);
+        Assert.Null(store.LoadJournal(out _));
+        Assert.False(Directory.Exists(store.SnapshotDirectory));
+        var diagnostic = Assert.Single(logger.Errors, message => message.Contains("operation=install", StringComparison.Ordinal));
+        Assert.Contains("target=" + targets[0], diagnostic, StringComparison.Ordinal);
+        Assert.Contains("phase=write_game_temp", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("exception=UnauthorizedAccessException", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("hresult=0x80070005 win32_error=5", diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain(logger.Errors, message => message.Contains("operation=rollback", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WindowsFileReplace_ReadOnlyManagedTargetReproducesAccessDenied()
+    {
+        using var temp = new TestTemp();
+        var target = Path.Combine(temp.Root, "target.bin");
+        var replacement = Path.Combine(temp.Root, "target.tmp");
+        File.WriteAllBytes(target, new byte[] { 1 });
+        File.WriteAllBytes(replacement, new byte[] { 2 });
+        File.SetAttributes(target, File.GetAttributes(target) | FileAttributes.ReadOnly);
+
+        var exception = Record.Exception(() => File.Replace(replacement, target, null));
+
+        Assert.NotNull(exception);
+        Assert.Equal(unchecked((int)0x80070005), exception.HResult);
+        Assert.Equal(new byte[] { 1 }, File.ReadAllBytes(target));
+        Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(replacement));
+    }
+
+    [Fact]
+    public async Task Install_ReadOnlyTargetReplaceFailureWithNoTargetChangeSkipsDestructiveRollback()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "Where Winds Meet");
+        CreateGameMarkers(root);
+        var targets = WwmGameDefinition.Default.ManagedRelativePaths;
+        var originals = new[] { new byte[] { 21, 22 }, new byte[] { 23, 24 } };
+        foreach (var (relative, index) in targets.Select((relative, index) => (relative, index)))
+        {
+            var target = Path.Combine(root, relative);
+            File.WriteAllBytes(target, originals[index]);
+            File.SetAttributes(target, File.GetAttributes(target) | FileAttributes.ReadOnly);
+        }
+        var archive = CreatePackage();
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
+        var paths = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
+        paths.EnsureDirectories();
+        var store = new WwmStateStore(paths);
+        var logger = new NullLogger();
+        var service = new WwmInstallService(client, paths, store, logger)
+        {
+            BeforeTargetReplaceForTest = (_, _) => throw new UnauthorizedAccessException("Injected replace denial.")
+        };
+
+        var result = await service.InstallAsync(root, "42", CreatePackageMetadata(archive));
+
+        Assert.Equal(WwmMutationError.Mutation, result.Error);
+        for (var i = 0; i < targets.Length; i++)
+        {
+            var target = Path.Combine(root, targets[i]);
+            Assert.Equal(originals[i], await File.ReadAllBytesAsync(target));
+            Assert.True((File.GetAttributes(target) & FileAttributes.ReadOnly) != 0);
+        }
+        Assert.Null(store.LoadJournal(out _));
+        Assert.False(Directory.Exists(store.SnapshotDirectory));
+        AssertNoGameTemps(root);
+        var diagnostic = Assert.Single(logger.Errors, message => message.Contains("operation=install", StringComparison.Ordinal));
+        Assert.Contains("phase=replace_target", diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain(logger.Errors, message => message.Contains("operation=rollback", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1149,6 +1285,12 @@ public sealed class WwmStage10Tests
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "wwm-stage10-tests", Guid.NewGuid().ToString("N"));
         public TestTemp() => Directory.CreateDirectory(Root);
-        public void Dispose() { if (Directory.Exists(Root)) Directory.Delete(Root, recursive: true); }
+        public void Dispose()
+        {
+            if (!Directory.Exists(Root)) return;
+            foreach (var file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
+            Directory.Delete(Root, recursive: true);
+        }
     }
 }

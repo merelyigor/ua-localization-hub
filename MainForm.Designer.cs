@@ -74,7 +74,7 @@ partial class MainForm
         bdoTargetProjectLabel = new Label { Text = ApplicationBrand.BdoTargetProject, AutoSize = true, AccessibleName = ApplicationBrand.BdoTargetProject, ForeColor = UiTheme.SecondaryText, Margin = new Padding(0, 0, 12, 0) };
         bdoTargetStatusLabel = new Label { Text = ApplicationBrand.BdoTargetStatus, AutoSize = true, AccessibleName = $"{ApplicationBrand.BdoTargetProject}: {ApplicationBrand.BdoTargetStatus}", ForeColor = UiTheme.Success, Margin = new Padding(0) };
         wwmTargetProjectLabel = new Label { Text = ApplicationBrand.WwmTargetProject, AutoSize = true, AccessibleName = ApplicationBrand.WwmTargetProject, ForeColor = UiTheme.SecondaryText, Margin = new Padding(0, 2, 12, 0) };
-        wwmTargetStatusLabel = new Label { Text = ApplicationBrand.WwmTargetStatus, AutoSize = true, AccessibleName = $"{ApplicationBrand.WwmTargetProject}: {ApplicationBrand.WwmTargetStatus}", ForeColor = UiTheme.Accent, Margin = new Padding(0, 2, 0, 0) };
+        wwmTargetStatusLabel = new Label { Text = ApplicationBrand.WwmTargetStatus, AutoSize = true, AccessibleName = $"{ApplicationBrand.WwmTargetProject}: {ApplicationBrand.WwmTargetStatus}", ForeColor = UiTheme.Success, Margin = new Padding(0, 2, 0, 0) };
         var bdoTargetRow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
         bdoTargetRow.Controls.Add(bdoTargetProjectLabel); bdoTargetRow.Controls.Add(bdoTargetStatusLabel);
         var wwmTargetRow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };

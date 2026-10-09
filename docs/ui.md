@@ -43,7 +43,7 @@
 
 - **headerTitleLabel** — «Хаб Українізаторів BDO - WWM», Segoe UI 20pt Bold.
 - **headerSubtitleLabel** — «Українські локалізації для ігор BDO - WWM».
-- Блок **«Цільові проєкти»** показує Black Desert Online / BDO UA Translate зі статусом «Доступно» та Where Winds Meet / Winds4UA (W4U) зі статусом «Інтеграція готується».
+- Блок **«Цільові проєкти»** показує Black Desert Online / BDO UA Translate та Where Winds Meet / Winds4UA (W4U) зі статусом «Доступно».
 - **gameSelectorComboBox** — native `DropDownList` selector «Активна гра»; production catalog містить лише «Black Desert Online», тому selector вимкнений, доки не з'явиться друга реальна runtime session.
 - **headerAccentLine** — акцентна лінія 2px.
 - **rightUtilityPanel** (праворуч):
@@ -63,7 +63,7 @@
 - **`gamePathLabel`** — шлях до гри, `AutoEllipsis`.
 - **`detectGameButton`** — автоматичний пошук. Динамічний текст: «Знайти автоматично» → «Пошук...» під час пошуку → «Перевірити» після успіху.
 - **`browseGameButton`** — **«Обрати папку»**, відкриває `FolderBrowserDialog`.
-- **`restoreOriginalButton`** — **«Відновити оригінал»**, розташований у блоці гри. Активний лише коли локалізація встановлена.
+- **`restoreOriginalButton`** — **«Відновити оригінал»**, розташований у блоці гри. Для WWM активний лише за довіреного початкового pre-Hub snapshot, відповідного керованого стану, цілісних файлів і допустимого Steam build. Назва кнопки не обіцяє stock Steam bytes.
 
 ### Детекція гри: UX-поведінка
 
@@ -112,6 +112,8 @@ API запит та локальна детекція запускаються �
 - Всю площу картку клікабельна; вибір картки зберігає `LastMode` у `Config`
 
 Презентація та вибір карток централізовані в `ModeCardPresentationPolicy` (internal static).
+
+Для WWM `WwmPackageResolver` залишає видимими лише режими з `available=true` і валідним matching current artifact; недоступні/неповні режими не показуються. Exact-current встановлений режим має `✓ Встановлено` без кнопки; `Оновити` з'являється лише для іншого package identity того самого режиму. Кнопка WWM `Відновити оригінал` активна лише за валідного довіреного першого pre-Hub snapshot; назва не є твердженням про stock Steam bytes.
 
 ### Стан локалізації
 
