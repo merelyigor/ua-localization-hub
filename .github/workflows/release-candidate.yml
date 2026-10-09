@@ -118,7 +118,7 @@ jobs:
           -p:PublishSingleFile=true `
           -p:IncludeNativeLibrariesForSelfExtract=true `
           -p:PublishTrimmed=false `
-          -p:AssemblyName=BDO-UA-Client `
+          -p:AssemblyName=BDO-WWM-UAClient `
           -p:Version=$version `
           -p:AssemblyVersion=$assemblyVersion `
           -p:FileVersion=$assemblyVersion `
@@ -129,7 +129,7 @@ jobs:
     - name: Verify EXE exists
       shell: pwsh
       run: |
-        $exe = "artifacts/publish/win-x64/BDO-UA-Client.exe"
+        $exe = "artifacts/publish/win-x64/BDO-WWM-UAClient.exe"
         if (!(Test-Path $exe)) {
           Write-Error "EXE not found at $exe"
           exit 1
@@ -140,7 +140,7 @@ jobs:
     - name: Verify EXE version metadata
       shell: pwsh
       run: |
-        $exe = "artifacts/publish/win-x64/BDO-UA-Client.exe"
+        $exe = "artifacts/publish/win-x64/BDO-WWM-UAClient.exe"
         $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
         $version = "${{ steps.resolve.outputs.RELEASE_VERSION }}"
         $expectedFileVersion = "$version.0"
@@ -160,53 +160,48 @@ jobs:
         }
         Write-Output "EXE version metadata verified (exact match)"
 
-    - name: Prepare flat release artifact
-      shell: pwsh
-      run: |
-        $sourceExe = "artifacts/publish/win-x64/BDO-UA-Client.exe"
-        $flatExe = "artifacts/BDO-UA-Client.exe"
-        Copy-Item -LiteralPath $sourceExe -Destination $flatExe -Force
-
-        $sourceHash = (Get-FileHash -Path $sourceExe -Algorithm SHA256).Hash.ToLower()
-        $flatHash = (Get-FileHash -Path $flatExe -Algorithm SHA256).Hash.ToLower()
-        if ($sourceHash -ne $flatHash) {
-          Write-Error "Flat EXE is not byte-identical to published EXE."
-          exit 1
-        }
-        Write-Output "Flat release EXE prepared: $flatExe ($((Get-Item $flatExe).Length) bytes)"
-
-    - name: Calculate SHA-256
-      shell: pwsh
-      run: |
-        $assetName = "BDO-UA-Client.exe"
-        $exePath = "artifacts/$assetName"
-        $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash.ToLower()
-        @("$hash  $assetName") | Out-File -FilePath "artifacts/SHA256SUMS.txt" -Encoding utf8
-        Write-Output "EXE SHA-256: $hash"
-
-    - name: Create release manifest
+    - name: Prepare canonical and legacy bundles
       shell: pwsh
       run: |
         $version = "${{ steps.resolve.outputs.RELEASE_VERSION }}"
         $tag = "${{ steps.resolve.outputs.RELEASE_TAG }}"
-        $sha = "${{ github.sha }}"
-        $assetName = "BDO-UA-Client.exe"
-        $hash = (Get-FileHash -Path "artifacts/BDO-UA-Client.exe" -Algorithm SHA256).Hash.ToLower()
+        $sourceSha = "${{ github.sha }}"
+        $sourceExe = "artifacts/publish/win-x64/BDO-WWM-UAClient.exe"
+        $canonicalDir = "artifacts/bundles/canonical"
+        $legacyDir = "artifacts/bundles/legacy"
+        New-Item -ItemType Directory -Force -Path $canonicalDir, $legacyDir | Out-Null
+
+        $canonicalExe = "BDO-WWM-UAClient.exe"
+        $legacyExe = "BDO-UA-Client.exe"
+        Copy-Item -LiteralPath $sourceExe -Destination (Join-Path $canonicalDir $canonicalExe)
+        Copy-Item -LiteralPath $sourceExe -Destination (Join-Path $legacyDir $legacyExe)
+        $canonicalHash = (Get-FileHash -LiteralPath (Join-Path $canonicalDir $canonicalExe) -Algorithm SHA256).Hash.ToLowerInvariant()
+        $legacyHash = (Get-FileHash -LiteralPath (Join-Path $legacyDir $legacyExe) -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($canonicalHash -ne $legacyHash) { throw "Canonical and legacy executable payloads differ." }
+
         $runId = "${{ github.run_id }}"
+        foreach ($bundle in @(@{ Directory = $canonicalDir; Exe = $canonicalExe }, @{ Directory = $legacyDir; Exe = $legacyExe })) {
+          $manifest = @{
+            schema_version = 2
+            version = $version
+            tag = $tag
+            commit_sha = $sourceSha
+            asset_name = $bundle.Exe
+            sha256 = $canonicalHash
+            platform = "win-x64"
+            workflow_run_id = $runId
+          } | ConvertTo-Json -Depth 2
+          $manifest | Out-File -LiteralPath (Join-Path $bundle.Directory "release-manifest.json") -Encoding utf8
+          @("$canonicalHash  $($bundle.Exe)") | Out-File -LiteralPath (Join-Path $bundle.Directory "SHA256SUMS.txt") -Encoding utf8
 
-        $manifest = @{
-          schema_version = 2
-          version = $version
-          tag = $tag
-          commit_sha = $sha
-          asset_name = $assetName
-          sha256 = $hash
-          platform = "win-x64"
-          workflow_run_id = $runId
-        } | ConvertTo-Json -Depth 2
-
-        $manifest | Out-File -FilePath "artifacts/release-manifest.json" -Encoding utf8
-        Write-Output "release-manifest.json created"
+          $writtenManifest = Get-Content -LiteralPath (Join-Path $bundle.Directory "release-manifest.json") -Raw | ConvertFrom-Json
+          $writtenSums = (Get-Content -LiteralPath (Join-Path $bundle.Directory "SHA256SUMS.txt") -Raw).TrimEnd("`r", "`n")
+          $expectedSums = "$canonicalHash  $($bundle.Exe)"
+          if ($writtenManifest.asset_name -ne $bundle.Exe -or $writtenManifest.sha256 -ne $canonicalHash -or $writtenSums -ne $expectedSums) {
+            throw "Bundle contract verification failed for $($bundle.Exe)."
+          }
+        }
+        Write-Output "Both filename-specific manifests and sums verified against identical executable bytes: $canonicalHash"
 
     - name: Generate release notes from structured source
       shell: pwsh
@@ -214,31 +209,53 @@ jobs:
         $version = "${{ steps.resolve.outputs.RELEASE_VERSION }}"
         $tag = "${{ steps.resolve.outputs.RELEASE_TAG }}"
         $sha = "${{ github.sha }}"
-        $assetName = "BDO-UA-Client-v$version-win-x64.zip"
-        $exeHash = (Get-FileHash -Path "artifacts/BDO-UA-Client.exe" -Algorithm SHA256).Hash.ToLower()
-
-        $notes = & "${{ github.workspace }}\scripts\Generate-ReleaseNotes.ps1" `
-          -Version $version `
-          -Tag $tag `
-          -Sha $sha `
-          -AssetName $assetName `
-          -ExeSha256 $exeHash `
+        $canonicalAssetName = "BDO-WWM-UAClient-v$version-win-x64.zip"
+        $legacyAssetName = "BDO-UA-Client-v$version-win-x64.zip"
+        $exeHash = (Get-FileHash -LiteralPath "artifacts/bundles/canonical/BDO-WWM-UAClient.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+        $canonicalNotes = & "${{ github.workspace }}\scripts\Generate-ReleaseNotes.ps1" `
+          -Version $version -Tag $tag -Sha $sha -AssetName $canonicalAssetName -ExeSha256 $exeHash `
           -FragmentsPath "${{ github.workspace }}\docs\releases\NEXT.json"
+        $legacyExeHash = (Get-FileHash -LiteralPath "artifacts/bundles/legacy/BDO-UA-Client.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+        $legacyNotes = & "${{ github.workspace }}\scripts\Generate-ReleaseNotes.ps1" `
+          -Version $version -Tag $tag -Sha $sha -AssetName $legacyAssetName -ExeSha256 $legacyExeHash `
+          -FragmentsPath "${{ github.workspace }}\docs\releases\NEXT.json"
+        $canonicalNotes | Out-File -LiteralPath "artifacts/bundles/canonical/RELEASE_NOTES-v$version.md" -Encoding utf8
+        $legacyNotes | Out-File -LiteralPath "artifacts/bundles/legacy/RELEASE_NOTES-v$version.md" -Encoding utf8
+        Write-Output "Identity-specific release notes generated for both bundles."
 
-        $notes | Out-File -FilePath "artifacts/RELEASE_NOTES-v$version.md" -Encoding utf8
-        Write-Output "RELEASE_NOTES-v$version.md generated from docs/releases/NEXT.json"
-        Write-Output ""
-        Write-Output $notes
+    - name: Verify complete bundle layouts
+      shell: pwsh
+      run: |
+        $version = "${{ steps.resolve.outputs.RELEASE_VERSION }}"
+        foreach ($bundle in @(
+          @{ Directory = "artifacts/bundles/canonical"; Exe = "BDO-WWM-UAClient.exe" },
+          @{ Directory = "artifacts/bundles/legacy"; Exe = "BDO-UA-Client.exe" }
+        )) {
+          $expectedNames = @($bundle.Exe, "release-manifest.json", "SHA256SUMS.txt", "RELEASE_NOTES-v$version.md") | Sort-Object
+          $actualNames = @(Get-ChildItem -LiteralPath $bundle.Directory -File | ForEach-Object Name | Sort-Object)
+          if ($actualNames.Count -ne 4 -or ($actualNames -join "|") -ne ($expectedNames -join "|")) {
+            throw "Unexpected files in bundle $($bundle.Directory): $($actualNames -join ', ')"
+          }
+          $exeHash = (Get-FileHash -LiteralPath (Join-Path $bundle.Directory $bundle.Exe) -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = Get-Content -LiteralPath (Join-Path $bundle.Directory "release-manifest.json") -Raw | ConvertFrom-Json
+          $sums = (Get-Content -LiteralPath (Join-Path $bundle.Directory "SHA256SUMS.txt") -Raw).TrimEnd("`r", "`n")
+          if ($manifest.version -ne $version -or $manifest.asset_name -ne $bundle.Exe -or $manifest.sha256 -ne $exeHash -or $sums -ne "$exeHash  $($bundle.Exe)") {
+            throw "Manifest/SHA-256 contract failed in $($bundle.Directory)."
+          }
+          Write-Output "Verified $($bundle.Exe), $exeHash, and exactly four flat files."
+        }
 
-    - name: Upload artifact
+    - name: Upload canonical artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: BDO-WWM-UAClient-v${{ steps.resolve.outputs.RELEASE_VERSION }}-win-x64
+        path: artifacts/bundles/canonical/*
+
+    - name: Upload legacy compatibility artifact
       uses: actions/upload-artifact@v4
       with:
         name: BDO-UA-Client-v${{ steps.resolve.outputs.RELEASE_VERSION }}-win-x64
-        path: |
-          artifacts/BDO-UA-Client.exe
-          artifacts/SHA256SUMS.txt
-          artifacts/release-manifest.json
-          artifacts/RELEASE_NOTES-v${{ steps.resolve.outputs.RELEASE_VERSION }}.md
+        path: artifacts/bundles/legacy/*
 
     - name: Summary
       shell: pwsh
@@ -252,6 +269,7 @@ jobs:
         } else {
           $source = "Automatic patch"
         }
+        $verifiedExeSha = (Get-FileHash -LiteralPath "artifacts/bundles/canonical/BDO-WWM-UAClient.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
 
         @"
         ## Release Candidate v$version
@@ -262,27 +280,25 @@ jobs:
         | **Version** | $version |
         | **Proposed final tag** | ``$tag`` (not created by the RC workflow) |
         | **Commit** | ``$sha`` |
-        | **Artifact** | ``BDO-UA-Client-v$version-win-x64`` |
+        | **Source SHA** | ``$sha`` |
+        | **Canonical artifact** | ``BDO-WWM-UAClient-v$version-win-x64`` |
+        | **Legacy compatibility artifact** | ``BDO-UA-Client-v$version-win-x64`` |
 
-        ### Artifact contents
+        ### Bundle contracts
 
-        Downloaded GitHub Actions artifact (GitHub's transport wrapper) contains exactly these flat files:
-         - ``BDO-UA-Client.exe``
-         - ``release-manifest.json`` (schema 2, internal bundle manifest)
-         - ``SHA256SUMS.txt`` (internal EXE hash only)
-         - ``RELEASE_NOTES-v$version.md``
+        Each GitHub Actions artifact contains exactly four flat files. The canonical bundle contains ``BDO-WWM-UAClient.exe``; the legacy bundle contains ``BDO-UA-Client.exe``. Each has its own schema-2 manifest and sums filename, and both EXE payloads are byte-identical (SHA-256 ``$verifiedExeSha``).
 
         ### Next steps
 
-        1. Download artifact ``BDO-UA-Client-v$version-win-x64``
-        2. Test ``BDO-UA-Client.exe`` locally
-        3. Do NOT unpack/repackage the downloaded artifact ZIP for publication
-        4. Perform Owner native UI smoke on ``BDO-UA-Client.exe`` from this exact RC/source SHA
+        1. Download and test canonical artifact ``BDO-WWM-UAClient-v$version-win-x64``
+        2. Verify the legacy compatibility artifact ``BDO-UA-Client-v$version-win-x64`` is also present
+        3. Do NOT unpack/repackage either downloaded artifact ZIP for publication
+        4. Perform Owner native UI smoke on ``BDO-WWM-UAClient.exe`` from this exact RC/source SHA
         5. After Owner approval, create and push ``$tag`` on the exact source SHA ``$sha``
         6. Draft GitHub Release → select the existing tag ``$tag``
         7. Use ``RELEASE_NOTES-v$version.md`` generated from ``docs/releases/NEXT.json`` directly as the release body; edit only to correct a factual defect found during owner validation
-        8. Upload the EXACT downloaded artifact ZIP as the ONLY application asset
-        9. Do NOT separately upload ``BDO-UA-Client.exe``, ``release-manifest.json`` or ``SHA256SUMS.txt``
+        8. Upload both EXACT downloaded artifact ZIPs as the canonical and legacy compatibility application assets
+        9. Do NOT separately upload either EXE, ``release-manifest.json`` or ``SHA256SUMS.txt``
         10. Click **Publish release**
 
         > Final tag creation and GitHub Release publication are intentionally outside this RC workflow.

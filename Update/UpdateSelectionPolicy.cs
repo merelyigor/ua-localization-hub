@@ -7,12 +7,14 @@ public sealed class UpdateCandidate
     public AppVersion Version { get; }
     public string TagName { get; }
     public GitHubRelease Release { get; }
+    public string? BundleAssetName { get; }
 
-    public UpdateCandidate(AppVersion version, string tagName, GitHubRelease release)
+    public UpdateCandidate(AppVersion version, string tagName, GitHubRelease release, string? bundleAssetName = null)
     {
         Version = version;
         TagName = tagName;
         Release = release;
+        BundleAssetName = bundleAssetName;
     }
 }
 
@@ -100,19 +102,37 @@ public sealed class UpdateSelectionPolicy
         }
         else
         {
-            var bundleName = ApplicationTechnicalIdentity.BuildPackageFileName(best.Version.ToString());
-            var bundleAssetCount = best.Release.Assets?.Count(a =>
-                string.Equals(a.Name, bundleName, StringComparison.Ordinal)) ?? 0;
+            var version = best.Version.ToString();
+            var canonicalName = ApplicationTechnicalIdentity.BuildPackageFileName(version);
+            var legacyName = ApplicationTechnicalIdentity.BuildLegacyPackageFileName(version);
+            var canonicalCount = CountAssets(best, canonicalName);
+            var legacyCount = CountAssets(best, legacyName);
             var hasDirectExe = best.Release.Assets?.Any(a =>
-                string.Equals(a.Name, ApplicationTechnicalIdentity.ExecutableFileName, StringComparison.Ordinal)) == true;
-            if (bundleAssetCount != 1 || hasDirectExe || UpdatePackageService.FindExactlyOneAsset(best, bundleName) == null)
+                ApplicationTechnicalIdentity.IsSupportedExecutableFileName(a.Name)) == true;
+            if (canonicalCount > 1 || legacyCount > 1 || hasDirectExe ||
+                canonicalCount == 0 && legacyCount == 0)
             {
-                _logger.Warning($"Update: candidate {best.TagName} lacks one valid canonical bundle asset; fail closed");
+                _logger.Warning($"Update: candidate {best.TagName} has missing or ambiguous supported bundle assets; fail closed");
                 return null;
             }
+
+            foreach (var name in new[] { canonicalName, legacyName })
+            {
+                if (CountAssets(best, name) != 0 && UpdatePackageService.FindExactlyOneAsset(best, name) == null)
+                {
+                    _logger.Warning($"Update: candidate {best.TagName} has an invalid bundle asset '{name}'; fail closed");
+                    return null;
+                }
+            }
+
+            best = new UpdateCandidate(best.Version, best.TagName, best.Release,
+                canonicalCount == 1 ? canonicalName : legacyName);
         }
 
         _logger.Debug($"Update: candidate selected: {best.TagName} (prerelease={best.Release.Prerelease})");
         return best;
     }
+
+    private static int CountAssets(UpdateCandidate candidate, string name)
+        => candidate.Release.Assets?.Count(a => string.Equals(a.Name, name, StringComparison.Ordinal)) ?? 0;
 }

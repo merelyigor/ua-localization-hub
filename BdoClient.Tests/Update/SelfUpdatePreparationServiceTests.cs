@@ -68,7 +68,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "wrong content");
 
         var service = CreateService("C:\\nonexistent.exe", "0.1.3", "0.1.4");
@@ -84,7 +84,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "staged");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
         _store.WriteSession(session);
@@ -103,7 +103,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "staged");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
         _store.WriteSession(session);
@@ -121,7 +121,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "staged");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -131,7 +131,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
 
         _store.WriteSession(session);
 
-        var service = CreateService("C:\\different-path\\BDO-UA-Client.exe",
+        var service = CreateService("C:\\different-path\\BDO-WWM-UAClient.exe",
             session.CurrentVersion, session.TargetVersion);
         var result = await service.PrepareAsync(session.SessionId);
         Assert.False(result.IsSuccess);
@@ -145,7 +145,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "new version");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -172,7 +172,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "staged");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -200,7 +200,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "staged content");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -228,7 +228,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "new version");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -262,7 +262,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "new");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -287,7 +287,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "new");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -313,7 +313,7 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         _store.WriteSession(session);
 
         var stagedDir = _store.GetSessionDir(session.SessionId);
-        var stagedExePath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var stagedExePath = Path.Combine(stagedDir, "BDO-WWM-UAClient.exe");
         File.WriteAllText(stagedExePath, "staged content");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(stagedExePath);
 
@@ -409,9 +409,9 @@ public class SelfUpdatePreparationServiceTests : IDisposable
         CurrentVersion = "0.1.3",
         TargetVersion = "0.1.4",
         TargetTag = "v0.1.4",
-        TargetPath = Path.Combine(Path.GetTempPath(), $"bdo-test-{Guid.NewGuid():N}", "target", "BDO-UA-Client.exe"),
+        TargetPath = Path.Combine(Path.GetTempPath(), $"bdo-test-{Guid.NewGuid():N}", "target", "BDO-WWM-UAClient.exe"),
         ParentPid = 12345,
-        PackageAssetName = "BDO-UA-Client.exe",
+        PackageAssetName = "BDO-WWM-UAClient.exe",
         PackageSha256 = new string('a', 64),
         StagedExeSha256 = new string('b', 64)
     };

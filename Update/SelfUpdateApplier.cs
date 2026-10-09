@@ -83,7 +83,7 @@ public sealed class SelfUpdateApplier
             return ExitCodeInvalidArgs;
         }
 
-        var expectedHelperPath = Path.GetFullPath(Path.Combine(_sessionStore.GetSessionDir(sessionId), ApplicationTechnicalIdentity.ExecutableFileName));
+        var expectedHelperPath = Path.GetFullPath(Path.Combine(_sessionStore.GetSessionDir(sessionId), session.PackageAssetName));
         var actualHelperPath = Path.GetFullPath(currentPath);
         if (!string.Equals(actualHelperPath, expectedHelperPath, StringComparison.OrdinalIgnoreCase))
         {

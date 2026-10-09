@@ -20,14 +20,21 @@ public sealed class UpdateManifestValidator
     public UpdateManifestValidationResult Validate(UpdateManifest manifest, UpdateCandidate candidate)
         => ValidateInternal(manifest, candidate, expectedSchemaVersion: 1, rejectPackageFields: false);
 
+    public UpdateManifestValidationResult ValidateBundle(
+        UpdateManifest manifest,
+        UpdateCandidate candidate,
+        string expectedAssetName)
+        => ValidateInternal(manifest, candidate, expectedSchemaVersion: 2, rejectPackageFields: true, expectedAssetName);
+
     public UpdateManifestValidationResult ValidateBundle(UpdateManifest manifest, UpdateCandidate candidate)
-        => ValidateInternal(manifest, candidate, expectedSchemaVersion: 2, rejectPackageFields: true);
+        => ValidateBundle(manifest, candidate, ApplicationTechnicalIdentity.ExecutableFileName);
 
     private UpdateManifestValidationResult ValidateInternal(
         UpdateManifest manifest,
         UpdateCandidate candidate,
         int expectedSchemaVersion,
-        bool rejectPackageFields)
+        bool rejectPackageFields,
+        string? expectedAssetName = null)
     {
         if (manifest.SchemaVersion != expectedSchemaVersion)
         {
@@ -65,10 +72,10 @@ public sealed class UpdateManifestValidator
             return UpdateManifestValidationResult.Failure("Missing asset_name");
         }
 
-        const string expectedAssetName = ApplicationTechnicalIdentity.ExecutableFileName;
-        if (!string.Equals(manifest.AssetName, expectedAssetName, StringComparison.Ordinal))
+        if (!ApplicationTechnicalIdentity.IsSupportedExecutableFileName(manifest.AssetName) ||
+            expectedAssetName != null && !string.Equals(manifest.AssetName, expectedAssetName, StringComparison.Ordinal))
         {
-            _logger.Warning($"Manifest: asset_name '{manifest.AssetName}' != expected '{expectedAssetName}'");
+            _logger.Warning($"Manifest: unsupported or unexpected asset_name '{manifest.AssetName}'");
             return UpdateManifestValidationResult.Failure("Asset name mismatch");
         }
 
@@ -88,7 +95,7 @@ public sealed class UpdateManifestValidator
 
         if (hasPackageName && !rejectPackageFields)
         {
-            var expectedPackageName = ApplicationTechnicalIdentity.BuildPackageFileName(candidate.Version.ToString());
+            var expectedPackageName = ApplicationTechnicalIdentity.BuildPackageFileName(manifest.AssetName!, candidate.Version.ToString());
             if (!string.Equals(manifest.PackageName, expectedPackageName, StringComparison.Ordinal))
                 return UpdateManifestValidationResult.Failure("Package name mismatch");
             if (!Sha256HexRegex.IsMatch(manifest.PackageSha256!))

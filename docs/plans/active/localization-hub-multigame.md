@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **CORRECTIVE IMPLEMENTATION AUTHORIZED — HIGH-RISK PRE-COMMIT REVIEW REQUIRED**
-Current phase: Stage 10 real install/rollback corrective — IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW
-Next action: external review of this corrective patch; real-game recovery/install/restore remains unauthorized until a separate Owner gate.
+Implementation authorization: **BOUNDED EXECUTABLE IDENTITY MIGRATION AUTHORIZED**
+Current phase: public executable/release artifact identity migration — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW; Stage 10 — REVIEWED / ACCEPTED
+Next action: external review of the identity migration; no Release Candidate is started by this task.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -65,15 +65,15 @@ Dedicated rebrand work eventually updates window title, header/subtitle, tray te
 
 ### Technical identity compatibility
 
-Centralize compatibility metadata before physical renames for the legacy identities: repository `merelyigor/bdo-ua-client`, updater User-Agent/BDO-UA-Client identity, `BDO-UA-Client.exe`, `BDO-UA-Client-vX.Y.Z-win-x64.zip`, autostart value `BDO-UA-Client`, and `%LocalAppData%\\BDO-UA-Client`.
+The public executable/package identity migration is completed as a bridge-compatible change: `BDO-WWM-UAClient.exe` and `BDO-WWM-UAClient-vX.Y.Z-win-x64.zip` are canonical; `BDO-UA-Client.exe` and its versioned ZIP remain explicit legacy compatibility identities. User-Agent `BDO-UA-Client`, autostart value, `%LocalAppData%\\BDO-UA-Client`, single-instance/log/update workspace identities and repository fallback remain intentionally stable.
 
 Do not rename/migrate the LocalAppData root in the initial hub roadmap. Existing `games/<stable-game-id>/` logical isolation remains the basis. Any root migration requires a separate high-risk decision and pre-commit review.
 
 ### Repository and package rename
 
-The repository is now canonical at `merelyigor/ua-localization-hub`; `merelyigor/bdo-ua-client` remains a legacy redirected compatibility slug and must never be reused. The bridge release retained legacy fallback so old clients could update; after rename history/identity, local `origin`, Actions, releases, redirects, API behavior and update discovery were verified.
+The repository is canonical at `merelyigor/ua-localization-hub`; `merelyigor/bdo-ua-client` remains a legacy redirected compatibility slug and must never be reused. The repository bridge retained legacy fallback. Public EXE/package identity migration now publishes canonical and legacy four-file bundles from the same binary; v1.2.9 clients can keep selecting the exact legacy bundle while new clients prefer canonical.
 
-Visible rebrand and technical EXE/package/autostart rename are separate. First use the new display identity while retaining legacy physical names. Optional later rename requires updater support for both identities, add-new/verify/remove-old autostart migration, and an old-client update test. It must not be required for the first hub release.
+Autostart and local-data identity migration are out of scope and remain legacy-stable. No automatic installed-file path migration is introduced by the public artifact rename; the current process path remains the updater replacement target.
 
 ### Second-game onboarding gate
 
@@ -163,11 +163,11 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 ### Stage 10 — Real Where Winds Meet Steam-first integration
 
-**IMPLEMENTED / VALIDATED; NEEDS CORRECTION.** The base implementation pre-commit review was accepted, and the earlier switch-presentation correction passed native smoke. Owner's real install attempt exposed a ReadOnly-target replacement failure; the failed journal, operation backups, and pre-Hub snapshot are preserved. The current correction adds phase-aware transaction diagnostics, preserves/restores target attributes while safely replacing ReadOnly files, distinguishes temp preparation from target mutation, serializes per-config load/save and uses unique config temp names, and shows WWM as `Доступно`. This correction is validated on synthetic fixtures only and awaits external pre-commit review. No real-game recovery/install/restore was performed during this task; that E2E gate requires separate Owner authorization. Stage 10 remains unreleased.
+**REVIEWED / ACCEPTED.** Stage 10 WWM implementation and its corrective iterations passed external review and the authorized real install/restore E2E. The reviewed transaction restores the exact pre-Hub files/attributes; WWM remains Steam-first and unreleased in stable v1.2.9. Public executable identity migration is a separate bounded pre-v1.2.10 release/update-contract task and does not change localization runtime behavior.
 
 Owner UX addendum: unavailable modes are omitted, saved unavailable selection falls back to the first installable card, exact-current packages show `✓ Встановлено` without an action, and only a different package for the installed mode shows `Доступне оновлення` / `Оновити`. The restore button says `Відновити оригінал` while its validated data contract remains exact initial pre-Hub baseline—not asserted Steam stock. The action requires valid managed state, snapshot cycle ownership/integrity, unchanged targets and build-safety checks.
 
-No real game install/restore was performed. This is high-risk multi-file mutation; the required external pre-commit Architect review of the base implementation is accepted. The switch-loading presentation correction passed local native smoke; final Architect acceptance remains pending. Owner acceptance is not claimed. Stage 10 remains unreleased.
+Stage 10 real install/restore E2E and external review are accepted. Stage 10 remains unreleased in v1.2.9; the separate public executable identity migration is not a new localization stage and does not authorize an RC or release.
 
 ## Acceptance criteria
 
@@ -177,7 +177,7 @@ No real game install/restore was performed. This is high-risk multi-file mutatio
 - Application-global self-update, tray and autostart remain stable.
 - Game mutation retains backup, restore and rollback guarantees.
 - Repository rename, if Owner proceeds, preserves redirects, releases and old-client update compatibility.
-- Physical EXE rename, if performed, is bridge-compatible; LocalAppData is not destructively migrated without a separate decision.
+- Public EXE/package identity is canonicalized with bridge-compatible legacy bundles; LocalAppData and autostart remain unchanged.
 - BDO ↔ WWM ↔ BDO lifecycle uses separate sessions and game-scoped state, with WWM Steam-only detection and two-file transaction recovery.
 
 ## Non-goals
@@ -192,7 +192,7 @@ Stage 9 established the current production API, Steam-first detection, v2.6.2 pa
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW** for the real install/rollback correction; real-game recovery/E2E install/restore remains unauthorized. Stable public release remains v1.2.9; Stage 10 is unreleased.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9 and 10 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 implementation and real-game E2E are accepted but unreleased in stable v1.2.9. The executable identity migration is a separate pre-v1.2.10 release-contract task.
 
 ### v1.2.9 release cycle
 

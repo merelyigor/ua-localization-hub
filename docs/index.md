@@ -22,7 +22,7 @@
 ## Поточний стан
 
 - **Платформа:** Windows x64, .NET 8, WinForms
-- **Пакування:** self-contained single-file (BDO-UA-Client.exe)
+- **Пакування:** self-contained single-file (BDO-WWM-UAClient.exe); legacy bundle identity remains available for updates from published clients
 - **Оновлення застосунку:** GitHub Releases `merelyigor/ua-localization-hub`, canonical ZIP transport (schema-2 manifest)
 - **Тести:** остання локальна Stage 10 Release suite — 1092 passed / 0 failed / 0 skipped
 - **Стабільний реліз:** v1.2.9, опублікований з canonical ZIP self-update/release transport

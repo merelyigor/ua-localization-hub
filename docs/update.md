@@ -12,18 +12,22 @@
 - Backup перед replace, rollback при будь-якій помилці. Ніколи «old deleted, new not installed».
 - Application update та localization операції взаємовиключні.
 
-## Транспорт: canonical ZIP
+## Транспорт: canonical і legacy-сумісний ZIP
 
-Єдиний release asset — GitHub-generated ZIP `BDO-UA-Client-vX.Y.Z-win-x64.zip`, всередині якого чотири flat-файли:
+Нові релізи містять два GitHub-generated ZIP assets, створені з однакових EXE bytes. Канонічний bundle:
+
+`BDO-WWM-UAClient-vX.Y.Z-win-x64.zip`
 
 | Файл | Призначення |
 |---|---|
-| `BDO-UA-Client.exe` | Застосунок |
+| `BDO-WWM-UAClient.exe` | Застосунок |
 | `release-manifest.json` | Schema-2 manifest (internal) |
 | `SHA256SUMS.txt` | Суми файлів |
 | `RELEASE_NOTES-vX.Y.Z.md` | Нотатки релізу |
 
-Немає project-created nested ZIP, немає `.7z`/`.tar` тощо. GitHub asset digest валідує зовнішній ZIP; updater валідує внутрішній EXE SHA-256 та version metadata.
+Для вже опублікованих клієнтів також створюється сумісний `BDO-UA-Client-vX.Y.Z-win-x64.zip`; він містить той самий EXE під ім'ям `BDO-UA-Client.exe`, а його manifest і sums використовують це legacy-ім'я. Кожен bundle має власний коректний schema-2 contract. Новий updater віддає перевагу canonical bundle, а якщо він відсутній — може прийняти єдиний валідний legacy bundle. Якщо один із знайдених підтримуваних bundles malformed або неоднозначний, вибір завершується fail-closed. Клієнти v1.2.9 вибирають legacy ZIP за точним старим ім'ям і залишаються сумісними навіть коли поряд опублікований canonical ZIP.
+
+Немає project-created nested ZIP, немає `.7z`/`.tar` тощо. GitHub asset digest валідує кожен зовнішній ZIP; updater валідує внутрішній EXE SHA-256 та version metadata.
 
 ## Компоненти (Update/)
 
@@ -101,4 +105,4 @@ UI — `UpdateApplyingForm`.
 
 Поточний updater спочатку запитує canonical repository `merelyigor/ua-localization-hub`. Якщо canonical endpoint повертає HTTP 404, bounded discovery один раз пробує legacy compatibility slug `merelyigor/bdo-ua-client`. Успішна canonical-відповідь не викликає другий endpoint; 401/403/rate-limit, 5xx, network failure та malformed JSON не запускають fallback і залишаються звичайною помилкою discovery. Asset download URLs не переписуються й використовуються в тому вигляді, у якому їх повернув GitHub.
 
-Stage 6 централізує ці compatibility identities, але фізично зберігає `BDO-UA-Client.exe`, `BDO-UA-Client-vX.Y.Z-win-x64.zip`, autostart value `BDO-UA-Client` і `%LocalAppData%\\BDO-UA-Client`. Repository вже перейменовано на canonical `merelyigor/ua-localization-hub`; старий slug не повинен повторно використовуватися.
+Поточна публічна executable/package identity — `BDO-WWM-UAClient.exe` / `BDO-WWM-UAClient-vX.Y.Z-win-x64.zip`; legacy `BDO-UA-Client.exe` та `BDO-UA-Client-vX.Y.Z-win-x64.zip` зберігаються у compatibility bundle для вже опублікованих клієнтів. Міграція не змінює User-Agent, autostart value `BDO-UA-Client`, `%LocalAppData%\\BDO-UA-Client`, single-instance/log/workspace identity або repository compatibility slugs.

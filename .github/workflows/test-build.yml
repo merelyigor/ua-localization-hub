@@ -53,7 +53,7 @@ jobs:
           -p:PublishSingleFile=true `
           -p:IncludeNativeLibrariesForSelfExtract=true `
           -p:PublishTrimmed=false `
-          -p:AssemblyName=BDO-UA-Client `
+          -p:AssemblyName=BDO-WWM-UAClient `
           -p:Version=0.0.0 `
           -p:AssemblyVersion=0.0.0.0 `
           -p:FileVersion=0.0.0.0 `
@@ -63,7 +63,7 @@ jobs:
     - name: Verify EXE version
       shell: pwsh
       run: |
-        $exe = "artifacts/publish/win-x64/BDO-UA-Client.exe"
+        $exe = "artifacts/publish/win-x64/BDO-WWM-UAClient.exe"
         $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
         Write-Output "FileVersion:    $($info.FileVersion)"
         Write-Output "ProductVersion: $($info.ProductVersion)"
@@ -71,5 +71,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: BDO-UA-Client-test-build-win-x64
-        path: artifacts/publish/win-x64/BDO-UA-Client.exe
+        name: BDO-WWM-UAClient-test-build-win-x64
+        path: artifacts/publish/win-x64/BDO-WWM-UAClient.exe

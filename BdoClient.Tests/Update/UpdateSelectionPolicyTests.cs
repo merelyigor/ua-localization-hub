@@ -235,7 +235,7 @@ public class UpdateSelectionPolicyTests
                 {
                     new()
                     {
-                        Name = "BDO-UA-Client-v0.1.4-win-x64.zip",
+                        Name = "BDO-WWM-UAClient-v0.1.4-win-x64.zip",
                         BrowserDownloadUrl = "https://example.com/bundle.zip",
                         Size = 100,
                         State = "uploaded"
@@ -248,6 +248,87 @@ public class UpdateSelectionPolicyTests
 
         Assert.NotNull(candidate);
         Assert.Equal("v0.1.4", candidate!.TagName);
+        Assert.Equal("BDO-WWM-UAClient-v0.1.4-win-x64.zip", candidate.BundleAssetName);
+    }
+
+    [Fact]
+    public void DualBundleRelease_IsCanonicalForNewClientAndSelectableByV129()
+    {
+        var policy = new UpdateSelectionPolicy(Logger);
+        var releases = new List<GitHubRelease>
+        {
+            MakeRelease("v0.1.3", assets: Manifest),
+            MakeRelease("v0.1.4", assets: new[]
+            {
+                ("BDO-WWM-UAClient-v0.1.4-win-x64.zip", "https://example.com/canonical.zip", "uploaded"),
+                ("BDO-UA-Client-v0.1.4-win-x64.zip", "https://example.com/legacy.zip", "uploaded")
+            })
+        };
+        releases[1].Assets![0].Size = 100;
+        releases[1].Assets![1].Size = 100;
+
+        var candidate = policy.FindUpdate(AppVersionInfo.FromRawVersion("0.1.3"), releases);
+
+        Assert.NotNull(candidate);
+        Assert.Equal("BDO-WWM-UAClient-v0.1.4-win-x64.zip", candidate!.BundleAssetName);
+        Assert.Single(candidate.Release.Assets!, a => a.Name == "BDO-UA-Client-v0.1.4-win-x64.zip");
+        Assert.DoesNotContain(candidate.Release.Assets!, a => a.Name == "BDO-UA-Client.exe");
+        Assert.NotNull(UpdatePackageService.FindExactlyOneAsset(candidate, "BDO-UA-Client-v0.1.4-win-x64.zip"));
+    }
+
+    [Fact]
+    public void LegacyBundleWithoutCanonical_IsAcceptedForCompatibility()
+    {
+        var policy = new UpdateSelectionPolicy(Logger);
+        var releases = new List<GitHubRelease>
+        {
+            MakeRelease("v0.1.3", assets: Manifest),
+            MakeRelease("v0.1.4", assets: ("BDO-UA-Client-v0.1.4-win-x64.zip", "https://example.com/legacy.zip", "uploaded"))
+        };
+        releases[1].Assets![0].Size = 100;
+
+        var candidate = policy.FindUpdate(AppVersionInfo.FromRawVersion("0.1.3"), releases);
+
+        Assert.NotNull(candidate);
+        Assert.Equal("BDO-UA-Client-v0.1.4-win-x64.zip", candidate!.BundleAssetName);
+    }
+
+    [Fact]
+    public void DuplicateCanonicalBundle_FailsClosed()
+    {
+        var policy = new UpdateSelectionPolicy(Logger);
+        var releases = new List<GitHubRelease>
+        {
+            MakeRelease("v0.1.3", assets: Manifest),
+            MakeRelease("v0.1.4", assets: new[]
+            {
+                ("BDO-WWM-UAClient-v0.1.4-win-x64.zip", "https://example.com/a.zip", "uploaded"),
+                ("BDO-WWM-UAClient-v0.1.4-win-x64.zip", "https://example.com/b.zip", "uploaded")
+            })
+        };
+        releases[1].Assets![0].Size = 100;
+        releases[1].Assets![1].Size = 100;
+
+        Assert.Null(policy.FindUpdate(AppVersionInfo.FromRawVersion("0.1.3"), releases));
+    }
+
+    [Fact]
+    public void MalformedLegacyBundleWithCanonicalBundle_FailsClosed()
+    {
+        var policy = new UpdateSelectionPolicy(Logger);
+        var releases = new List<GitHubRelease>
+        {
+            MakeRelease("v0.1.3", assets: Manifest),
+            MakeRelease("v0.1.4", assets: new[]
+            {
+                ("BDO-WWM-UAClient-v0.1.4-win-x64.zip", "https://example.com/canonical.zip", "uploaded"),
+                ("BDO-UA-Client-v0.1.4-win-x64.zip", "http://example.com/legacy.zip", "uploaded")
+            })
+        };
+        releases[1].Assets![0].Size = 100;
+        releases[1].Assets![1].Size = 100;
+
+        Assert.Null(policy.FindUpdate(AppVersionInfo.FromRawVersion("0.1.3"), releases));
     }
 
     [Fact]
@@ -257,7 +338,7 @@ public class UpdateSelectionPolicyTests
         var policy = new UpdateSelectionPolicy(Logger);
         var release = MakeRelease("v0.1.4", assets: new[]
         {
-            ("BDO-UA-Client-v0.1.4-win-x64.zip", "https://example.com/bundle.zip", "uploaded"),
+            ("BDO-WWM-UAClient-v0.1.4-win-x64.zip", "https://example.com/bundle.zip", "uploaded"),
             ("BDO-UA-Client.exe", "https://example.com/app.exe", "uploaded")
         });
         release.Assets!.First(a => a.Name!.EndsWith(".zip", StringComparison.Ordinal)).Size = 100;

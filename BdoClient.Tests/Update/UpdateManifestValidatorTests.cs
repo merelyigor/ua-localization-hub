@@ -14,7 +14,7 @@ public class UpdateManifestValidatorTests
         Version = "0.1.4",
         Tag = "v0.1.4",
         CommitSha = "74875dfcc6762ec0edb75c40e225150f94fa45e5",
-        AssetName = "BDO-UA-Client.exe",
+        AssetName = "BDO-WWM-UAClient.exe",
         Sha256 = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
         Platform = "win-x64",
         WorkflowRunId = "32211040254"
@@ -38,7 +38,7 @@ public class UpdateManifestValidatorTests
     public void OptionalPackageFields_Valid()
     {
         var manifest = ValidManifest();
-        manifest.PackageName = "BDO-UA-Client-v0.1.4-win-x64.zip";
+        manifest.PackageName = "BDO-WWM-UAClient-v0.1.4-win-x64.zip";
         manifest.PackageSha256 = new string('b', 64);
         Assert.True(new UpdateManifestValidator(Logger).Validate(manifest, MakeCandidate("v0.1.4", new AppVersion(0, 1, 4))).IsValid);
     }
@@ -49,7 +49,7 @@ public class UpdateManifestValidatorTests
     public void OnlyOneOptionalPackageField_Fails(bool hasName, bool hasSha)
     {
         var manifest = ValidManifest();
-        manifest.PackageName = hasName ? "BDO-UA-Client-v0.1.4-win-x64.zip" : null;
+        manifest.PackageName = hasName ? "BDO-WWM-UAClient-v0.1.4-win-x64.zip" : null;
         manifest.PackageSha256 = hasSha ? new string('b', 64) : null;
         Assert.False(new UpdateManifestValidator(Logger).Validate(manifest, MakeCandidate("v0.1.4", new AppVersion(0, 1, 4))).IsValid);
     }
@@ -58,7 +58,7 @@ public class UpdateManifestValidatorTests
     public void MalformedPackageSha_Fails()
     {
         var manifest = ValidManifest();
-        manifest.PackageName = "BDO-UA-Client-v0.1.4-win-x64.zip";
+        manifest.PackageName = "BDO-WWM-UAClient-v0.1.4-win-x64.zip";
         manifest.PackageSha256 = "not-a-sha";
         Assert.False(new UpdateManifestValidator(Logger).Validate(manifest, MakeCandidate("v0.1.4", new AppVersion(0, 1, 4))).IsValid);
     }
@@ -151,6 +151,18 @@ public class UpdateManifestValidatorTests
         var manifest = ValidManifest();
         manifest.AssetName = "BDO-UA-Client-v0.1.4-win-x64.zip";
         Assert.False(new UpdateManifestValidator(Logger).Validate(manifest, MakeCandidate("v0.1.4", new AppVersion(0, 1, 4))).IsValid);
+    }
+
+    [Fact]
+    public void LegacyManifestAndPackageIdentity_RemainsValid()
+    {
+        var manifest = ValidManifest();
+        manifest.AssetName = ApplicationTechnicalIdentity.LegacyExecutableFileName;
+        manifest.PackageName = ApplicationTechnicalIdentity.BuildLegacyPackageFileName("0.1.4");
+        manifest.PackageSha256 = new string('b', 64);
+
+        Assert.True(new UpdateManifestValidator(Logger)
+            .Validate(manifest, MakeCandidate("v0.1.4", new AppVersion(0, 1, 4))).IsValid);
     }
 
     [Fact]

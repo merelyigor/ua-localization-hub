@@ -601,6 +601,20 @@ public class UpdateSessionStoreTests : IDisposable
         Assert.Equal(UpdateSessionLoadStatus.Invalid, result.Status);
     }
 
+    [Theory]
+    [InlineData("BDO-WWM-UAClient.exe")]
+    [InlineData("BDO-UA-Client.exe")]
+    public void LoadSession_SupportedHelperIdentity_RemainsValid(string executableName)
+    {
+        var session = MakeSession();
+        session.PackageAssetName = executableName;
+        _store.WriteSession(session);
+
+        var result = _store.LoadSession(session.SessionId);
+
+        Assert.Equal(UpdateSessionLoadStatus.Valid, result.Status);
+    }
+
     [Fact]
     public void LoadSession_PackageShaNonHex_ReturnsInvalid()
     {

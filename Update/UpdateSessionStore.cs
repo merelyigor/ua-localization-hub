@@ -249,8 +249,7 @@ public sealed class UpdateSessionStore
         if (session.ParentPid <= 0)
             return UpdateSessionLoadResult.Invalid;
 
-        const string expectedAssetName = ApplicationTechnicalIdentity.ExecutableFileName;
-        if (!string.Equals(session.PackageAssetName, expectedAssetName, StringComparison.Ordinal))
+        if (!ApplicationTechnicalIdentity.IsSupportedExecutableFileName(session.PackageAssetName))
             return UpdateSessionLoadResult.Invalid;
 
         if (!IsValidSha256Hex(session.PackageSha256))
@@ -311,8 +310,7 @@ public sealed class UpdateSessionStore
         if (session.ParentPid <= 0)
             return UpdateSessionLoadResult.Invalid;
 
-        const string expectedAssetName = ApplicationTechnicalIdentity.ExecutableFileName;
-        if (!string.Equals(session.PackageAssetName, expectedAssetName, StringComparison.Ordinal))
+        if (!ApplicationTechnicalIdentity.IsSupportedExecutableFileName(session.PackageAssetName))
             return UpdateSessionLoadResult.Invalid;
 
         if (!IsValidSha256Hex(session.PackageSha256))
@@ -486,7 +484,7 @@ public sealed class UpdateSessionStore
 
         var targetVersion = AppVersion.TryParseCoreVersion(session.TargetVersion);
         return targetVersion.HasValue
-            ? ApplicationTechnicalIdentity.BuildPackageFileName(targetVersion.Value.ToString())
+            ? ApplicationTechnicalIdentity.BuildPackageFileName(session.PackageAssetName, targetVersion.Value.ToString())
             : null;
     }
 

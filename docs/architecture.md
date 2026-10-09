@@ -122,7 +122,7 @@ WWM runtime є Steam-only. `WwmSteamDetector` читає Steam libraries та `a
 
 ## Technical identity boundary
 
-`ApplicationTechnicalIdentity` централізує активні compatibility identities для поточного update/startup/storage protocol: canonical repository `merelyigor/ua-localization-hub`, legacy fallback `merelyigor/bdo-ua-client`, User-Agent `BDO-UA-Client`, фізичний EXE `BDO-UA-Client.exe`, legacy package naming, autostart value та `%LocalAppData%\\BDO-UA-Client`. Repository rename уже виконано без зміни фізичних compatibility identities.
+`ApplicationTechnicalIdentity` централізує публічні та compatibility identities: canonical repository `merelyigor/ua-localization-hub`, legacy fallback `merelyigor/bdo-ua-client`, canonical EXE/package `BDO-WWM-UAClient.exe` / `BDO-WWM-UAClient-vX.Y.Z-win-x64.zip`, а також legacy EXE/package `BDO-UA-Client.exe` / `BDO-UA-Client-vX.Y.Z-win-x64.zip` для вже опублікованих клієнтів. User-Agent, autostart value, `%LocalAppData%\\BDO-UA-Client`, single-instance, logs і update workspace залишаються незмінними.
 
 `GitHubUpdateClient` виконує bounded ordered discovery: спочатку canonical repository, а legacy fallback — лише після canonical HTTP 404. Успішний canonical response, malformed JSON та інші HTTP failures не запускають fallback; asset URLs залишаються тими, які повернув GitHub.
 

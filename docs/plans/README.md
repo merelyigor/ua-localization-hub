@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 10 real install/rollback corrective — IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW
+**Current phase:** Stage 10 — REVIEWED / ACCEPTED; public executable identity migration — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW
 **Next:** External review of corrective patch; real-game recovery/E2E install/restore requires a separate Owner authorization
-**Implementation authorization:** Current corrective patch is complete; no commit/push before external pre-commit review.
+**Implementation authorization:** Bounded identity migration is authorized; Stage 10 runtime changes are not in scope.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 real install/rollback corrective — IMPLEMENTED / VALIDATED / PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW | External review; real-game recovery/E2E install/restore requires separate Owner authorization |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 — REVIEWED / ACCEPTED; executable identity migration — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW | External review of identity migration; RC v1.2.10 not started |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
-Stage 9 read-only evidence and external acceptance plus Stage 10 implementation details are in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10's real install/rollback correction is validated on synthetic fixtures and awaits external pre-commit review. The preserved real transaction must not be touched until a separate Owner authorization. Stage 8B remains OPTIONAL / NOT STARTED; Stage 9 remains REVIEWED / ACCEPTED. Stable release is v1.2.9; Stage 10 is unreleased.
+Stage 9 analysis and Stage 10 WWM implementation/real E2E are REVIEWED / ACCEPTED. The plan remains ACTIVE / PRIMARY. The current bounded public identity migration is separate from localization runtime and remains pending external review. Stage 8B remains OPTIONAL / NOT STARTED; stable release is v1.2.9; no RC is authorized by this task.
 
 ## Backlog
 

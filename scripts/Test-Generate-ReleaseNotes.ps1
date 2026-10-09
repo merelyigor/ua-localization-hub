@@ -12,9 +12,9 @@ function Write-JsonFile([string]$Path, $Value) {
     [System.IO.File]::WriteAllText($Path, $json, [System.Text.Encoding]::UTF8)
 }
 
-function Invoke-Notes([string]$Path) {
+function Invoke-Notes([string]$Path, [string]$AssetName = "BDO-WWM-UAClient-v1.2.2-win-x64.zip") {
     try {
-        $output = & $generatorPath -Version "1.2.2" -Tag "v1.2.2" -Sha ("a" * 40) -AssetName "BDO-UA-Client-v1.2.2-win-x64.zip" -ExeSha256 ("b" * 64) -FragmentsPath $Path
+        $output = & $generatorPath -Version "1.2.2" -Tag "v1.2.2" -Sha ("a" * 40) -AssetName $AssetName -ExeSha256 ("b" * 64) -FragmentsPath $Path
         return @{ Success = $true; Output = ($output -join "`n") }
     } catch {
         return @{ Success = $false; Output = $_.Exception.Message }
@@ -53,16 +53,22 @@ try {
     $performanceIndex = $valid.Output.IndexOf("## Продуктивність")
     Assert-True "canonical section order" ($newIndex -ge 0 -and $newIndex -lt $fixedIndex -and $fixedIndex -lt $performanceIndex)
     Assert-True "item ordering preserved" ($valid.Output.IndexOf("перша можливість") -lt $valid.Output.IndexOf("друга можливість"))
-    Assert-True "asset and hash rendered" ($valid.Output.Contains("BDO-UA-Client-v1.2.2-win-x64.zip") -and $valid.Output.Contains(("b" * 64)))
+    Assert-True "canonical asset and hash rendered" ($valid.Output.Contains("BDO-WWM-UAClient-v1.2.2-win-x64.zip") -and $valid.Output.Contains(("b" * 64)) -and $valid.Output.Contains("BDO-WWM-UAClient.exe"))
+    Assert-True "legacy compatibility package is documented" $valid.Output.Contains("BDO-UA-Client-v1.2.2-win-x64.zip")
     Assert-True "Hub heading rendered" ($valid.Output.Contains("# Хаб Українізаторів BDO - WWM 1.2.2") -and -not $valid.Output.Contains("# BDO UA Client 1.2.2"))
-    Assert-True "canonical repository links and legacy technical install contract retained" ($valid.Output.Contains("BDO-UA-Client.exe") -and $valid.Output.Contains("https://github.com/merelyigor/ua-localization-hub") -and -not $valid.Output.Contains("https://github.com/merelyigor/bdo-ua-client"))
+    Assert-True "canonical repository links rendered" ($valid.Output.Contains("https://github.com/merelyigor/ua-localization-hub") -and -not $valid.Output.Contains("https://github.com/merelyigor/bdo-ua-client"))
     Assert-True "Ukrainian installation and links rendered" ($valid.Output.Contains("## Як встановити") -and $valid.Output.Contains("## Посилання") -and $valid.Output.Contains("SmartScreen"))
+
+    $legacy = Invoke-Notes $validPath "BDO-UA-Client-v1.2.2-win-x64.zip"
+    Assert-True "legacy bundle notes retain the legacy executable identity" ($legacy.Success -and $legacy.Output.Contains("BDO-UA-Client.exe"))
 
     $emptyPath = Join-Path $tempRoot "empty.json"
     Write-JsonFile $emptyPath ([ordered]@{ schema_version = 1; summary = ""; new = @(); fixed = @(); reliability = @(); performance = @(); changes = @(); limitations = @() })
     $empty = Invoke-Notes $emptyPath
     Assert-True "empty sections omitted" ($empty.Success -and -not $empty.Output.Contains("## Що нового") -and -not $empty.Output.Contains("## Виправлено"))
     Assert-True "maintenance fallback rendered" $empty.Output.Contains("Технічне обслуговування та внутрішні покращення")
+
+    Assert-Fails "unknown release asset identity" (Invoke-Notes $emptyPath "other-v1.2.2.zip")
 
     $publicVersionPath = Join-Path $tempRoot "public-version.json"
     Write-JsonFile $publicVersionPath ([ordered]@{ schema_version = 1; summary = ""; new = @("сумісність із v1.2.2"); fixed = @(); reliability = @(); performance = @(); changes = @(); limitations = @() })

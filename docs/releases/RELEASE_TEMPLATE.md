@@ -37,9 +37,10 @@ Internal EXE SHA-256:
 ## Як встановити
 
 1. Завантажте `{{ASSET_NAME}}` з цієї сторінки
-2. Розпакуйте з архіву `BDO-UA-Client.exe`
-3. Запустіть `BDO-UA-Client.exe`
-4. Якщо Windows SmartScreen покаже попередження — натисніть "Докладніше" → "Виконати" (деталі: [README](https://github.com/merelyigor/ua-localization-hub#windows-smartscreen))
+2. Розпакуйте з архіву `BDO-WWM-UAClient.exe`
+3. Запустіть `BDO-WWM-UAClient.exe`
+4. Для вже опублікованих клієнтів доступний сумісний пакет `BDO-UA-Client-v{{VERSION}}-win-x64.zip`.
+5. Якщо Windows SmartScreen покаже попередження — натисніть "Докладніше" → "Виконати" (деталі: [README](https://github.com/merelyigor/ua-localization-hub#windows-smartscreen))
 
 ## Відомі проблеми / обмеження
 

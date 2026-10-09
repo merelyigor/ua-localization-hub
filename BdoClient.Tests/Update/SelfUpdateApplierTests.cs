@@ -51,8 +51,9 @@ public class SelfUpdateApplierTests : IDisposable
     {
         var store = new UpdateSessionStore(_appPaths, _logger);
         var session = MakePreparedSession(store);
+        session.PackageAssetName = ApplicationTechnicalIdentity.ExecutableFileName;
         var stagedDir = store.GetSessionDir(session.SessionId);
-        var helperPath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var helperPath = Path.Combine(stagedDir, ApplicationTechnicalIdentity.ExecutableFileName);
         File.WriteAllText(helperPath, "helper content");
         session.StagedExeSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         store.WriteSession(session);
@@ -221,8 +222,9 @@ public class SelfUpdateApplierTests : IDisposable
     {
         var store = new UpdateSessionStore(_appPaths, _logger);
         var session = MakePreparedSession(store);
+        session.PackageAssetName = ApplicationTechnicalIdentity.ExecutableFileName;
         var stagedDir = store.GetSessionDir(session.SessionId);
-        var helperPath = Path.Combine(stagedDir, "BDO-UA-Client.exe");
+        var helperPath = Path.Combine(stagedDir, ApplicationTechnicalIdentity.ExecutableFileName);
         File.WriteAllText(helperPath, "new version content");
         session.StagedExeSha256 = await HashHelper.ComputeFileSha256Async(helperPath);
 

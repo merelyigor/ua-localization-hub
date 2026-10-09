@@ -33,7 +33,7 @@ dotnet test BdoUaClient.sln --no-build
 ## Release publish
 
 ```bash
-dotnet publish BdoClient.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:AssemblyName=BDO-UA-Client
+dotnet publish BdoClient.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
 ```
 
 ### Параметри
@@ -46,11 +46,11 @@ dotnet publish BdoClient.csproj -c Release -r win-x64 --self-contained true -p:P
 | `-p:PublishSingleFile=true` | single file | Один EXE файл |
 | `-p:IncludeNativeLibrariesForSelfExtract=true` | extract native | Native libs всередині EXE |
 | `-p:PublishTrimmed=false` | no trimming | Без trimming |
-| `-p:AssemblyName=BDO-UA-Client` | rename | Ім'я вихідного файлу |
+| `AssemblyName` у `BdoClient.csproj` | `BDO-WWM-UAClient` | Канонічне ім'я вихідного файлу |
 
 ## Single-file output
 
-Результат: **`BDO-UA-Client.exe`** (self-contained, ~150+ MB).
+Результат: **`BDO-WWM-UAClient.exe`** (self-contained, ~150+ MB).
 
 - Один файл, без sibling DLL
 - Не потребує встановлення .NET runtime на машині користувача
@@ -93,19 +93,20 @@ Trimming може видалити типи, які використовують
 3. Restore: `dotnet restore BdoUaClient.sln`
 4. Build Release: `dotnet build BdoUaClient.sln -c Release --no-restore`
 5. Test Release: `dotnet test BdoUaClient.sln -c Release --no-build`
-6. Publish single-file: `dotnet publish BdoClient.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:AssemblyName=BDO-UA-Client -o artifacts/publish/win-x64`
-7. Upload artifact: тільки `BDO-UA-Client.exe` (artifact: `BDO-UA-Client-test-build`)
+6. Publish single-file canonical EXE `BDO-WWM-UAClient.exe`
+7. Upload artifact: тільки `BDO-WWM-UAClient.exe` (artifact: `BDO-WWM-UAClient-test-build-win-x64`)
 
 Призначення: тестовий білд для перевірок. Не створює тег, не генерує реліз-нотатки.
 
 ## Actions artifact vs public release asset
 
-**GitHub Actions artifact** (CI transport wrapper created by GitHub): **`BDO-UA-Client-vX.Y.Z-win-x64`**
-- Після завантаження GitHub створює ZIP-wrapper з flat-файлами: `BDO-UA-Client.exe`, `release-manifest.json`, `SHA256SUMS.txt`, `RELEASE_NOTES-vX.Y.Z.md`
-- Цей exact GitHub-generated ZIP стає єдиним application asset у public GitHub Release
+**GitHub Actions artifacts** (CI transport wrappers created by GitHub): **`BDO-WWM-UAClient-vX.Y.Z-win-x64`** та **`BDO-UA-Client-vX.Y.Z-win-x64`**
+- Canonical ZIP-wrapper має `BDO-WWM-UAClient.exe`; legacy compatibility wrapper має byte-identical payload під `BDO-UA-Client.exe`.
+- Кожен wrapper має власні `release-manifest.json`, `SHA256SUMS.txt`, `RELEASE_NOTES-vX.Y.Z.md`; manifest/sums відповідають EXE-імені саме цього bundle.
+- Обидва exact GitHub-generated ZIP-и стають application assets у public GitHub Release.
 
-**Public release asset**: `BDO-UA-Client-vX.Y.Z-win-x64.zip`
-- Standalone `BDO-UA-Client.exe`, manifest і sums не завантажуються окремо
+**Public release assets**: `BDO-WWM-UAClient-vX.Y.Z-win-x64.zip` (canonical) і `BDO-UA-Client-vX.Y.Z-win-x64.zip` (compatibility)
+- Standalone EXE, manifest і sums не завантажуються окремо.
 
 Усередині public ZIP немає project-created nested ZIP. Internal schema-2 manifest перевіряє EXE SHA/version, а GitHub Release asset digest перевіряє зовнішній ZIP.
 
@@ -119,7 +120,7 @@ Trimming може видалити типи, які використовують
 - **Trigger:** push до main, PR до main, `workflow_dispatch`
 - Автоматичний білд при кожному коміті/PR
 - Версія: `0.0.0-dev.{short_sha}` (наприклад `0.0.0-dev.4264c1f`)
-- Artifact: `BDO-UA-Client-test-build` (тільки EXE)
+- Artifact: `BDO-WWM-UAClient-test-build-win-x64` (тільки canonical EXE)
 - Artifact доступний всім (Actions → Test Build → завантажити)
 - НЕ створює GitHub Release
 
@@ -134,7 +135,7 @@ Trimming може видалити типи, які використовують
   6. Verify EXE version metadata — exact FileVersion/ProductVersion match
   7. Генерація schema-2 manifest (`release-manifest.json`) + `SHA256SUMS.txt`
   8. Release notes через `scripts/Generate-ReleaseNotes.ps1` (авто-генерація з git log)
-  9. Upload версійованого artifact `BDO-UA-Client-vX.Y.Z-win-x64`
+  9. Upload canonical та legacy compatibility artifacts з versioned names
 - НЕ створює GitHub Release автоматично
 
 ### Scripts

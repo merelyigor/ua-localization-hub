@@ -13,7 +13,6 @@ public sealed class UpdatePackageService
 {
     private const string ExeFileName = ApplicationTechnicalIdentity.ExecutableFileName;
     private const string ManifestFileName = "release-manifest.json";
-    private const string PackageEntryName = ApplicationTechnicalIdentity.ExecutableFileName;
     public const long ZipMaxBytes = 100_000_000;
 
     private readonly GitHubUpdateClient _gitHubClient;
@@ -86,10 +85,12 @@ public sealed class UpdatePackageService
                 string.Equals(a.Name, ManifestFileName, StringComparison.Ordinal)) ?? 0;
             if (manifestAssetCount == 0)
             {
-                var bundleName = ApplicationTechnicalIdentity.BuildPackageFileName(candidate.Version.ToString());
+                var bundleName = ResolveBundleAssetName(candidate);
+                if (bundleName == null)
+                    return UpdatePackageResult.Failure(UpdatePackageError.AssetMissing, "No unambiguous supported bundle asset found");
                 var packageAsset = FindExactlyOneAsset(candidate, bundleName);
                 if (packageAsset == null)
-                    return UpdatePackageResult.Failure(UpdatePackageError.AssetMissing, "Canonical bundle not found or ambiguous");
+                    return UpdatePackageResult.Failure(UpdatePackageError.AssetMissing, "Selected bundle not found or ambiguous");
                 if (packageAsset.Size <= 0 || packageAsset.Size > ZipMaxBytes)
                     return UpdatePackageResult.Failure(UpdatePackageError.SizeMismatch, $"Invalid ZIP size: {packageAsset.Size}");
                 if (!ValidateGitHubDigest(packageAsset, expectedSha: null, requireDigest: true))
@@ -142,7 +143,9 @@ public sealed class UpdatePackageService
                     packageSha = packageResult.Value!.Sha256;
                     if (!string.Equals(packageSha, manifest.PackageSha256, StringComparison.OrdinalIgnoreCase))
                         return UpdatePackageResult.Failure(UpdatePackageError.HashMismatch, "ZIP SHA-256 mismatch");
-                    var extractionResult = await ExtractValidatedExeAsync(packagePath, exePath, expectedSha, candidate.Version, cancellationToken);
+                    var extractionResult = await ExtractValidatedExeAsync(
+                        packagePath, exePath, expectedSha, candidate.Version, cancellationToken,
+                        expectedEntryName: manifest.AssetName);
                     if (!extractionResult.IsValid)
                         return UpdatePackageResult.Failure(UpdatePackageError.PackageInvalid, extractionResult.Error!);
                 }
@@ -236,7 +239,8 @@ public sealed class UpdatePackageService
         string expectedSha,
         AppVersion version,
         CancellationToken cancellationToken = default,
-        Func<string?, string?, bool>? versionValidator = null)
+        Func<string?, string?, bool>? versionValidator = null,
+        string? expectedEntryName = null)
     {
         try
         {
@@ -244,8 +248,9 @@ public sealed class UpdatePackageService
             if (archive.Entries.Count != 1)
                 return (false, "ZIP must contain exactly one entry");
             var entry = archive.Entries[0];
-            if (!string.Equals(entry.FullName, PackageEntryName, StringComparison.Ordinal) || entry.FullName.Contains('/') || entry.FullName.Contains('\\'))
-                return (false, $"ZIP entry must be exactly {ApplicationTechnicalIdentity.ExecutableFileName} at archive root");
+            expectedEntryName ??= ApplicationTechnicalIdentity.ExecutableFileName;
+            if (!string.Equals(entry.FullName, expectedEntryName, StringComparison.Ordinal) || entry.FullName.Contains('/') || entry.FullName.Contains('\\'))
+                return (false, $"ZIP entry must be exactly {expectedEntryName} at archive root");
             if (entry.Length <= 0 || entry.Length > GitHubUpdateClient.ExeMaxBytes)
                 return (false, "ZIP EXE entry size is invalid");
             using var input = entry.Open();
@@ -285,14 +290,27 @@ public sealed class UpdatePackageService
         UpdateCandidate candidate,
         CancellationToken cancellationToken = default,
         UpdateManifestValidator? manifestValidator = null,
-        Func<string?, string?, bool>? versionValidator = null)
+        Func<string?, string?, bool>? versionValidator = null,
+        string? expectedEntryName = null)
     {
         try
         {
+            if (expectedEntryName == null)
+            {
+                var version = candidate.Version.ToString();
+                if (candidate.BundleAssetName == null || candidate.BundleAssetName == ApplicationTechnicalIdentity.BuildPackageFileName(version))
+                    expectedEntryName = ApplicationTechnicalIdentity.ExecutableFileName;
+                else if (candidate.BundleAssetName == ApplicationTechnicalIdentity.BuildLegacyPackageFileName(version))
+                    expectedEntryName = ApplicationTechnicalIdentity.LegacyExecutableFileName;
+                else
+                    return (false, "Unsupported bundle package identity", null);
+            }
+            if (!ApplicationTechnicalIdentity.IsSupportedExecutableFileName(expectedEntryName))
+                return (false, "Unsupported bundle executable identity", null);
             using var archive = ZipFile.OpenRead(packagePath);
             var expectedNames = new HashSet<string>(StringComparer.Ordinal)
             {
-                PackageEntryName,
+                expectedEntryName,
                 ManifestFileName,
                 "SHA256SUMS.txt",
                 $"RELEASE_NOTES-v{candidate.Version}.md"
@@ -313,7 +331,7 @@ public sealed class UpdatePackageService
             if (manifest == null)
                 return (false, "Bundle manifest is empty", null);
             manifestValidator ??= new UpdateManifestValidator(new SilentLogger());
-            var validation = manifestValidator.ValidateBundle(manifest, candidate);
+            var validation = manifestValidator.ValidateBundle(manifest, candidate, expectedEntryName);
             if (!validation.IsValid)
                 return (false, validation.ErrorMessage, null);
 
@@ -322,11 +340,11 @@ public sealed class UpdatePackageService
                 sumsLine = sumsLine[..^1];
             if (sumsLine.Contains('\n'))
                 return (false, "SHA256SUMS.txt must contain exactly one line", null);
-            var expectedSumsLine = $"{validation.NormalizedSha256}  {PackageEntryName}";
+            var expectedSumsLine = $"{validation.NormalizedSha256}  {expectedEntryName}";
             if (!string.Equals(sumsLine, expectedSumsLine, StringComparison.OrdinalIgnoreCase))
                 return (false, "SHA256SUMS.txt does not match the bundle manifest", null);
 
-            var entry = archive.GetEntry(PackageEntryName)!;
+            var entry = archive.GetEntry(expectedEntryName)!;
             if (entry.Length <= 0 || entry.Length > GitHubUpdateClient.ExeMaxBytes)
                 return (false, "Bundle EXE entry size is invalid", null);
             using var input = entry.Open();
@@ -414,6 +432,23 @@ public sealed class UpdatePackageService
             return null;
 
         return asset;
+    }
+
+    private static string? ResolveBundleAssetName(UpdateCandidate candidate)
+    {
+        var version = candidate.Version.ToString();
+        var canonical = ApplicationTechnicalIdentity.BuildPackageFileName(version);
+        var legacy = ApplicationTechnicalIdentity.BuildLegacyPackageFileName(version);
+        if (candidate.BundleAssetName != null)
+            return candidate.BundleAssetName == canonical || candidate.BundleAssetName == legacy
+                ? candidate.BundleAssetName
+                : null;
+
+        var canonicalCount = candidate.Release.Assets?.Count(a => a.Name == canonical) ?? 0;
+        var legacyCount = candidate.Release.Assets?.Count(a => a.Name == legacy) ?? 0;
+        if (canonicalCount > 1 || legacyCount > 1 || canonicalCount == 0 && legacyCount == 0)
+            return null;
+        return canonicalCount == 1 ? canonical : legacy;
     }
 
     private static void SafeDelete(string path)

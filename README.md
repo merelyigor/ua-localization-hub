@@ -64,10 +64,10 @@ WWM підтримується для Steam installation (AppID `3564740`). Offi
 Завантажте canonical ZIP-архів:
 
 ```
-BDO-UA-Client-vX.Y.Z-win-x64.zip
+BDO-WWM-UAClient-vX.Y.Z-win-x64.zip
 ```
 
-Public release містить один GitHub-generated application ZIP. Усередині нього рівно чотири flat-файли: `BDO-UA-Client.exe`, `release-manifest.json`, `SHA256SUMS.txt` і release notes. Project-created nested ZIP не використовується.
+Public release також містить legacy compatibility ZIP `BDO-UA-Client-vX.Y.Z-win-x64.zip` для вже опублікованих клієнтів. Canonical bundle містить `BDO-WWM-UAClient.exe`, а legacy bundle — той самий виконуваний файл під ім'ям `BDO-UA-Client.exe`; кожен архів має власні manifest, SHA sums та release notes. Project-created nested ZIP не використовується.
 
 Для роботи не потрібно встановлювати .NET Runtime — застосунок самодостатній (self-contained).
 
@@ -88,13 +88,13 @@ Public release містить один GitHub-generated application ZIP. Усе�
 ### Як запустити
 
 1. Завантажте canonical ZIP тільки з офіційної сторінки [GitHub Releases](https://github.com/merelyigor/ua-localization-hub/releases) репозиторію `merelyigor/ua-localization-hub`.
-2. Розпакуйте **BDO-UA-Client.exe**.
-3. Запустіть **BDO-UA-Client.exe**.
+2. Розпакуйте **BDO-WWM-UAClient.exe**.
+3. Запустіть **BDO-WWM-UAClient.exe**.
 4. Якщо з'явилось вікно SmartScreen, натисніть **"Докладніше"**.
 
 ![Windows SmartScreen — Докладніше](docs/img/smartscreen-more-info.png)
 
-5. Перевірте, що вказано **BDO-UA-Client.exe**.
+5. Перевірте, що вказано **BDO-WWM-UAClient.exe**.
 6. Натисніть **"Виконати"**.
 
 ![Windows SmartScreen — Виконати](docs/img/smartscreen-run-anyway.png)
@@ -105,13 +105,13 @@ Public release містить один GitHub-generated application ZIP. Усе�
 
 ## Як видалити Хаб Українізаторів BDO - WWM
 
-Хаб Українізаторів BDO - WWM — portable-застосунок: він не встановлюється у Windows через MSI/MSIX або Windows Installer, тому окремого деінсталятора у **Programs and Features** немає. Для сумісності поточний виконуваний файл зберігає технічну назву **`BDO-UA-Client.exe`**.
+Хаб Українізаторів BDO - WWM — portable-застосунок: він не встановлюється у Windows через MSI/MSIX або Windows Installer, тому окремого деінсталятора у **Programs and Features** немає. Поточне canonical-ім'я виконуваного файла — **`BDO-WWM-UAClient.exe`**; legacy-ім'я **`BDO-UA-Client.exe`** залишається для compatibility bundle.
 
 ### Звичайне видалення
 
 1. Якщо увімкнено автозапуск, спочатку вимкніть його в меню іконки трея **«Запускати разом із Windows»**.
 2. Повністю завершіть застосунок через меню трея **«Вихід»**. Натискання **X** лише ховає програму у трей і не завершує процес.
-3. Видаліть файл **`BDO-UA-Client.exe`**.
+3. Видаліть файл **`BDO-WWM-UAClient.exe`**.
 
 ### Повне очищення даних
 

@@ -90,6 +90,11 @@ foreach ($categoryName in $sectionMap.Keys) {
 if ($sections.Count -eq 0) { $sections += "## Зміни`n`n- Технічне обслуговування та внутрішні покращення без окремих користувацьких нововведень." }
 
 $body = $sections -join "`n`n"
+$exeName = switch -Exact ($AssetName) {
+    { $_ -eq "BDO-WWM-UAClient-v$Version-win-x64.zip" } { "BDO-WWM-UAClient.exe"; break }
+    { $_ -eq "BDO-UA-Client-v$Version-win-x64.zip" } { "BDO-UA-Client.exe"; break }
+    default { throw "Unsupported release asset identity: $AssetName" }
+}
 $notes = @"
 # Хаб Українізаторів BDO - WWM $Version
 
@@ -107,11 +112,14 @@ Internal EXE SHA-256:
 
 ``$ExeSha256``
 
+Для сумісності з уже опублікованими клієнтами цей реліз також містить пакет
+``BDO-UA-Client-v$Version-win-x64.zip`` із тим самим виконуваним файлом під legacy-ім'ям.
+
 ## Як встановити
 
 1. Завантажте ``$AssetName`` зі сторінки цього релізу
 2. Розпакуйте архів
-3. Запустіть ``BDO-UA-Client.exe``
+3. Запустіть ``$exeName``
 4. Якщо Windows SmartScreen покаже попередження — натисніть "Докладніше" → "Виконати" (деталі: [README](https://github.com/merelyigor/ua-localization-hub#windows-smartscreen))
 
 ## Посилання

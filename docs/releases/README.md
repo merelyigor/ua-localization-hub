@@ -14,7 +14,7 @@ Production GitHub Releases завжди публікуються вручну в
 - GitHub Actions → **Release Candidate** → **Run workflow**
 - Оберіть гілку `main`
 - **Version**: залиште порожнім для автоматичного наступного patch (найпоширеніший випадок), або введіть версію вручну для minor/major
-- Дочекайтеся завершення: Validate → Resolve → Build → Test → Publish → Prepare flat release artifact → SHA/manifest/notes → Summary. RC workflow не створює фінальний tag.
+- Дочекайтеся завершення: Validate → Resolve → Build → Test → Publish → Prepare canonical + legacy flat bundles → SHA/manifest/notes → Summary. RC workflow не створює фінальний tag.
 
 #### Автоматична версія (порожнє поле)
 
@@ -28,10 +28,9 @@ Production GitHub Releases завжди публікуються вручну в
 
 ### 3. Завантаження artifact
 
-- Завантажте artifact `BDO-UA-Client-vX.Y.Z-win-x64` з workflow run
-- GitHub-generated downloaded ZIP містить рівно flat-файли: `BDO-UA-Client.exe`, `release-manifest.json`, `SHA256SUMS.txt`, `RELEASE_NOTES-vX.Y.Z.md`
-- Розпакуйте локальну копію artifact ZIP і протестуйте `BDO-UA-Client.exe`
-- Перевірте SHA-256 за бажанням
+- Завантажте обидва artifacts `BDO-WWM-UAClient-vX.Y.Z-win-x64` та `BDO-UA-Client-vX.Y.Z-win-x64` з workflow run.
+- Canonical ZIP містить `BDO-WWM-UAClient.exe`; legacy bundle містить ті самі EXE bytes як `BDO-UA-Client.exe`. Кожен ZIP має свій schema-2 manifest, SHA sums і notes з відповідним executable/package ім'ям.
+- Розпакуйте локальну копію canonical artifact ZIP і протестуйте `BDO-WWM-UAClient.exe`; перевірте наявність legacy bundle для старих клієнтів.
 
 ### 4. Підготовка реліз-нотаток
 
@@ -46,10 +45,10 @@ Production GitHub Releases завжди публікуються вручну в
 - GitHub → **Releases** → **Draft a new release**
 - Оберіть створений tag `vX.Y.Z`
 - Вставте відредаговані реліз-нотатки у тіло релізу
-- Завантажте exact downloaded GitHub artifact ZIP як **єдиний application asset**.
+- Завантажте обидва exact downloaded GitHub artifact ZIP-и як canonical і legacy compatibility application assets.
 - Не unpack/repackage artifact ZIP перед публікацією.
-- Не завантажуйте окремо `BDO-UA-Client.exe`, `release-manifest.json` або `SHA256SUMS.txt`.
-- Schema-2 manifest є внутрішнім файлом bundle; GitHub asset digest захищає зовнішній ZIP.
+- Не завантажуйте окремо EXE, `release-manifest.json` або `SHA256SUMS.txt`.
+- Кожен schema-2 manifest є внутрішнім файлом свого bundle; GitHub asset digest захищає зовнішній ZIP.
 - Для першого публічного прев'ю: позначте як **Pre-release**
 - Натисніть **Publish release**
 
