@@ -112,6 +112,13 @@ internal sealed class GameTestConfirmationDialog : Form
         return dialog.ShowDialog(owner) == DialogResult.Yes;
     }
 
+    internal static bool ShowNeutralConfirmation(IWin32Window owner, string heading, string supportingText)
+    {
+        var presentation = new GameTestConfirmationPresentation(heading, supportingText, Array.Empty<string>());
+        using var dialog = new GameTestConfirmationDialog(presentation);
+        return dialog.ShowDialog(owner) == DialogResult.Yes;
+    }
+
     private Label CreateLabel(string text, float fontSize, FontStyle fontStyle, Color color) => new()
     {
         AutoSize = true,

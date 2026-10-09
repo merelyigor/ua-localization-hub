@@ -12,6 +12,9 @@ public partial class MainForm
     private System.Windows.Forms.Timer? _localFileMonitorTimer;
     private readonly LocalFileChangeTracker _localFileChangeTracker = new();
     private bool _localFileCheckInProgress;
+    private FileSystemWatcher? _wwmFileWatcher;
+    private System.Windows.Forms.Timer? _wwmFileRefreshTimer;
+    private long _wwmWatchGeneration;
 
     private const int LocalFileMonitorIntervalMilliseconds = 300000; // ~5 minutes, hidden/background only
 
@@ -33,6 +36,7 @@ public partial class MainForm
     {
         _localFileMonitorTimer?.Stop();
         _localFileChangeTracker.Clear();
+        DisposeWwmFileMonitor();
     }
 
     private void EnsureLocalFileMonitorTimer()
@@ -102,11 +106,86 @@ public partial class MainForm
         }
 
         _localFileChangeTracker.Clear();
+        DisposeWwmFileMonitor();
+    }
+
+    private void StartWwmFileMonitorIfEligible()
+    {
+        if (_wwmSession == null || _gameRoot == null || _closing || IsDisposed || Disposing) return;
+        var directory = Path.Combine(_gameRoot, WwmGameDefinition.Default.LocaleRelativePath);
+        if (!Directory.Exists(directory)) return;
+        if (_wwmFileWatcher == null)
+        {
+            _wwmWatchGeneration = _gameSessionGeneration;
+            _wwmFileRefreshTimer = new System.Windows.Forms.Timer { Interval = 700 };
+            _wwmFileRefreshTimer.Tick += WwmFileRefreshTimer_Tick;
+            _wwmFileWatcher = new FileSystemWatcher(directory)
+            {
+                IncludeSubdirectories = false,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                EnableRaisingEvents = true
+            };
+            _wwmFileWatcher.Changed += WwmFileWatcher_Changed;
+            _wwmFileWatcher.Created += WwmFileWatcher_Changed;
+            _wwmFileWatcher.Deleted += WwmFileWatcher_Changed;
+            _wwmFileWatcher.Renamed += WwmFileWatcher_Renamed;
+        }
+    }
+
+    private void WwmFileWatcher_Changed(object sender, FileSystemEventArgs e) => QueueWwmFileRefresh(e.FullPath);
+    private void WwmFileWatcher_Renamed(object sender, RenamedEventArgs e) => QueueWwmFileRefresh(e.FullPath);
+
+    private void QueueWwmFileRefresh(string path)
+    {
+        var expected = WwmGameDefinition.Default.ManagedRelativePaths
+            .Select(relative => Path.GetFullPath(Path.Combine(_gameRoot ?? "", relative)));
+        if (!expected.Contains(Path.GetFullPath(path), StringComparer.OrdinalIgnoreCase)
+            || _closing || IsDisposed || !IsHandleCreated) return;
+        try
+        {
+            BeginInvoke(new Action(() =>
+            {
+                if (_wwmFileRefreshTimer == null || _wwmWatchGeneration != _gameSessionGeneration) return;
+                _wwmFileRefreshTimer.Stop();
+                _wwmFileRefreshTimer.Start();
+            }));
+        }
+        catch (InvalidOperationException) { }
+    }
+
+    private void WwmFileRefreshTimer_Tick(object? sender, EventArgs e)
+    {
+        _wwmFileRefreshTimer?.Stop();
+        if (_wwmSession == null || _operationInProgress || _wwmWatchGeneration != _gameSessionGeneration) return;
+        var task = RefreshWwmStateAsync(_wwmWatchGeneration, _gameSessionCts?.Token ?? default);
+        TrackSessionWork(task);
+    }
+
+    private void DisposeWwmFileMonitor()
+    {
+        if (_wwmFileWatcher != null)
+        {
+            _wwmFileWatcher.EnableRaisingEvents = false;
+            _wwmFileWatcher.Changed -= WwmFileWatcher_Changed;
+            _wwmFileWatcher.Created -= WwmFileWatcher_Changed;
+            _wwmFileWatcher.Deleted -= WwmFileWatcher_Changed;
+            _wwmFileWatcher.Renamed -= WwmFileWatcher_Renamed;
+            _wwmFileWatcher.Dispose();
+            _wwmFileWatcher = null;
+        }
+        if (_wwmFileRefreshTimer != null)
+        {
+            _wwmFileRefreshTimer.Stop();
+            _wwmFileRefreshTimer.Tick -= WwmFileRefreshTimer_Tick;
+            _wwmFileRefreshTimer.Dispose();
+            _wwmFileRefreshTimer = null;
+        }
     }
 
     private void LocalFileMonitorTimer_Tick(object? sender, EventArgs e)
     {
-        var task = RunLocalFileCheckSafeAsync(allowVisible: false, _gameSessionGeneration, _activeGameSession,
+        if (_activeGameSession is not BdoGameSession bdo) return;
+        var task = RunLocalFileCheckSafeAsync(allowVisible: false, _gameSessionGeneration, bdo,
             _gameSessionCts?.Token ?? default);
         TrackSessionWork(task);
     }
@@ -271,7 +350,17 @@ public partial class MainForm
     /// </summary>
     private void ScheduleLocalFileCheckAfterRestore()
     {
-        if (_operationInProgress || _feedCoordinator.IsBlocked || _closing || IsDisposed || Disposing)
+        if (_operationInProgress || _closing || IsDisposed || Disposing)
+            return;
+
+        if (_activeGameSession is WwmGameSession)
+        {
+            TrackSessionWork(RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default));
+            return;
+        }
+        if (_activeGameSession is not BdoGameSession bdo)
+            return;
+        if (_feedCoordinator.IsBlocked)
             return;
 
         BeginInvoke(new Action(() =>
@@ -279,7 +368,7 @@ public partial class MainForm
             var task = RunLocalFileCheckSafeAsync(
                 allowVisible: true,
                 _gameSessionGeneration,
-                _activeGameSession,
+                bdo,
                 _gameSessionCts?.Token ?? default);
             TrackSessionWork(task);
         }));

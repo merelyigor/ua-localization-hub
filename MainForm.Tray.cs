@@ -33,7 +33,8 @@ public partial class MainForm
         var checkNowItem = new ToolStripMenuItem("Перевірити зараз");
         checkNowItem.Click += (_, _) =>
         {
-            _poller.RequestImmediatePoll();
+            if (_activeGameSession is BdoGameSession) _poller.RequestImmediatePoll();
+            else if (_activeGameSession is WwmGameSession wwm) _ = wwm.Poller.RequestImmediatePollAsync();
             RequestApplicationUpdateCheck();
         };
 
@@ -93,7 +94,8 @@ public partial class MainForm
         ShowInTaskbar = false;
         Hide();
 
-        _poller.SetPollingMode(ReleaseFeedPollingMode.Background);
+        if (_activeGameSession is BdoGameSession) _poller.SetPollingMode(ReleaseFeedPollingMode.Background);
+        else if (_activeGameSession is WwmGameSession wwm) wwm.Poller.SetVisible(false);
 
         // T4: only starts the local monitor if a baseline already exists from a prior
         // successful state refresh. It must NOT re-baseline from the current file here.
@@ -193,8 +195,16 @@ public partial class MainForm
         // that occurred while hidden remains comparable after restore.
         StopLocalFileMonitorPreservingBaseline();
 
-        _poller.SetPollingMode(ReleaseFeedPollingMode.Visible);
-        _poller.RequestImmediatePoll();
+        if (_activeGameSession is BdoGameSession)
+        {
+            _poller.SetPollingMode(ReleaseFeedPollingMode.Visible);
+            _poller.RequestImmediatePoll();
+        }
+        else if (_activeGameSession is WwmGameSession wwm)
+        {
+            wwm.Poller.SetVisible(true);
+            _ = wwm.Poller.RequestImmediatePollAsync();
+        }
         RequestApplicationUpdateCheck();
 
         BeginInvoke(new Action(ReconcileLayoutAfterRestore));

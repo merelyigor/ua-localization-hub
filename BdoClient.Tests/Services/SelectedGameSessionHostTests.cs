@@ -71,21 +71,62 @@ public sealed class SelectedGameSessionHostTests
             await previousBdo.StopAsync();
             previousBdo.Dispose();
             Assert.Same(secondGame, host.CurrentSession);
-            Assert.False(previousBdo.ReleaseFeedPoller.IsRunning);
-            Assert.True(previousBdo.IsDisposed);
+            Assert.False(((BdoGameSession)previousBdo).ReleaseFeedPoller.IsRunning);
+            Assert.True(((BdoGameSession)previousBdo).IsDisposed);
 
             secondGame.ReleaseFeedPoller.Start(null);
             var previousSynthetic = host.CommitCandidate(returnToBdo);
             await previousSynthetic.StopAsync();
             previousSynthetic.Dispose();
             Assert.Same(returnToBdo, host.CurrentSession);
-            Assert.False(previousSynthetic.ReleaseFeedPoller.IsRunning);
-            Assert.True(previousSynthetic.IsDisposed);
+            Assert.False(((BdoGameSession)previousSynthetic).ReleaseFeedPoller.IsRunning);
+            Assert.True(((BdoGameSession)previousSynthetic).IsDisposed);
         }
         finally
         {
             if (Directory.Exists(root))
                 Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SwitchingBdoToWwmAndBack_DrainsAndDisposesGameSpecificSessions()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "bdo-session-host-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = new AppPaths(root);
+            var logger = new TestLogger();
+            using var bdoClient = new HttpClient(new StubHandler());
+            using var wwmClient = new HttpClient(new StubHandler());
+            using var returnedBdoClient = new HttpClient(new StubHandler());
+            var bdo = BdoGameSession.CreateForTests(paths, logger, AppVersionInfo.FromRawVersion("1.2.9"), bdoClient);
+            var wwm = WwmGameSession.CreateForTests(paths, logger, wwmClient);
+            var returnedBdo = BdoGameSession.CreateForTests(paths, logger, AppVersionInfo.FromRawVersion("1.2.9"), returnedBdoClient);
+            using var host = new SelectedGameSessionHost(bdo, descriptor => descriptor.Id switch
+            {
+                "where-winds-meet" => wwm,
+                "black-desert-online" => returnedBdo,
+                _ => throw new InvalidOperationException("Unexpected game descriptor.")
+            });
+
+            wwm.Poller.Start(null);
+            var priorBdo = host.CommitCandidate(host.CreateCandidate(new GameDescriptor("where-winds-meet", "Where Winds Meet")));
+            await priorBdo.StopAsync();
+            priorBdo.Dispose();
+            Assert.Same(wwm, host.CurrentSession);
+            Assert.True(((BdoGameSession)priorBdo).IsDisposed);
+
+            var priorWwm = host.CommitCandidate(host.CreateCandidate(new GameDescriptor("black-desert-online", "Black Desert Online")));
+            await priorWwm.StopAsync();
+            priorWwm.Dispose();
+            Assert.Same(returnedBdo, host.CurrentSession);
+            Assert.True(((WwmGameSession)priorWwm).IsDisposed);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 

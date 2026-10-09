@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Text.Json;
 using System.Windows.Forms;
 using BdoClient.Api;
 using BdoClient.Logging;
@@ -15,7 +16,12 @@ public partial class MainForm : Form
     private ConfigStore _configStore = null!;
     private readonly ApplicationConfigStore _applicationConfigStore;
     private BdoUaApiClient _apiClient = null!;
-    private BdoGameSession _activeGameSession = null!;
+    private IGameSession _activeGameSession = null!;
+    private WwmGameSession? _wwmSession;
+    private WwmReleaseFeed? _wwmFeed;
+    private Action<WwmReleaseFeed>? _wwmFeedHandler;
+    private bool _wwmRecoveryBlocked;
+    private string? _wwmRecoveryMessage;
     private GameDetector _gameDetector = null!;
     private BdoGameDefinition _gameDefinition = null!;
     private readonly GameCatalog _gameCatalog;
@@ -154,7 +160,7 @@ public partial class MainForm : Form
         };
     }
 
-    private void BindGameSession(BdoGameSession session, long generation)
+    private void BindGameSession(IGameSession session, long generation)
     {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -164,22 +170,40 @@ public partial class MainForm : Form
         _gameSessionCts = new CancellationTokenSource();
         _selectedGame = session.Descriptor;
         gameSectionCaptionLabel.Text = _selectedGame.DisplayName;
-        _configStore = session.ConfigStore;
-        _apiClient = session.ApiClient;
-        _gameDetector = session.GameDetector;
-        _gameDefinition = session.GameDefinition;
-        _stateService = session.LocalizationStateService;
-        _compatService = session.LocalizationCompatibilityService;
-        _localizationInstaller = session.LocalizationInstaller;
-        _backupStore = session.BackupStore;
-        _stateStore = session.InstallationStateStore;
-        _releaseFeedCacheStore = session.ReleaseFeedCacheStore;
-        _poller = session.ReleaseFeedPoller;
-        _feedCoordinator = new FeedApplicationCoordinator(ApplyFeedPipelineAsync, _poller, _logger);
-        _sessionFeedCandidateHandler = candidate => QueueSessionFeedWork(session, generation, candidate, isCandidate: true);
-        _sessionFeedSuccessHandler = feed => QueueSessionFeedWork(session, generation, feed, isCandidate: false);
-        _poller.OnFeedCandidate += _sessionFeedCandidateHandler;
-        _poller.OnFeedSuccess += _sessionFeedSuccessHandler;
+        if (session is BdoGameSession bdo)
+        {
+            _wwmSession = null;
+            gameSectionCaptionLabel.Text = session.Descriptor.DisplayName;
+            restoreOriginalButton.Text = "Відновити оригінал";
+            _configStore = bdo.ConfigStore;
+            _apiClient = bdo.ApiClient;
+            _gameDetector = bdo.GameDetector;
+            _gameDefinition = bdo.GameDefinition;
+            _stateService = bdo.LocalizationStateService;
+            _compatService = bdo.LocalizationCompatibilityService;
+            _localizationInstaller = bdo.LocalizationInstaller;
+            _backupStore = bdo.BackupStore;
+            _stateStore = bdo.InstallationStateStore;
+            _releaseFeedCacheStore = bdo.ReleaseFeedCacheStore;
+            _poller = bdo.ReleaseFeedPoller;
+            _feedCoordinator = new FeedApplicationCoordinator(ApplyFeedPipelineAsync, _poller, _logger);
+            _sessionFeedCandidateHandler = candidate => QueueSessionFeedWork(bdo, generation, candidate, isCandidate: true);
+            _sessionFeedSuccessHandler = feed => QueueSessionFeedWork(bdo, generation, feed, isCandidate: false);
+            _poller.OnFeedCandidate += _sessionFeedCandidateHandler;
+            _poller.OnFeedSuccess += _sessionFeedSuccessHandler;
+        }
+        else if (session is WwmGameSession wwm)
+        {
+            _wwmSession = wwm;
+            _wwmFeed = null;
+            _wwmFeedHandler = feed => QueueWwmFeedWork(wwm, generation, feed);
+            wwm.Poller.FeedUpdated += _wwmFeedHandler;
+            _configStore = wwm.ConfigStore;
+            _gameRoot = wwm.GameRoot;
+            gameSectionCaptionLabel.Text = "Where Winds Meet — Winds4UA / W4U";
+            restoreOriginalButton.Text = "Відновити попередній стан";
+        }
+        else throw new InvalidOperationException($"Unsupported game session type: {session.GetType().Name}");
 
         _suppressGameSelection = true;
         try
@@ -200,9 +224,12 @@ public partial class MainForm : Form
             _poller.OnFeedSuccess -= _sessionFeedSuccessHandler;
         _sessionFeedCandidateHandler = null;
         _sessionFeedSuccessHandler = null;
+        if (_wwmFeedHandler != null && _wwmSession != null)
+            _wwmSession.Poller.FeedUpdated -= _wwmFeedHandler;
+        _wwmFeedHandler = null;
     }
 
-    private bool IsCurrentGameSession(long generation, BdoGameSession? session = null)
+    private bool IsCurrentGameSession(long generation, IGameSession? session = null)
         => !_closing
             && generation == _gameSessionGeneration
             && (session == null || ReferenceEquals(session, _activeGameSession))
@@ -240,7 +267,7 @@ public partial class MainForm : Form
         if (_switchInProgress || _operationInProgress || _initializing || _closing)
             return;
 
-        BdoGameSession? candidate = null;
+        IGameSession? candidate = null;
         var committed = false;
         var previous = _activeGameSession;
         var previousCts = _gameSessionCts;
@@ -280,8 +307,16 @@ public partial class MainForm : Form
 
             if (!_closing && IsCurrentGameSession(_gameSessionGeneration, _activeGameSession))
             {
-                _poller.Start(_apiResponse);
-                _poller.SetPollingMode(Visible ? ReleaseFeedPollingMode.Visible : ReleaseFeedPollingMode.Background);
+                if (_activeGameSession is BdoGameSession)
+                {
+                    _poller.Start(_apiResponse);
+                    _poller.SetPollingMode(Visible ? ReleaseFeedPollingMode.Visible : ReleaseFeedPollingMode.Background);
+                }
+                else if (_activeGameSession is WwmGameSession wwm)
+                {
+                    wwm.Poller.Start(_wwmFeed);
+                    wwm.Poller.SetVisible(Visible);
+                }
             }
         }
         catch (OperationCanceledException) when (_closing || !IsCurrentGameSession(_gameSessionGeneration, previous))
@@ -342,6 +377,9 @@ public partial class MainForm : Form
         _cachedFeedSavedAtUtc = null;
         _apiErrorMessage = null;
         _apiErrorKind = ApiErrorKind.None;
+        _wwmFeed = null;
+        _wwmRecoveryBlocked = false;
+        _wwmRecoveryMessage = null;
         _lastResolvedState = LocalizationState.NotInstalled;
         _lastInstalledModeSlug = null;
         _lastInstalledPublicId = null;
@@ -355,8 +393,14 @@ public partial class MainForm : Form
     }
 
     internal GameDescriptor SelectedGame => _selectedGame;
-    internal string ActivePersistenceRoot => _activeGameSession.PersistencePaths.Root;
-    internal BdoGameSession ActiveGameSession => _activeGameSession;
+    internal string ActivePersistenceRoot => _activeGameSession switch
+    {
+        BdoGameSession bdo => bdo.PersistencePaths.Root,
+        WwmGameSession wwm => wwm.PersistencePaths.Root,
+        _ => throw new InvalidOperationException("Unknown session type")
+    };
+    internal BdoGameSession ActiveGameSession => (BdoGameSession)_activeGameSession;
+    internal IGameSession ActiveSessionForTest => _activeGameSession;
     internal long GameSessionGeneration => _gameSessionGeneration;
     internal bool IsSwitchInProgress => _switchInProgress;
     internal bool IsOperationInProgress => _operationInProgress;
@@ -368,6 +412,37 @@ public partial class MainForm : Form
         long generation,
         ReleasesResponse feed)
         => HandleSessionFeedAsync(session, generation, feed, isCandidate: false);
+
+    private void QueueWwmFeedWork(WwmGameSession session, long generation, WwmReleaseFeed feed)
+        => TrackSessionWork(HandleWwmFeedAsync(session, generation, feed));
+
+    private async Task HandleWwmFeedAsync(WwmGameSession session, long generation, WwmReleaseFeed feed)
+    {
+        try
+        {
+            if (InvokeRequired)
+            {
+                var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                BeginInvoke(new Action(async () =>
+                {
+                    try { await HandleWwmFeedAsync(session, generation, feed).ConfigureAwait(true); completion.TrySetResult(null); }
+                    catch (Exception ex) { completion.TrySetException(ex); }
+                }));
+                await completion.Task.ConfigureAwait(false);
+                return;
+            }
+            if (!IsCurrentGameSession(generation, session) || _operationInProgress) return;
+            var oldFeed = _wwmFeed;
+            _wwmFeed = feed;
+            if (!string.Equals(JsonSerializer.Serialize(oldFeed), JsonSerializer.Serialize(feed), StringComparison.Ordinal))
+            {
+                BuildWwmModes();
+            }
+            await RefreshWwmStateAsync(generation, _gameSessionCts?.Token ?? default).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (_gameSessionCts?.IsCancellationRequested == true) { }
+        catch (Exception ex) { _logger.Warning($"WWM feed update failed: {ex.Message}"); }
+    }
 
     internal void SetOperationInProgressForTest(bool value)
     {
@@ -382,6 +457,8 @@ public partial class MainForm : Form
     internal string BdoTargetStatus => bdoTargetStatusLabel.Text;
     internal string WwmTargetProject => wwmTargetProjectLabel.Text;
     internal string WwmTargetStatus => wwmTargetStatusLabel.Text;
+    internal bool WwmRecoveryBlockedForTest => _wwmRecoveryBlocked;
+    internal bool WwmRestoreEnabledForTest => restoreOriginalButton.Enabled;
     internal string ActiveGameSelectorLabel => gameSelectorLabel.Text;
     internal string GameSectionCaption => gameSectionCaptionLabel.Text;
     internal string UninstallHelpText => uninstallHelpLink.Text;
@@ -390,12 +467,15 @@ public partial class MainForm : Form
     internal int InitialClientHeightForTest => _initialClientHeight;
     internal int ModeSectionHeightForTest => modeGroupBox.Height;
     internal Func<CurrentRelease, bool>? GameTestConfirmationForTest { get; set; }
+    internal Func<bool>? WwmCompatibilityConfirmationForTest { get; set; }
     internal string? SelectedModeCardStateTextForTest => modesFlowPanel.Controls
         .OfType<LocalizationModeCard>()
         .FirstOrDefault(card => string.Equals(card.ModeSlug, GetSelectedModeSlug(), StringComparison.Ordinal))?
         .StateTextForTest;
     internal OperationState OperationStateForTest => _operationState;
+    internal string OperationMessageForTest => operationMessageLabel.Text;
     internal Task HandleInstallForTestAsync() => HandleInstallAsync();
+    internal Task HandleWwmInstallForTestAsync(string slug, string variant) => HandleWwmInstallAsync(slug, variant);
 
     private void InitializeGameSelector()
     {
@@ -601,7 +681,7 @@ public partial class MainForm : Form
             PrepareTrayForShutdown();
             _updateCheckCts?.Cancel();
             _gameSessionCts?.Cancel();
-            _poller.Stop();
+            StopActivePoller();
             return;
         }
 
@@ -625,7 +705,7 @@ public partial class MainForm : Form
                 PrepareTrayForShutdown();
                 _updateCheckCts?.Cancel();
                 _gameSessionCts?.Cancel();
-                _poller.Stop();
+                StopActivePoller();
                 return;
 
             case MainFormCloseAction.DeferUntilOperationCompletes:
@@ -654,6 +734,12 @@ public partial class MainForm : Form
         {
             SetMessage("Дочекайтеся завершення поточної операції.");
         }
+    }
+
+    private void StopActivePoller()
+    {
+        if (_activeGameSession is BdoGameSession) _poller.Stop();
+        else if (_activeGameSession is WwmGameSession wwm) wwm.Poller.Stop();
     }
 
     /// <summary>

@@ -127,12 +127,13 @@ static class Program
         var appVersionInfo = AppVersionInfo.Detect();
         var gameDefinition = BdoGameDefinition.Default;
         var gameCatalog = GameCatalog.Create(gameDefinition);
-        BdoGameSession CreateSession(GameDescriptor descriptor)
+        IGameSession CreateSession(GameDescriptor descriptor)
         {
-            if (!string.Equals(descriptor.Id, gameDefinition.Id, StringComparison.Ordinal))
-                throw new InvalidOperationException($"Unsupported production game '{descriptor.Id}'.");
-
-            return BdoGameSession.CreateProduction(appPaths, logger, appVersionInfo);
+            if (string.Equals(descriptor.Id, gameDefinition.Id, StringComparison.Ordinal))
+                return BdoGameSession.CreateProduction(appPaths, logger, appVersionInfo);
+            if (string.Equals(descriptor.Id, WwmGameDefinition.Default.Id, StringComparison.Ordinal))
+                return WwmGameSession.CreateProduction(appPaths, logger);
+            throw new InvalidOperationException($"Unsupported production game '{descriptor.Id}'.");
         }
 
         var initialSession = CreateSession(gameCatalog.DefaultGame);

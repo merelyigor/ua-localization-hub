@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 9 — REVIEWED / ACCEPTED
-**Next:** Stage 10 Where Winds Meet Steam-first implementation as a separate bounded task, with HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED
-**Implementation authorization:** None in this documentation task; Stage 10 requires its own explicit implementation authorization.
+**Current phase:** Stage 10 — IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED
+**Next:** Post-commit exact-SHA CI verification, then Owner native smoke
+**Implementation authorization:** No further product-code changes; commit/push of the reviewed patch is authorized.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 9 — REVIEWED / ACCEPTED | Stage 10 Steam-first implementation task; high-risk pre-commit review |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 — IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED | Exact-SHA CI, then Owner native smoke |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
-Stage 9 read-only evidence, current 2026-10-08 Winds4UA production API/package facts, Owner decisions, and external Architect acceptance are recorded in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10 is NOT STARTED and requires a separate explicit task authorization; its multi-file mutation requires high-risk pre-commit Architect review. The current API marks `english-items` and `english-terms` unavailable, so the historical v2.9 identical-payload observation is no longer a blocker. Stage 8B remains OPTIONAL / NOT STARTED.
+Stage 9 read-only evidence and external acceptance plus Stage 10 implementation details are in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10 is implemented and locally validated; external pre-commit Architect review is accepted with BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0. Owner native smoke remains pending after exact-SHA CI. Stage 8B remains OPTIONAL / NOT STARTED; Stage 9 remains REVIEWED / ACCEPTED. Stable release is v1.2.9; Stage 10 is unreleased.
 
 ## Backlog
 

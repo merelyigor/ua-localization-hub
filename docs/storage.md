@@ -390,3 +390,11 @@ public virtual async Task<RestoreResult> RecoverFromRestorePointAsync(
 | `null` | Original snapshot (не містить цього маркера) |
 
 Цей маркер використовується для класифікації restore point через `ClassifyRestorePointState` та визначення, чи можна відновити стан встановлення при rollback.
+
+## WWM-specific state and snapshots
+
+WWM не використовує BDO `InstallationStateStore`/`BackupStore`. `WwmStateStore` зберігає окремі versioned `state/wwm-installation.json`, `state/wwm-transaction/journal.json` та `backups/pre-hub/` у `GamePersistencePaths` для stable ID `where-winds-meet`.
+
+Installation state містить game ID, `mode slug + variant`, release version, outer archive size/SHA та manifest двох target files з relative path/size/SHA. Перед першою Hub mutation snapshot фіксує кожного target-у попереднє існування та, якщо він існував, exact bytes/size/SHA. Per-operation journal окремо зберігає безпосередній попередній стан обох файлів і raw prior installation-state bytes.
+
+Malformed state/journal/snapshot fail closed. Restore допускається лише коли managed targets відповідають довіреному manifest, snapshot валідний, а Steam build ID не змінився; успішне restore очищує installation state і спожитий snapshot. Для target, який був відсутній до Hub, restore видаляє Hub-created file. Snapshot та journal є WWM-specific і не змінюють BDO schema.

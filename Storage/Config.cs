@@ -10,4 +10,8 @@ public sealed class Config
     [JsonPropertyName("last_mode")]
     public string? LastMode { get; set; }
 
+    [JsonPropertyName("last_mode_variant")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LastModeVariant { get; set; }
+
 }

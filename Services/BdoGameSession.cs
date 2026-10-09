@@ -10,7 +10,7 @@ namespace BdoClient.Services;
 /// Owns the concrete runtime composition for the currently supported game.
 /// Stage 2 has one BDO session; switching and session replacement belong to a later stage.
 /// </summary>
-public sealed class BdoGameSession : IDisposable
+public sealed class BdoGameSession : IGameSession
 {
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;

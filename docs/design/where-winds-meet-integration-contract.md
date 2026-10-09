@@ -4,7 +4,7 @@ Status: **STAGE 9 — REVIEWED / ACCEPTED**
 Evidence checked: **2026-10-08**
 Scope: read-only analysis; no game or production runtime changes.
 
-Owner decisions recorded: stable game ID `where-winds-meet`; initial implementation scope is Steam-first; restore means return to the exact pre-Hub state, not guaranteed stock bytes. Stage 10 remains unauthorized.
+Owner decisions recorded: stable game ID `where-winds-meet`; initial implementation scope is Steam-first; restore means return to the exact pre-Hub state, not guaranteed stock bytes. The original Stage 9 analysis preceded Stage 10 authorization; the current implementation handoff is recorded at the end of this document.
 
 ## Evidence boundary
 
@@ -145,8 +145,20 @@ Stage 10 must not claim compatibility or invent build ranges. Owner-approved int
 
 ## Stage 9 result and Stage 10 gate
 
-Stage 9 — **REVIEWED / ACCEPTED** by external Architect: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. The accepted evidence covers Steam discovery, current production API and mode availability, the v2.6.2 archive, two-file mapping, pre-Hub restore, and compatibility limits. No runtime code changed.
+At the time of Stage 9 analysis, Stage 9 — **REVIEWED / ACCEPTED** by external Architect: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. The accepted evidence covers Steam discovery, current production API and mode availability, the v2.6.2 archive, two-file mapping, pre-Hub restore, and compatibility limits. No runtime code changed in Stage 9.
 
-Stage 10 remains **NOT STARTED** and requires a separate bounded implementation task. The old identical-payload v2.9 issue is not a blocker: the current API marks both English modes unavailable and supplies no current artifacts for them. The Owner-approved stable ID remains `where-winds-meet`, scope is Steam-first, and Official launcher is deferred. The current API's `game_tested=true` does not assert compatibility with a particular Steam build; compatibility remains unconfirmed and requires neutral explicit user confirmation before mutation.
+At the time of the Stage 9 analysis, Stage 10 was **NOT STARTED** and required a separate bounded implementation task. The old identical-payload v2.9 issue is not a blocker: the current API marks both English modes unavailable and supplies no current artifacts for them. The Owner-approved stable ID remains `where-winds-meet`, scope is Steam-first, and Official launcher is deferred. The current API's `game_tested=true` does not assert compatibility with a particular Steam build; compatibility remains unconfirmed and requires neutral explicit user confirmation before mutation.
 
-Any Stage 10 multi-file installation is **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Before the first Hub mutation, preserve each managed target's relative path, prior existence, bytes when present, size and SHA-256. Restore means exact pre-Hub state: restore existing files and remove Hub-created files that were absent before. Use **“Відновити попередній стан”**, not “Відновити оригінал”, unless an authoritative stock source contract is added later. Production GameCatalog remains BDO-only until Stage 10 is separately authorized and implemented.
+At the time of this Stage 9 analysis, Stage 10 had not started. Any WWM multi-file installation requires **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Before the first Hub mutation, preserve each managed target's relative path, prior existence, bytes when present, size and SHA-256. Restore means exact pre-Hub state: restore existing files and remove Hub-created files that were absent before. Use **“Відновити попередній стан”**, not “Відновити оригінал”, unless an authoritative stock source contract is added later.
+
+## Stage 10 implementation handoff — 2026-10-09
+
+Stage 10 has now been implemented in the uncommitted working tree and locally validated; it is **PENDING EXTERNAL PRE-COMMIT ARCHITECT REVIEW**. This section records the implementation boundary, not external acceptance. The compile-time catalog now registers BDO and `where-winds-meet`; `IGameSession` is limited to common descriptor/lifetime operations, while WWM keeps dedicated `Winds4UaApiClient`, DTOs, Steam detector, package resolver/stager, poller, state store and installer.
+
+Before every WWM write, MainForm requests the latest feed again and re-resolves the selected `slug + variant`; `current=null`, unavailable/mismatched artifact, API failure, or declined compatibility confirmation blocks download/mutation. Mode cards stay dynamic and only a fresh available mode with one matching `current.files[]` package exposes an enabled action. BDO feed/API/install/storage flows remain game-specific and unchanged in contract.
+
+The package service validates HTTPS, declared outer size and SHA-256, limits archive structure/expanded size, rejects links/absolute/traversal/duplicate/unexpected entries, and stages exactly the two approved paths. The WWM transaction writes an operation journal and immediate prior bytes/state before mutation, applies/verifies both files, persists state only after verification, and rolls back both targets and state on failure/cancellation. Startup recovery verifies expected commit state before deciding cleanup versus rollback.
+
+The versioned WWM state and pre-Hub snapshot are isolated under `games/where-winds-meet`. Restore is only to the exact pre-Hub state, with absent files deleted; it is blocked for changed managed bytes, invalid/missing snapshot, or changed/missing Steam build evidence. Official launcher support remains deferred. API does not map release compatibility to a Steam build, so neutral confirmation remains mandatory. No real game installation/restore was performed.
+
+This is **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Owner native smoke remains pending; no commit, push, RC, tag or release was created.

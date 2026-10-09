@@ -34,7 +34,8 @@ public sealed class GameCatalog
         ArgumentNullException.ThrowIfNull(bdoGame);
         return new GameCatalog(new[]
         {
-            new GameDescriptor(bdoGame.Id, bdoGame.DisplayName)
+            new GameDescriptor(bdoGame.Id, bdoGame.DisplayName),
+            new GameDescriptor(WwmGameDefinition.Default.Id, WwmGameDefinition.Default.DisplayName)
         });
     }
 }

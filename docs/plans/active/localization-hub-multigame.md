@@ -3,21 +3,21 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NO — STAGE 9 REVIEWED / ACCEPTED; STAGE 10 REQUIRES A SEPARATE BOUNDED TASK AUTHORIZATION**
-Current phase: Stage 9 — REVIEWED / ACCEPTED
-Next action: prepare a separate Stage 10 Steam-first implementation task using HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED.
+Implementation authorization: **NO FURTHER PRODUCT-CODE CHANGES — PRE-COMMIT ARCHITECT REVIEW ACCEPTED; COMMIT/PUSH AUTHORIZED**
+Current phase: Stage 10 — IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED
+Next action: post-commit exact-SHA CI verification, then Owner native smoke.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
 
-Перетворити BDO-UA Client на один Windows launcher/hub для кількох незалежних ігор із локалізаціями. Поточна публічна назва застосунку — `Хаб Українізаторів BDO - WWM`. Production catalog містить лише Black Desert Online; Where Winds Meet не реєструється без реального продуктового та API-контракту.
+Перетворити BDO-UA Client на один Windows launcher/hub для кількох незалежних ігор із локалізаціями. Поточна публічна назва застосунку — `Хаб Українізаторів BDO - WWM`. Production catalog містить Black Desert Online та Steam-first Where Winds Meet із окремими game-specific API/install boundaries.
 
 ## Product targets
 
 - `Black Desert Online` — localization project `BDO UA Translate`, [bdo-ua.com.ua](https://bdo-ua.com.ua/), **INTEGRATED / AVAILABLE**.
-- `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **PLANNED / INTEGRATION PENDING**.
+- `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **INTEGRATED / STEAM AVAILABLE**; Official launcher deferred.
 
-Where Winds Meet is a known product target, not a registered runtime game. Stage 9 is reviewed and accepted with current production API, Steam detection, package, and pre-Hub restore evidence. Owner-approved stable ID is `where-winds-meet`; initial future scope is Steam-first. Modes are dynamic and installable only when the API marks them available and supplies the selected package. Compatibility remains unconfirmed by API and must not be invented.
+Where Winds Meet is registered as a second runtime game with Owner-approved stable ID `where-winds-meet`; initial support is Steam-only. Modes are dynamic and installable only when fresh API metadata marks the selected `slug + variant` available and supplies its matching package. Compatibility with a specific Steam build remains unconfirmed by API and requires neutral confirmation.
 
 ## Context
 
@@ -25,14 +25,14 @@ Current application already має explicit BDO boundary та game-scoped persis
 
 ## Scope
 
-Application-global scope: self-update, tray/background, autostart, logging, application config, single-instance, game catalog та selected-game state.
+Application-global scope: self-update, tray/background, autostart, logging, application config, single-instance, game catalog та selected-game state. BDO and WWM use a narrow shared session-lifetime boundary; game-specific service/DTO/storage models remain separate.
 
 Selected-game scope: identity, detection, game path, API/feed, localization modes, patch/version state, install/update, restore, backups, per-game cache, local monitor та scoped async lifetime. Одночасно активна лише одна game session.
 
-Explicit compile-time catalog спочатку реєструє тільки:
+Explicit compile-time catalog registers these production games:
 
-- stable id: `black-desert-online`;
-- display name: `Black Desert Online`.
+- stable id `black-desert-online`, display name `Black Desert Online`;
+- stable id `where-winds-meet`, display name `Where Winds Meet` (Steam AppID `3564740`).
 
 Synthetic second-game ids дозволені лише у тестових fixtures. Не створювати production placeholder, plugin system або dynamic module loading.
 
@@ -57,7 +57,7 @@ Existing game-scoped config/state/backups remain isolated. Before multiple live 
 
 ### API boundary
 
-BDO API DTOs and `/releases` contract remain BDO implementation detail. The observed Where Winds Meet / Winds4UA API is documented in Stage 9, but restore-original and game-build compatibility are unresolved; compare concrete contracts only after Stage 9 is resolved, and extract only proven common application-facing semantics. Do not invent universal DTOs or a feed framework.
+BDO API DTOs and `/releases` contract remain BDO implementation detail. WWM uses dedicated `Winds4UaApiClient` and DTOs for `/api/public/v1/releases/latest`; modes are resolved dynamically by `slug + variant`. Do not invent universal DTOs or a feed framework. Restore is exact pre-Hub state, not stock; game-build compatibility is not asserted.
 
 ### Visible rebrand
 
@@ -77,7 +77,7 @@ Visible rebrand and technical EXE/package/autostart rename are separate. First u
 
 ### Second-game onboarding gate
 
-For Stage 10, retain the Owner-approved stable ID `where-winds-meet`, Steam-first scope, exact pre-Hub restore semantics, and neutral confirmation because compatibility is not confirmed by API. Official launcher remains deferred. The current API marks `english-items` and `english-terms` unavailable and provides no installable artifacts for them; do not infer equivalence or expose them as installable. Stage 9's historical v2.9 content observation is not a current blocker. No architecture decision for WWM is made from assumptions.
+Stage 10 implements the Owner-approved stable ID `where-winds-meet`, Steam-first detection, exact pre-Hub restore semantics, and neutral confirmation because compatibility is not confirmed by API. Official launcher remains deferred. Current API availability controls mode actions; `english-items` and `english-terms` stay unavailable until matching current artifacts are provided. The historical v2.9 content observation is not a current blocker.
 
 ## Roadmap
 
@@ -161,11 +161,11 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 **REVIEWED / ACCEPTED.** External Architect review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. Read-only evidence and final Owner decisions are recorded in [Where Winds Meet integration contract](../../design/where-winds-meet-integration-contract.md): approved stable ID `where-winds-meet`, Steam-first AppID `3564740`, current production `/api/public/v1/releases/latest` contract, verified v2.6.2 two-file package, exact pre-Hub restore semantics, Official launcher deferred, and no hard compatibility claim. Current API exposes only `ukrainian/default` as available; `english-items` and `english-terms` are unavailable and have no current package. Their older v2.9 identical-content observation is not a Stage 10 blocker and does not imply mode interchangeability. No production WWM registration or game-file operation occurred.
 
-### Stage 10 — Real Where Winds Meet implementation
+### Stage 10 — Real Where Winds Meet Steam-first integration
 
-**NOT STARTED.** The obsolete identical-mode blocker is removed: the authoritative current API marks the two English modes unavailable, so only API-available packages are install candidates. Stage 10 still requires a separate bounded implementation task and explicit authorization. Initial scope is Steam-first; Official launcher is deferred. Any multi-file install/backup/rollback design requires **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED** before commit.
+**IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED.** External review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; reviewed full patch SHA-256 `be91c371ecd78d180303274bc0b9b22dba42d8c2dd386ab970b1b79edb85045e`. Added WWM as the second production game while preserving BDO-specific API/install/storage boundaries. Steam detection is manifest/library based with WWM EXE + locale markers. Dedicated latest API/DTO/package resolution keeps modes dynamic and requires a fresh available package before every mutation. ZIP outer size/SHA and strict two-target allow-list are verified in staging. `WwmInstallService` journals two-file transactions, keeps separate pre-Hub and per-operation snapshots, verifies writes, rolls back both files plus state, recovers interrupted transactions, and restores exact pre-Hub bytes/deletes previously absent files. Build ID is only a snapshot-staleness guard; API does not confirm compatibility, so mutation requires neutral confirmation. WWM state is game-scoped and versioned. Official launcher remains deferred. Owner native smoke remains pending; Stage 10 is unreleased.
 
-Current state: **NOT STARTED**.
+No real game install/restore was performed. This is high-risk multi-file mutation; the required external pre-commit Architect review is accepted and commit/push is authorized. Owner native smoke remains pending after exact-SHA CI.
 
 ## Acceptance criteria
 
@@ -176,21 +176,21 @@ Current state: **NOT STARTED**.
 - Game mutation retains backup, restore and rollback guarantees.
 - Repository rename, if Owner proceeds, preserves redirects, releases and old-client update compatibility.
 - Physical EXE rename, if performed, is bridge-compatible; LocalAppData is not destructively migrated without a separate decision.
-- Where Winds Meet can be onboarded without a global rewrite once its actual contract is known, and the BDO ↔ WWM ↔ BDO lifecycle is tested.
+- BDO ↔ WWM ↔ BDO lifecycle uses separate sessions and game-scoped state, with WWM Steam-only detection and two-file transaction recovery.
 
 ## Non-goals
 
-Не входять: Where Winds Meet до появи реального технічного контракту; plugins/reflection/MEF/DLL loading; DI container; database; dynamic registry; broad MVVM rewrite; invented universal API/schema; blanket namespace rename; automatic LocalAppData migration; unrelated refactoring; зміни v1.2.7 release scope.
+Не входять: Official-launcher WWM support; WWM compatibility claims unsupported by API; plugins/reflection/MEF/DLL loading; DI container; database; dynamic plugin registry; broad MVVM rewrite; invented universal API/schema; blanket namespace rename; automatic LocalAppData migration; unrelated refactoring; public release.
 
 ## Risks / dependencies
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-The roadmap depends on v1.2.7 release completion and explicit Owner activation. Stage 9 has established and externally accepted the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 remains a separate high-risk implementation task; do not infer stock restore or game-build compatibility.
+Stage 9 established the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implements the bounded Steam-only runtime. External pre-commit review is accepted (BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0); commit/push is authorized. Owner native smoke remains pending after exact-SHA CI.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete and its dependency is satisfied. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8D.2 Owner final native smoke is accepted. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. The current API exposes only the Ukrainian mode as installable; the old v2.9 English-mode payload observation no longer blocks Stage 10. Stage 10 remains **NOT STARTED** and requires a separate bounded task authorization. Its multi-file install/backup/rollback requires **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Implementation authorization: **NO — awaiting a separate Stage 10 task prompt**.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 is **IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED**; Owner smoke remains pending after exact-SHA CI. Stable public release remains v1.2.9; this implementation is unreleased.
 
 ### v1.2.9 release cycle
 

@@ -86,7 +86,8 @@ public partial class MainForm
 
     private void EnsureMinimumUsableWidth()
     {
-        var modeCount = modesFlowPanel?.Controls.OfType<LocalizationModeCard>().Count() ?? 0;
+        var modeCount = modesFlowPanel?.Controls.Cast<Control>()
+            .Count(control => control is LocalizationModeCard or WwmModeCard) ?? 0;
         var logicalMinimumWidth = modeCount >= 3
             ? CompactMultiModeMinimumClientWidth
             : GlobalMinimumClientWidth;
@@ -324,7 +325,9 @@ public partial class MainForm
             && _gameCatalog.Games.Count > 1;
         foreach (var card in modesFlowPanel.Controls.OfType<LocalizationModeCard>())
             card.Enabled = enabled;
-        if (_apiLoadedSuccessfully)
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+            card.Enabled = enabled;
+        if (_apiLoadedSuccessfully && _wwmSession == null)
             ApplyModeCardPresentations(_lastResolvedState, _lastInstalledModeSlug, _lastInstalledPublicId);
         RefreshUpdateButtonPresentation();
     }

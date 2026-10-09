@@ -33,10 +33,57 @@ public partial class MainForm
             SetOperationState(OperationState.Idle);
             SetControlsDuringOperation(true);
             if (!_closing && IsCurrentGameSession(_gameSessionGeneration, _activeGameSession))
-                _poller.Start(_apiResponse);
+            {
+                if (_activeGameSession is BdoGameSession) _poller.Start(_apiResponse);
+                else if (_activeGameSession is WwmGameSession wwm)
+                {
+                    wwm.Poller.Start(_wwmFeed);
+                    wwm.Poller.SetVisible(Visible);
+                }
+            }
             ScheduleContentFit();
             _startupCompletion.TrySetResult(null);
         }
+    }
+
+    private async Task LoadWwmGameSessionAsync(WwmGameSession session, long generation, CancellationToken token)
+    {
+        _wwmRecoveryBlocked = false;
+        _wwmRecoveryMessage = null;
+        SetOperationState(OperationState.DetectingGame);
+        var detection = session.DetectGame();
+        SetWwmGamePresentation(detection);
+        if (detection.GameRoot != null)
+        {
+            var recovery = await session.InstallService.RecoverAsync(detection.GameRoot, detection.BuildId, token);
+            if (!recovery.IsSuccess)
+            {
+                _logger.Error($"WWM startup recovery blocked: {recovery.Error}: {recovery.Message}");
+                _wwmRecoveryBlocked = true;
+                _wwmRecoveryMessage = recovery.Message ?? "Не вдалося безпечно відновити незавершену операцію WWM.";
+            }
+        }
+        SetOperationState(OperationState.LoadingApi);
+        var result = await session.ApiClient.GetLatestAsync(token);
+        if (!IsCurrentGameSession(generation, session)) return;
+        if (result.IsSuccess && result.Feed != null)
+        {
+            _wwmFeed = result.Feed;
+            _apiLoadedSuccessfully = true;
+            BuildWwmModes();
+            var config = session.ConfigStore.Load().Value ?? new Config();
+            if (!string.IsNullOrWhiteSpace(config.LastMode)) SelectModeBySlug(config.LastMode);
+            await RefreshWwmStateAsync(generation, token);
+        }
+        else
+        {
+            _apiLoadedSuccessfully = false;
+            ShowModeFailurePlaceholder();
+            if (!_wwmRecoveryBlocked)
+                SetMessage(result.Error ?? "Не вдалося завантажити дані Winds4UA.");
+        }
+        if (_wwmRecoveryBlocked) ApplyWwmRecoveryBlockedPresentation();
+        SetOperationState(OperationState.Idle);
     }
 
     private async Task LoadCurrentGameSessionAsync(
@@ -44,6 +91,15 @@ public partial class MainForm
         CancellationToken cancellationToken,
         bool runGlobalStartup)
     {
+        if (_activeGameSession is WwmGameSession wwmSession)
+        {
+            await LoadWwmGameSessionAsync(wwmSession, generation, cancellationToken).ConfigureAwait(true);
+            if (runGlobalStartup && !_closing && IsCurrentGameSession(generation, wwmSession))
+                await StartupUpdateLifecycleCoordinator.RunAsync(
+                    RunStartupLifecycleMaintenanceAsync, () => _closing, StartApplicationUpdateMonitoring,
+                    ex => _logger.Warning($"Startup lifecycle maintenance failed: {ex.Message}"));
+            return;
+        }
         var configLoad = _configStore.Load();
         var config = configLoad.Value ?? new Config();
 
@@ -193,7 +249,7 @@ public partial class MainForm
     {
         var previous = _activeGameSession;
         var previousCts = _gameSessionCts;
-        BdoGameSession? candidate = null;
+        IGameSession? candidate = null;
 
         try
         {

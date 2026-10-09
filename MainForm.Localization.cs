@@ -12,6 +12,11 @@ public partial class MainForm
 
     private void BuildDynamicModes()
     {
+        if (_wwmSession != null)
+        {
+            BuildWwmModes();
+            return;
+        }
         var allModes = _apiResponse?.Data?.Modes;
         var installable = DynamicModePolicy.GetInstallableModes(allModes);
 
@@ -50,6 +55,250 @@ public partial class MainForm
         ScheduleContentFit();
     }
 
+    private void BuildWwmModes()
+    {
+        ClearModeControls();
+        var modes = _wwmFeed?.Data?.Modes ?? new List<WwmMode>();
+        if (modes.Count == 0)
+        {
+            AddModePlaceholder(new Label { Text = "Не вдалося завантажити режими Winds4UA.", AutoSize = true,
+                ForeColor = UiTheme.SecondaryText, BackColor = Color.Transparent, Margin = new Padding(0) });
+        }
+        else
+        {
+            foreach (var mode in modes)
+            {
+                var card = new WwmModeCard(mode);
+                card.SelectionRequested += ModeCard_SelectionRequested;
+                card.ActionRequested += ModeCard_ActionRequested;
+                modesFlowPanel.Controls.Add(card);
+            }
+            var savedMode = _wwmSession?.ConfigStore.Load().Value;
+            var selected = modes.FirstOrDefault(mode => mode.Slug == savedMode?.LastMode
+                && mode.Variant == savedMode?.LastModeVariant)
+                ?? modes.FirstOrDefault(mode => mode.Slug == savedMode?.LastMode)
+                ?? modes[0];
+            SelectWwmMode(selected.Slug!, selected.Variant!);
+            RefreshModeCardLayout();
+        }
+        EnsureMinimumUsableWidth();
+        ScheduleContentFit();
+    }
+
+    private async Task RefreshWwmStateAsync(long? expectedGeneration = null, CancellationToken cancellationToken = default)
+    {
+        var session = _wwmSession;
+        if (session == null) return;
+        var generation = expectedGeneration ?? _gameSessionGeneration;
+        if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
+        if (_wwmRecoveryBlocked)
+        {
+            ApplyWwmRecoveryBlockedPresentation();
+            return;
+        }
+        if (_gameRoot == null)
+        {
+            DisposeWwmFileMonitor();
+            SetActionsEnabled(false);
+            SetMessage("Гру не знайдено. Натисніть «Знайти автоматично» або оберіть папку.");
+            foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+                card.Present(card.Mode.Available ? "Доступно" : "Готується", card.Mode.Available ? "Встановити" : null, false);
+            ScheduleContentFit();
+            return;
+        }
+
+        var installed = session.StateStore.Load(out var stateError);
+        if (stateError != null)
+        {
+            SetMessage("Збережений стан WWM пошкоджено. Встановлення та відновлення заблоковано.");
+            SetActionsEnabled(false);
+        }
+        var restore = installed != null && Directory.Exists(session.StateStore.SnapshotDirectory);
+        restoreOriginalButton.Text = "Відновити попередній стан";
+        SetActionsEnabled(restore && stateError == null);
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+        {
+            var hasPackage = WwmPackageResolver.TryResolve(_wwmFeed, card.ModeSlug, card.ModeVariant, out var package, out _);
+            var state = installed == null
+                ? new WwmInstalledStateResult(WwmInstalledStateKind.Unknown)
+                : await session.InstallService.ResolveStateAsync(_gameRoot, hasPackage ? package : null, cancellationToken).ConfigureAwait(true);
+            if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
+            var status = !card.Mode.Available || !hasPackage ? "Недоступно"
+                : state.State switch
+                {
+                    WwmInstalledStateKind.Current when installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant => "Встановлено",
+                    WwmInstalledStateKind.UpdateAvailable when stateError == null => "Доступне оновлення",
+                    WwmInstalledStateKind.Modified => "Файли змінені",
+                    _ => "Доступно"
+                };
+            var canWrite = hasPackage && state.State != WwmInstalledStateKind.Modified && stateError == null && !_operationInProgress;
+            card.Present(status, card.Mode.Available ?
+                installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant ? "Оновити" : "Встановити" : null,
+                canWrite);
+        }
+        var overallState = installed == null
+            ? new WwmInstalledStateResult(WwmInstalledStateKind.Unknown)
+            : await session.InstallService.ResolveStateAsync(_gameRoot, null, cancellationToken).ConfigureAwait(true);
+        if (stateError == null && installed != null && overallState.State == WwmInstalledStateKind.Modified)
+        {
+            SetMessage("Керовані файли WWM змінені поза Хабом. Автоматичні операції заблоковано.");
+            SetActionsEnabled(false);
+        }
+        if (installed != null && stateError == null) StartWwmFileMonitorIfEligible();
+        else DisposeWwmFileMonitor();
+        ScheduleContentFit();
+    }
+
+    private void ApplyWwmRecoveryBlockedPresentation()
+    {
+        DisposeWwmFileMonitor();
+        restoreOriginalButton.Text = "Відновити попередній стан";
+        SetActionsEnabled(false);
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+            card.Present("Потрібне відновлення", null, false);
+        SetMessage(_wwmRecoveryMessage ?? "Не вдалося безпечно відновити незавершену операцію WWM.");
+        ScheduleContentFit();
+    }
+
+    private void SetWwmGamePresentation(WwmDetectionResult result)
+    {
+        _gameRoot = result.GameRoot;
+        if (result.GameRoot == null)
+        {
+            _gameDetectionSource = null;
+            gameStatusLabel.Text = "Steam-гру не знайдено";
+            gameStatusLabel.ForeColor = UiTheme.SecondaryText;
+            gamePathLabel.Text = "";
+        }
+        else
+        {
+            _gameDetectionSource = DetectionSource.Steam;
+            gameStatusLabel.Text = string.IsNullOrWhiteSpace(result.BuildId)
+                ? "Знайдено Steam-гру · build невідомий"
+                : $"Знайдено Steam-гру · build {result.BuildId} (сумісність не підтверджено)";
+            gameStatusLabel.ForeColor = UiTheme.Success;
+            gamePathLabel.Text = result.GameRoot;
+        }
+        detectGameButton.Text = result.GameRoot == null ? "Знайти автоматично" : "Перевірити";
+    }
+
+    private async Task HandleWwmInstallAsync(string slug, string variant)
+    {
+        var session = _wwmSession;
+        if (session == null || _operationInProgress || _gameRoot == null || _wwmRecoveryBlocked) return;
+        _operationInProgress = true;
+        _operationCts = CancellationTokenSource.CreateLinkedTokenSource(_gameSessionCts?.Token ?? CancellationToken.None);
+        var token = _operationCts.Token;
+        session.Poller.Pause();
+        SetControlsDuringOperation(false);
+        SetOperationState(OperationState.LoadingApi);
+        try
+        {
+            var latest = await session.ApiClient.GetLatestAsync(token);
+            if (!latest.IsSuccess || latest.Feed == null)
+            {
+                SetOperationState(latest.IsCancelled ? OperationState.Cancelled : OperationState.Failed);
+                SetMessage("Не вдалося перевірити актуальний реліз Winds4UA. Встановлення не виконано.");
+                return;
+            }
+            if (!WwmPackageResolver.TryResolve(latest.Feed, slug, variant, out var package, out var packageError))
+            {
+                SetOperationState(OperationState.Failed);
+                _logger.Warning($"WWM install blocked by fresh API metadata: mode={slug}/{variant}, detail={packageError}");
+                SetMessage("Вибраний режим Winds4UA зараз недоступний або його метадані некоректні.");
+                _wwmFeed = latest.Feed;
+                BuildWwmModes();
+                return;
+            }
+            if (!(WwmCompatibilityConfirmationForTest?.Invoke() ?? GameTestConfirmationDialog.ShowNeutralConfirmation(this,
+                    "Сумісність із поточним Steam build не підтверджена",
+                    "API не підтверджує сумісність цього перекладу з конкретною версією гри. Ви можете продовжити або повернутися назад.")))
+            {
+                SetOperationState(OperationState.Cancelled);
+                SetMessage("Встановлення скасовано.");
+                return;
+            }
+            token.ThrowIfCancellationRequested();
+            if (!IsCurrentGameSession(_gameSessionGeneration, session)) return;
+            SetOperationState(OperationState.Downloading);
+            cancelButton.Visible = true;
+            cancelButton.Enabled = true;
+            var result = await session.InstallService.InstallAsync(_gameRoot, session.SteamBuildId, package!, token);
+            SetOperationState(result.IsSuccess ? OperationState.Completed : OperationState.Failed);
+            SetMessage(result.IsSuccess ? "Локалізацію Winds4UA успішно встановлено." : result.Message ?? "Операцію Winds4UA не виконано.");
+            _wwmFeed = latest.Feed;
+        }
+        catch (OperationCanceledException)
+        {
+            SetOperationState(OperationState.Cancelled);
+            SetMessage("Операцію скасовано.");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"WWM install failed: {ex.Message}");
+            SetOperationState(OperationState.Failed);
+            SetMessage("Не вдалося виконати операцію Winds4UA.");
+        }
+        finally
+        {
+            cancelButton.Visible = false;
+            cancelButton.Enabled = false;
+            _operationCts?.Dispose();
+            _operationCts = null;
+            _operationInProgress = false;
+            SetControlsDuringOperation(true);
+            if (IsCurrentGameSession(_gameSessionGeneration, session))
+                await RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
+            session.Poller.Resume();
+        }
+    }
+
+    private async Task<WwmMutationResult> HandleWwmRestoreAsync()
+    {
+        var session = _wwmSession;
+        if (session == null || _operationInProgress || _gameRoot == null || _wwmRecoveryBlocked)
+            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Гру не знайдено.");
+        _operationInProgress = true;
+        _operationCts = CancellationTokenSource.CreateLinkedTokenSource(_gameSessionCts?.Token ?? CancellationToken.None);
+        var token = _operationCts.Token;
+        session.Poller.Pause();
+        SetControlsDuringOperation(false);
+        SetOperationState(OperationState.Restoring);
+        cancelButton.Visible = true;
+        cancelButton.Enabled = true;
+        try
+        {
+            var result = await session.InstallService.RestorePreHubAsync(_gameRoot, session.SteamBuildId, token);
+            SetOperationState(result.IsSuccess ? OperationState.Completed : OperationState.Failed);
+            SetMessage(result.IsSuccess ? "Попередній стан файлів відновлено." : result.Message ?? "Відновлення не виконано.");
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            SetOperationState(OperationState.Cancelled);
+            SetMessage("Відновлення скасовано.");
+            return WwmMutationResult.Failure(WwmMutationError.Cancelled, "Відновлення скасовано.");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"WWM restore failed: {ex.Message}");
+            SetOperationState(OperationState.Failed);
+            SetMessage("Не вдалося безпечно відновити попередній стан WWM.");
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Не вдалося безпечно відновити попередній стан WWM.");
+        }
+        finally
+        {
+            cancelButton.Visible = false;
+            cancelButton.Enabled = false;
+            _operationCts?.Dispose();
+            _operationCts = null;
+            _operationInProgress = false;
+            SetControlsDuringOperation(true);
+            await RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
+            session.Poller.Resume();
+        }
+    }
+
 
     private void RefreshModeCardLayout()
     {
@@ -67,7 +316,8 @@ public partial class MainForm
             : width >= twoColumnWidth ? 2 : 1;
         var cardWidth = Math.Max(minimumCardWidth, (width - gap * (columns - 1)) / columns);
         var cardHeight = UiTheme.Scale(modesFlowPanel, 220);
-        var cards = modesFlowPanel.Controls.OfType<LocalizationModeCard>().ToList();
+        var cards = modesFlowPanel.Controls.Cast<Control>()
+            .Where(control => control is LocalizationModeCard or WwmModeCard).ToList();
         foreach (var card in cards)
         {
             card.Width = cardWidth;
@@ -209,18 +459,52 @@ public partial class MainForm
     {
         foreach (var card in modesFlowPanel.Controls.OfType<LocalizationModeCard>().ToList())
             card.Dispose();
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>().ToList())
+            card.Dispose();
         modesFlowPanel.Controls.Clear();
     }
 
 
     private void SelectModeBySlug(string slug)
     {
-        var selected = modesFlowPanel.Controls
+        Control? selected = modesFlowPanel.Controls
             .OfType<LocalizationModeCard>()
             .FirstOrDefault(card => string.Equals(card.ModeSlug, slug, StringComparison.Ordinal));
+        selected ??= modesFlowPanel.Controls.OfType<WwmModeCard>()
+            .FirstOrDefault(card => string.Equals(card.ModeSlug, slug, StringComparison.Ordinal));
         selected ??= modesFlowPanel.Controls.OfType<LocalizationModeCard>().FirstOrDefault();
+        selected ??= modesFlowPanel.Controls.OfType<WwmModeCard>().FirstOrDefault();
         foreach (var card in modesFlowPanel.Controls.OfType<LocalizationModeCard>())
             card.IsSelected = ReferenceEquals(card, selected);
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+            card.IsSelected = ReferenceEquals(card, selected);
+    }
+
+    private void SelectWwmMode(string slug, string variant)
+    {
+        WwmModeCard? selected = modesFlowPanel.Controls.OfType<WwmModeCard>()
+            .FirstOrDefault(card => string.Equals(card.ModeSlug, slug, StringComparison.Ordinal)
+                && string.Equals(card.ModeVariant, variant, StringComparison.Ordinal));
+        selected ??= modesFlowPanel.Controls.OfType<WwmModeCard>().FirstOrDefault();
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+            card.IsSelected = ReferenceEquals(card, selected);
+    }
+
+    private async Task PersistWwmModeSelectionAsync(WwmModeCard card)
+    {
+        var session = _wwmSession;
+        if (session == null) return;
+        try
+        {
+            var config = session.ConfigStore.Load().Value ?? new Config();
+            config.LastMode = card.ModeSlug;
+            config.LastModeVariant = card.ModeVariant;
+            await session.ConfigStore.SaveAsync(config, _gameSessionCts?.Token ?? default);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+        {
+            _logger.Warning($"Failed to save WWM mode selection: {ex.Message}");
+        }
     }
 
 
@@ -236,6 +520,12 @@ public partial class MainForm
                 found = card.ModeSlug;
                 count++;
             }
+        }
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+        {
+            if (!card.IsSelected) continue;
+            found = card.ModeSlug;
+            count++;
         }
 
         if (count > 1)
@@ -265,6 +555,26 @@ public partial class MainForm
         var generation = _gameSessionGeneration;
         var session = _activeGameSession;
         var cancellationToken = _gameSessionCts?.Token ?? default;
+        if (_wwmSession is { } wwm)
+        {
+            _operationInProgress = true;
+            SetControlsDuringOperation(false);
+            SetOperationState(OperationState.DetectingGame);
+            try
+            {
+                var found = wwm.DetectGame();
+                _gameRoot = found.GameRoot;
+                SetWwmGamePresentation(found);
+                await RefreshStateAsync(_gameSessionGeneration, cancellationToken);
+            }
+            finally
+            {
+                _operationInProgress = false;
+                SetOperationState(OperationState.Idle);
+                SetControlsDuringOperation(true);
+            }
+            return;
+        }
         _operationInProgress = true;
         detectGameButton.Enabled = false;
         var previousGameRoot = _gameRoot;
@@ -318,6 +628,24 @@ public partial class MainForm
 
     private async void BrowseGameButton_Click(object? sender, EventArgs e)
     {
+        if (_wwmSession is { } wwm)
+        {
+            using var wwmDialog = new FolderBrowserDialog { Description = "Оберіть папку Where Winds Meet або її батьківську папку" };
+            if (wwmDialog.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                if (!await wwm.ValidateAndSaveManualPathAsync(wwmDialog.SelectedPath, _gameSessionCts?.Token ?? default))
+                {
+                    SetMessage("У вибраній папці не знайдено потрібні файли Where Winds Meet.");
+                    return;
+                }
+                _gameRoot = wwm.GameRoot;
+                SetWwmGamePresentation(new WwmDetectionResult(wwm.GameRoot, wwm.SteamBuildId, null));
+                await RefreshStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
+            }
+            catch (Exception ex) { _logger.Warning($"WWM manual path selection failed: {ex.Message}"); SetMessage("Не вдалося перевірити шлях Where Winds Meet."); }
+            return;
+        }
         if (_operationInProgress || _switchInProgress || _initializing || _closing)
             return;
 
@@ -394,13 +722,26 @@ public partial class MainForm
     {
         if (_initializing) return;
         if (_suppressModeChanged) return;
-        if (sender is not LocalizationModeCard card || !card.Enabled) return;
+        if (_wwmSession != null && sender is WwmModeCard selectedWwmCard)
+        {
+            if (_operationInProgress) return;
+            SelectWwmMode(selectedWwmCard.ModeSlug, selectedWwmCard.ModeVariant);
+            await PersistWwmModeSelectionAsync(selectedWwmCard);
+            await RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
+            return;
+        }
+        var slug = sender switch
+        {
+            LocalizationModeCard bdoCard when bdoCard.Enabled => bdoCard.ModeSlug,
+            WwmModeCard wwmCard => wwmCard.ModeSlug,
+            _ => null
+        };
+        if (slug == null) return;
 
         try
         {
             var previousSlug = GetSelectedModeSlug();
-            SelectModeBySlug(card.ModeSlug);
-            var slug = card.ModeSlug;
+            SelectModeBySlug(slug);
             if (string.Equals(previousSlug, slug, StringComparison.Ordinal)) return;
             string? configWarning = null;
 
@@ -438,6 +779,14 @@ public partial class MainForm
 
     private async void ModeCard_ActionRequested(object? sender, EventArgs e)
     {
+        if (_wwmSession != null && sender is WwmModeCard wwmCard)
+        {
+            if (_initializing || _suppressModeChanged || _operationInProgress || !wwmCard.Mode.Available) return;
+            SelectWwmMode(wwmCard.ModeSlug, wwmCard.ModeVariant);
+            await PersistWwmModeSelectionAsync(wwmCard);
+            await HandleWwmInstallAsync(wwmCard.ModeSlug, wwmCard.ModeVariant);
+            return;
+        }
         if (_initializing || _suppressModeChanged || _operationInProgress || sender is not LocalizationModeCard card)
             return;
 
@@ -584,6 +933,11 @@ public partial class MainForm
 
     private async Task RefreshStateAsync(long? expectedGeneration = null, CancellationToken cancellationToken = default)
     {
+        if (_wwmSession != null)
+        {
+            await RefreshWwmStateAsync(expectedGeneration, cancellationToken).ConfigureAwait(true);
+            return;
+        }
         var generation = expectedGeneration ?? _gameSessionGeneration;
         var session = _activeGameSession;
         if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session))

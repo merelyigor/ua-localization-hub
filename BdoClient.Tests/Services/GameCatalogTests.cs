@@ -5,13 +5,13 @@ namespace BdoClient.Tests.Services;
 public sealed class GameCatalogTests
 {
     [Fact]
-    public void ProductionCatalog_ContainsOnlyBlackDesert()
+    public void ProductionCatalog_ContainsBdoAndWwm()
     {
         var catalog = GameCatalog.Create(BdoGameDefinition.Default);
 
-        var game = Assert.Single(catalog.Games);
-        Assert.Equal("black-desert-online", game.Id);
-        Assert.Equal("Black Desert Online", game.DisplayName);
+        Assert.Collection(catalog.Games,
+            game => { Assert.Equal("black-desert-online", game.Id); Assert.Equal("Black Desert Online", game.DisplayName); },
+            game => { Assert.Equal("where-winds-meet", game.Id); Assert.Equal("Where Winds Meet", game.DisplayName); });
     }
 
     [Fact]

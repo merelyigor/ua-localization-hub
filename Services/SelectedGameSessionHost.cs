@@ -6,29 +6,29 @@ namespace BdoClient.Services;
 /// </summary>
 public sealed class SelectedGameSessionHost : IDisposable
 {
-    private readonly Func<GameDescriptor, BdoGameSession> _factory;
-    private BdoGameSession? _current;
+    private readonly Func<GameDescriptor, IGameSession> _factory;
+    private IGameSession? _current;
     private bool _disposed;
 
     public SelectedGameSessionHost(
-        BdoGameSession initialSession,
-        Func<GameDescriptor, BdoGameSession> factory)
+        IGameSession initialSession,
+        Func<GameDescriptor, IGameSession> factory)
     {
         _current = initialSession ?? throw new ArgumentNullException(nameof(initialSession));
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     }
 
-    public BdoGameSession CurrentSession
+    public IGameSession CurrentSession
         => _current ?? throw new ObjectDisposedException(nameof(SelectedGameSessionHost));
 
-    public BdoGameSession CreateCandidate(GameDescriptor descriptor)
+    public IGameSession CreateCandidate(GameDescriptor descriptor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(descriptor);
         return _factory(descriptor);
     }
 
-    public BdoGameSession CommitCandidate(BdoGameSession candidate)
+    public IGameSession CommitCandidate(IGameSession candidate)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(candidate);

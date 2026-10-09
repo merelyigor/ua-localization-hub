@@ -96,6 +96,168 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task SwitchingBdoWwmBdo_UsesIsolatedSessionsAndWwmApiModes()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.GameSelector.Enabled);
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.GameSectionCaption == "Where Winds Meet — Winds4UA / W4U"
+            && !form.IsSwitchInProgress
+            && form.ActivePersistenceRoot == fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").Root
+            && FindWwmModeCards(form).Count == 3);
+        Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        var cards = FindWwmModeCards(fixture.Form);
+        Assert.Contains(cards, card => card.ModeSlug == "ukrainian" && card.ActionVisibleForTest && card.ActionEnabledForTest);
+        Assert.Contains(cards, card => card.ModeSlug == "english-items" && !card.ActionEnabledForTest);
+
+        await fixture.SelectGameAsync("black-desert-online");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "black-desert-online"
+            && form.GameSectionCaption == "Black Desert Online"
+            && !form.IsSwitchInProgress
+            && form.ActivePersistenceRoot == fixture.AppPaths.GetGamePersistencePaths("black-desert-online").Root);
+        Assert.IsType<BdoGameSession>(fixture.Form.ActiveSessionForTest);
+        Assert.Equal("Black Desert Online", fixture.Form.GameSelector.Text);
+    }
+
+    [Fact]
+    public async Task WwmInstall_DeclineDoesNotDownloadAndAcceptUsesFreshPackage()
+    {
+        var archive = CreateTinyWwmArchive();
+        var wwmRequests = new List<string>();
+        var handlerFactory = MainFormTestFixture.CreateWwmApiHandlerFactory(archive, wwmRequests);
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: handlerFactory);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.GameSelector.Enabled);
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Count == 3);
+
+        var fakeRoot = fixture.WwmGameRoot;
+        var targets = WwmGameDefinition.Default.ManagedRelativePaths;
+        var original = new byte[] { 31, 32 };
+        await File.WriteAllBytesAsync(Path.Combine(fakeRoot, targets[0]), original);
+        await fixture.RunWwmInstallAsync("ukrainian", "default", confirm: false);
+        Assert.Equal(original, await File.ReadAllBytesAsync(Path.Combine(fakeRoot, targets[0])));
+        Assert.False(File.Exists(Path.Combine(fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").StateDir, "wwm-installation.json")));
+        Assert.DoesNotContain(wwmRequests, path => path.EndsWith(".zip", StringComparison.Ordinal));
+
+        await fixture.RunWwmInstallAsync("ukrainian", "default", confirm: true);
+        Assert.True(File.Exists(Path.Combine(fakeRoot, targets[0])));
+        Assert.True(File.Exists(Path.Combine(fakeRoot, targets[1])), fixture.Form.OperationMessageForTest + " | " + string.Join(" || ", fixture.Logger.Warnings));
+        Assert.True(File.Exists(Path.Combine(fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").StateDir, "wwm-installation.json")), fixture.Form.OperationMessageForTest);
+        Assert.Contains(wwmRequests, path => path.EndsWith(".zip", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task WwmInstall_FreshResponseUnavailableBlocksPreviouslyVisibleMode()
+    {
+        var available = true;
+        var requests = new List<string>();
+        var factory = MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive(), requests, () => available);
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(), includeWwm: true, wwmHandlerFactory: factory);
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Any(card => card.ModeSlug == "ukrainian" && card.ActionEnabledForTest));
+
+        available = false;
+        await fixture.RunWwmInstallAsync("ukrainian", "default", confirm: true);
+
+        Assert.DoesNotContain(requests, path => path.EndsWith(".zip", StringComparison.Ordinal));
+        Assert.False(File.Exists(Path.Combine(fixture.WwmGameRoot, WwmGameDefinition.Default.ManagedRelativePaths[0])));
+        Assert.False(File.Exists(Path.Combine(fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").StateDir, "wwm-installation.json")));
+    }
+
+    [Fact]
+    public async Task Startup_PersistedWwmSelectionActivatesWwmSession()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            applicationConfigJson: "{\"selected_game_id\":\"where-winds-meet\"}",
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()));
+
+        await fixture.Form.WaitForStartupCompletionForTestAsync().WaitAsync(MainFormTestFixture.Timeout);
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.GameSectionCaption == "Where Winds Meet — Winds4UA / W4U"
+            && FindWwmModeCards(form).Count == 3);
+
+        Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        var selected = new ApplicationConfigStore(fixture.AppPaths, new MainFormTestFixture.TestLogger()).Load();
+        Assert.Equal("where-winds-meet", selected.Value!.SelectedGameId);
+    }
+
+    [Fact]
+    public async Task Startup_MalformedWwmJournalBlocksMutationPresentationAndStillAllowsSwitchingAway()
+    {
+        var requests = new List<string>();
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive(), requests),
+            seedMalformedWwmJournal: true);
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.WwmRecoveryBlockedForTest
+            && FindWwmModeCards(form).Count == 3);
+
+        Assert.Contains("Журнал відновлення WWM пошкоджено", fixture.Form.OperationMessageForTest, StringComparison.Ordinal);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+        Assert.All(FindWwmModeCards(fixture.Form), card =>
+        {
+            Assert.Equal("Потрібне відновлення", card.StateTextForTest);
+            Assert.False(card.ActionEnabledForTest);
+            Assert.False(card.ActionVisibleForTest);
+        });
+        await fixture.RunWwmInstallAsync("ukrainian", "default", confirm: true);
+        Assert.DoesNotContain(requests, path => path.EndsWith(".zip", StringComparison.Ordinal));
+        Assert.All(WwmGameDefinition.Default.ManagedRelativePaths, path =>
+            Assert.False(File.Exists(Path.Combine(fixture.WwmGameRoot, path))));
+
+        await fixture.SelectGameAsync("black-desert-online");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "black-desert-online" && !form.IsSwitchInProgress);
+    }
+
+    private static List<WwmModeCard> FindWwmModeCards(Control root)
+    {
+        var cards = root.Controls.OfType<WwmModeCard>().ToList();
+        foreach (Control child in root.Controls) cards.AddRange(FindWwmModeCards(child));
+        return cards;
+    }
+
+    private static byte[] CreateTinyWwmArchive()
+    {
+        using var memory = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(memory, System.IO.Compression.ZipArchiveMode.Create, true))
+        {
+            foreach (var path in WwmGameDefinition.Default.ManagedRelativePaths)
+            {
+                var entry = zip.CreateEntry(path.Replace('\\', '/'));
+                using var output = entry.Open();
+                output.Write(new byte[] { 1, 2, 3 });
+            }
+        }
+        return memory.ToArray();
+    }
+
+    [Fact]
     public async Task StaleOldSessionFeedCannotOverwriteNewSession()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
@@ -953,6 +1115,9 @@ internal sealed class MainFormTestFixture : IDisposable
     private readonly string _mutexName;
     private readonly string _eventName;
     private readonly bool _includeSyntheticSecondGame;
+    private readonly bool _includeWwm;
+    private readonly Func<HttpMessageHandler>? _wwmHandlerFactory;
+    private readonly bool _seedMalformedWwmJournal;
     private readonly TaskCompletionSource<MainForm> _formReady =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<object?> _hostCompleted =
@@ -960,6 +1125,7 @@ internal sealed class MainFormTestFixture : IDisposable
 
     private readonly Thread _uiThread;
     private Exception? _hostException;
+    private TestLogger? _logger;
     private MainForm? _form;
     private BdoGameSession? _bdoSession;
     private SelectedGameSessionHost? _sessionHost;
@@ -972,10 +1138,18 @@ internal sealed class MainFormTestFixture : IDisposable
         bool seedReleaseFeedCache,
         int? gamePatch,
         string? applicationConfigJson,
-        bool includeSyntheticSecondGame)
+        bool includeSyntheticSecondGame,
+        bool includeWwm,
+        Func<HttpMessageHandler>? wwmHandlerFactory,
+        bool seedMalformedWwmJournal)
     {
         _bdoHandler = bdoHandler;
         _includeSyntheticSecondGame = includeSyntheticSecondGame;
+        _includeWwm = includeWwm;
+        _wwmHandlerFactory = wwmHandlerFactory;
+        _seedMalformedWwmJournal = seedMalformedWwmJournal;
+        if (includeWwm && wwmHandlerFactory == null)
+            throw new ArgumentException("A WWM API handler factory is required when WWM is included.", nameof(wwmHandlerFactory));
         _githubHandler = CreateSuccessfulGitHubHandler();
         _root = Path.Combine(Path.GetTempPath(), "bdo-ua-mainform-tests", Guid.NewGuid().ToString("N"));
         _appPaths = new AppPaths(Path.Combine(_root, "appdata"));
@@ -1012,6 +1186,24 @@ internal sealed class MainFormTestFixture : IDisposable
                 JsonSerializer.Serialize(new Config { GamePath = GameRoot }));
         }
 
+        WwmGameRoot = Path.Combine(_root, "fake-wwm-game");
+        if (includeWwm)
+        {
+            var definition = WwmGameDefinition.Default;
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(WwmGameRoot, definition.ExecutableRelativePath))!);
+            File.WriteAllBytes(Path.Combine(WwmGameRoot, definition.ExecutableRelativePath), new byte[] { 1 });
+            Directory.CreateDirectory(Path.Combine(WwmGameRoot, definition.LocaleRelativePath));
+            var wwmPaths = _appPaths.GetGamePersistencePaths(definition.Id);
+            wwmPaths.EnsureDirectories();
+            File.WriteAllText(wwmPaths.ConfigFile, JsonSerializer.Serialize(new Config { GamePath = WwmGameRoot }));
+            if (_seedMalformedWwmJournal)
+            {
+                var journal = Path.Combine(wwmPaths.StateDir, "wwm-transaction", "journal.json");
+                Directory.CreateDirectory(Path.GetDirectoryName(journal)!);
+                File.WriteAllText(journal, "{ invalid journal");
+            }
+        }
+
         _bdoHttpClient = new HttpClient(_bdoHandler);
         _githubHttpClient = new HttpClient(_githubHandler);
 
@@ -1028,6 +1220,8 @@ internal sealed class MainFormTestFixture : IDisposable
     }
 
     internal string GameRoot { get; }
+    internal string WwmGameRoot { get; }
+    internal TestLogger Logger => _logger ?? throw new InvalidOperationException("Test logger is not ready.");
 
     internal AppPaths AppPaths => _appPaths;
 
@@ -1190,11 +1384,14 @@ internal sealed class MainFormTestFixture : IDisposable
         bool seedReleaseFeedCache = false,
         int? gamePatch = null,
         string? applicationConfigJson = null,
-        bool includeSyntheticSecondGame = false)
+        bool includeSyntheticSecondGame = false,
+        bool includeWwm = false,
+        Func<HttpMessageHandler>? wwmHandlerFactory = null,
+        bool seedMalformedWwmJournal = false)
     {
         var fixture = new MainFormTestFixture(
             bdoHandler, startInBackground, exitWhenShown, seedReleaseFeedCache, gamePatch, applicationConfigJson,
-            includeSyntheticSecondGame);
+            includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal);
         fixture._uiThread.Start();
 
         try
@@ -1227,6 +1424,54 @@ internal sealed class MainFormTestFixture : IDisposable
 
     internal static MainFormTestHttpHandler CreateSuccessfulGitHubHandler()
         => new(HttpStatusCode.OK, "[]");
+
+    internal static Func<HttpMessageHandler> CreateWwmApiHandlerFactory(byte[]? package = null, List<string>? requests = null,
+        Func<bool>? modeAvailable = null)
+        => () => new MainFormTestHttpHandler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            requests?.Add(path);
+            if (path == "/api/public/v1/releases/latest")
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null), Encoding.UTF8, "application/json")
+                });
+            if (path == "/releases/test.zip" && package != null)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(package) });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+
+    private static string CreateWwmLatestJson(byte[]? package, bool modeAvailable)
+    {
+        var bytes = package ?? Array.Empty<byte>();
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+        return JsonSerializer.Serialize(new
+        {
+            success = true,
+            generated_at = "2026-10-09T00:00:00Z",
+            data = new
+            {
+                current = new
+                {
+                    version = "v-test", published_at = "2026-10-09T00:00:00Z", game_version = (string?)null,
+                    game_tested = true, translated_rows = (long?)null, status = "current",
+                    files = modeAvailable
+                        ? new object[] { new { variant = "default", slug = "ukrainian", label = "Українська",
+                            download_url = "https://winds4ua.com.ua/releases/test.zip", size_bytes = bytes.Length, sha256 = hash } }
+                        : Array.Empty<object>()
+                },
+                modes = new object[]
+                {
+                    new { variant = "default", slug = "ukrainian", label = "Українська", description = "", audience = "", available = modeAvailable,
+                        download_url = modeAvailable ? "https://winds4ua.com.ua/releases/test.zip" : "", size_bytes = modeAvailable ? bytes.Length : (long?)null, sha256 = modeAvailable ? hash : null },
+                    new { variant = "english_items", slug = "english-items", label = "Предмети англійською", description = "", audience = "", available = false,
+                        download_url = "", size_bytes = (long?)null, sha256 = (string?)null },
+                    new { variant = "english_terms", slug = "english-terms", label = "Терміни англійською", description = "", audience = "", available = false,
+                        download_url = "", size_bytes = (long?)null, sha256 = (string?)null }
+                }
+            }
+        });
+    }
 
     internal static MainFormTestHttpHandler CreateFailureApiHandler(HttpStatusCode statusCode)
         => new(statusCode, string.Empty);
@@ -1332,6 +1577,22 @@ internal sealed class MainFormTestFixture : IDisposable
         await form.WaitForSwitchCompletionForTestAsync().WaitAsync(Timeout);
     }
 
+    internal async Task RunWwmInstallAsync(string slug, string variant, bool confirm)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(async () =>
+        {
+            Form.WwmCompatibilityConfirmationForTest = () => confirm;
+            try
+            {
+                await Form.HandleWwmInstallForTestAsync(slug, variant);
+                completion.TrySetResult(null);
+            }
+            catch (Exception ex) { completion.TrySetException(ex); }
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
     internal void SignalSecondaryActivation()
     {
         using var secondary = new SingleInstanceCoordinator(_mutexName, _eventName);
@@ -1415,23 +1676,23 @@ internal sealed class MainFormTestFixture : IDisposable
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            var logger = new TestLogger();
+            var logger = _logger = new TestLogger();
             var applicationConfigStore = new ApplicationConfigStore(_appPaths, logger);
             var appVersionInfo = AppVersionInfo.FromRawVersion("1.2.2");
             _bdoSession = BdoGameSession.CreateForTests(
                 _appPaths, logger, appVersionInfo, _bdoHttpClient);
-            var gameCatalog = _includeSyntheticSecondGame
-                ? new GameCatalog(new[]
-                {
-                    _bdoSession.Descriptor,
-                    new GameDescriptor("synthetic-game", "Synthetic Game")
-                })
-                : GameCatalog.Create(_bdoSession.GameDefinition);
+            var descriptors = new List<GameDescriptor> { _bdoSession.Descriptor };
+            if (_includeSyntheticSecondGame) descriptors.Add(new GameDescriptor("synthetic-game", "Synthetic Game"));
+            if (_includeWwm) descriptors.Add(new GameDescriptor("where-winds-meet", "Where Winds Meet"));
+            var gameCatalog = new GameCatalog(descriptors);
             _sessionHost = new SelectedGameSessionHost(
                 _bdoSession,
-                descriptor => BdoGameSession.CreateForTests(
-                    _appPaths, logger, appVersionInfo, new HttpClient(_bdoHandler), ownsHttpClient: true,
-                    descriptor));
+                descriptor => descriptor.Id == "where-winds-meet"
+                    ? WwmGameSession.CreateForTests(_appPaths, logger,
+                        new HttpClient(_wwmHandlerFactory!(), disposeHandler: true), ownsHttpClient: true)
+                    : BdoGameSession.CreateForTests(
+                        _appPaths, logger, appVersionInfo, new HttpClient(_bdoHandler), ownsHttpClient: true,
+                        descriptor));
             var githubClient = new GitHubUpdateClient(_githubHttpClient, logger);
             var selectionPolicy = new UpdateSelectionPolicy(logger);
             var autostartService = new WindowsAutostartService(
@@ -1575,10 +1836,11 @@ internal sealed class MainFormTestFixture : IDisposable
 
     internal sealed class TestLogger : ILogger
     {
+        public List<string> Warnings { get; } = new();
         public void Debug(string message) { }
         public void Info(string message) { }
-        public void Warning(string message) { }
-        public void Error(string message) { }
+        public void Warning(string message) => Warnings.Add(message);
+        public void Error(string message) => Warnings.Add(message);
     }
 }
 
@@ -1635,7 +1897,11 @@ internal sealed class MainFormTestHttpHandler : HttpMessageHandler
         }
 
         if (_send != null)
-            return await _send(request, cancellationToken);
+        {
+            var response = await _send(request, cancellationToken);
+            response.RequestMessage ??= request;
+            return response;
+        }
 
         return new HttpResponseMessage(_statusCode)
         {

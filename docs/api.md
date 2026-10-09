@@ -2,13 +2,23 @@
 
 ## Endpoint
 
-Єдиний endpoint:
+BDO aggregate endpoint:
 
 ```
 GET https://bdo-ua.com.ua/api/public/v1/releases
 ```
 
 Авторизація не потрібна. Відповідь — JSON.
+
+## Winds4UA latest feed
+
+WWM має окремий API-контракт і DTO; він не десеріалізується у BDO `ReleasesResponse`.
+
+`Winds4UaApiClient.GetLatestAsync()` виконує `GET https://winds4ua.com.ua/api/public/v1/releases/latest`. Відповідь містить `success`, `generated_at`, nullable `data.current` і динамічний `data.modes[]`. `WwmPackageResolver` зіставляє вибраний artifact тільки за парою `slug + variant`, вимагає `available=true` та рівно один відповідний current file. Display label, порядок масиву, верхній `current.download_url` і історичні релізи не визначають package identity. URL має бути абсолютним HTTPS, size та SHA-256 — валідними. Невідомі поля й майбутні режими не ламають parsing.
+
+Перед WWM install/update виконується свіжий latest-запит; лише актуальні metadata можуть дозволити mutation. `current=null`, недоступний режим або некоректний artifact блокують запис. Steam build ID та `game_tested` не утворюють compatibility mapping, тому перед mutation показується нейтральне явне підтвердження. ZIP завантажується з вибраного mode/current-file URL, перевіряється за outer size/SHA і розпаковується лише у staging.
+
+Деталі production contract: [Where Winds Meet integration contract](design/where-winds-meet-integration-contract.md). API тести використовують контрольовані локальні HTTP fixtures.
 
 ## Ідентифікація desktop client
 

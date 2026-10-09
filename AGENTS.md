@@ -281,6 +281,16 @@ Hub отримує режими динамічно з API і не викорис
 
 Для install/update Hub спершу перевіряє latest metadata для вибраного режиму; збої перевірки блокують операцію без fallback до stale aggregate metadata. `game_test.state == verified` проходить без попередження; усі інші, null або невідомі значення вимагають явного підтвердження.
 
+### Winds4UA / Where Winds Meet API
+
+WWM має окремий dynamic contract; не десеріалізувати його в BDO `ReleasesResponse` і не розширювати `BdoUaApiClient` до універсального клієнта.
+
+`GET https://winds4ua.com.ua/api/public/v1/releases/latest` повертає `success`, `generated_at`, nullable `data.current` і `data.modes[]`. Mode identity — `slug + variant`; лише mode з `available=true` та рівно одним matching `current.files[]` artifact із валідними абсолютним HTTPS URL, size і SHA-256 можна встановлювати. Невідомі JSON fields/modes мають лишатися forward-compatible; unavailable mode з порожнім URL/null size/hash не є installable. Не використовувати top-level current URL, history, label або array order для package selection.
+
+Steam WWM identity — AppID `3564740`; automatic discovery використовує Steam library metadata та `appmanifest_3564740.acf`, а root validation — `Engine/Binaries/Win64r/wwm.exe` і `Package/HD/oversea/locale/`. Steam build ID є observational та snapshot-staleness metadata, не compatibility mapping. Fresh latest feed обов'язковий перед кожною WWM mutation. ZIP дозволено staging після HTTPS/size/SHA verification; приймаються лише дві allow-listed game-root-relative locale files, без direct extraction або script execution.
+
+WWM install state/transaction — окрема game-scoped versioned schema. До першої mutation зберігати pre-Hub existence/bytes/size/SHA кожного target; per-operation journal відновлює обидва targets і попередній state після partial failure. Restore означає exact **pre-Hub state**, не guaranteed stock, і має називатися `Відновити попередній стан`. Official launcher deferred; compatibility із конкретним Steam build API не підтверджує, тому перед mutation потрібне нейтральне явне підтвердження.
+
 ---
 
 ## §12 🔐 Secrets
@@ -304,6 +314,8 @@ Hub отримує режими динамічно з API і не викорис
 §13.5 Директорія валідується: наявність `{game_path}\ads\languagedata_en.loc`.
 
 §13.6 Ручний вибір завжди доступний.
+
+§13.7 WWM Steam-first detection читає Steam library metadata та `appmanifest_3564740.acf`; автоматично приймає manifest-derived root лише з `Engine/Binaries/Win64r/wwm.exe` і `Package/HD/oversea/locale/`. Ручний вибір застосовує ті самі product markers. Official launcher detection не підтримується. Steam `buildid` не є localization compatibility version.
 
 ---
 
@@ -333,6 +345,8 @@ Hub отримує режими динамічно з API і не викорис
 
 §14.9 Не видаляти `languagedata_en.loc` фізично як спосіб uninstall. Повернення до стану без української = відновлення official/original `.loc`.
 
+§14.10 Для WWM два managed targets — `Package/HD/oversea/locale/translate_words_map_en` і `_diff`. Перед першою Hub mutation зберігаються попереднє існування, exact bytes, size і SHA-256 кожного файла; кожна наступна mutation також має окрему rollback точку та durable journal. Rollback/restore повертає точні pre-operation/pre-Hub bytes або видаляє файл, якого раніше не існувало. Не називати це відновленням stock/original.
+
 ---
 
 ## §15 📦 API Release Metadata
@@ -360,6 +374,8 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 - стан вважати пошкодженим (`Corrupted`);
 - показати користувачу критичну помилку;
 - записати деталі в log.
+
+§15.4 WWM install/update використовує окремий latest endpoint/client і два-file transaction; BDO aggregate/poller/installer schemas не змінюються. Fresh `data.modes[]` package за `slug + variant` проходить HTTPS, outer size/SHA і bounded ZIP allow-list перевірки у staging до mutation. Кожен staged target повторно перевіряється за size/SHA після запису. WWM target set змінився — операція fail-closed до окремого contract review.
 
 ---
 

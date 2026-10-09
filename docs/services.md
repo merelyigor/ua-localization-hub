@@ -689,3 +689,15 @@ public static string GetDisplayText(LocalizationStateResult result);
 ```
 
 Пріоритет: patch transition тексти ("Встановлена локалізація застаріла", "Після оновлення гри файл локалізації було замінено") → текст стану. Детальніше — docs/states.md.
+
+## 18. Where Winds Meet services
+
+WWM session використовує окремі bounded компоненти:
+
+- `WwmSteamDetector` — знаходить Steam AppID `3564740` через Steam libraries/manifests; автоматичний і ручний root мають містити WWM EXE та locale directory. `buildid` — лише спостережна/snapshot-staleness metadata, не compatibility rule.
+- `Winds4UaApiClient` та `WwmPackageResolver` — отримують `/api/public/v1/releases/latest`, динамічно вибирають доступний package за `slug + variant`, звіряють mode з current file; fresh response повторно перевіряється безпосередньо перед install/update.
+- `WwmPackageService` — HTTPS download, outer size/SHA validation, bounded ZIP inspection і staging лише двох allow-listed locale targets. Архів не розпаковується напряму в гру та не виконує BAT/script.
+- `WwmInstallService` — зберігає pre-Hub snapshot і per-operation prior state, веде game-scoped transaction journal, замінює/створює обидва файли, верифікує їх і відновлює обидва targets/state при rollback. Startup recovery розрізняє завершений commit від незавершеної транзакції.
+- `WwmReleaseFeedPoller` — WWM-specific polling без перетворення feed у BDO `ReleasesResponse`.
+
+WWM compatibility із конкретним Steam build не підтверджується API; перед кожним install/update потрібне нейтральне explicit confirmation. Restore означає повернення до точного pre-Hub стану (`Відновити попередній стан`), не до гарантованих stock bytes. При зміні Steam build stale pre-Hub restore блокується.

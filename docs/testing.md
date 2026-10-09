@@ -86,6 +86,17 @@
 
 Ці тести використовують окремий STA thread і контрольований WinForms message loop, тимчасові `AppPaths` та локальні HTTP handlers. Native tray rendering, taskbar/foreground focus і реальна multi-process shell activation залишаються OS-dependent manual validation.
 
+### Where Winds Meet tests
+
+| Файл | Що тестує |
+|------|-----------|
+| `Services/WwmStage10Tests.cs` | Winds4UA latest DTO/client та failures, dynamic `slug + variant` resolution, Steam manifest/library/root markers, ZIP allow-list/size/SHA/path/link validation, isolated two-file install/rollback/cancellation/journal recovery/pre-Hub restore та installed-state resolution; усі game roots/AppPaths/archive/HTTP handlers — тимчасові fixtures |
+| `Services/GameCatalogTests.cs` | Реєстрація BDO і WWM production descriptors без зміни BDO ID |
+| `Services/SelectedGameSessionHostTests.cs` | Володіння та переключення BDO ↔ WWM session |
+| `MainFormLifecycleIntegrationTests.cs` | Persisted WWM startup, BDO → WWM → BDO isolation, latest mode becoming unavailable, compatibility decline/accept та session lifecycle |
+
+WWM tests не викликають live Winds4UA API, Registry або реальну Steam/game installation. Мутаційні fixtures створюються тільки у temp directory; вони не є native install/restore smoke.
+
 ### Storage тести
 
 | Файл | Що тестує |

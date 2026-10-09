@@ -269,6 +269,11 @@ public partial class MainForm
     }
     private async Task HandleRestoreOriginalAsync()
     {
+        if (_wwmSession != null)
+        {
+            await HandleWwmRestoreAsync();
+            return;
+        }
         if (_operationInProgress) return;
 
         string? finalMessage = null;
