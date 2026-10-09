@@ -518,6 +518,8 @@ BDO-UA-Client/
 
 §26.5 Якщо локальний GitHub CLI (`gh`) автентифікований, Implementation Agent може використовувати його для дозволених task-ом операцій із цим repository та GitHub Actions. Перед операцією перевірити `gh auth status`, repository/remote і exact ref/SHA; токени, credentials і повні auth-виводи не друкувати, не зберігати в repository та не включати у звіти. Якщо task не дозволяє мутацію — використовувати лише read-only GitHub/API/CI перевірки.
 
+§26.6 Коли Implementation Agent працює у Windows-середовищі з доступним native UI control, він може самостійно виконати й задокументувати механічну перевірку застосунку: зібрати та запустити WinForms UI, перевірити runtime-сценарії, перемикання екранів/ігор і tray/window lifecycle, переглянути логи, запустити автоматизовані тести та зберегти screenshots як evidence. У звіті вказувати точні source/commit SHA, фактично запущений EXE, сценарії, PASS/FAIL і шляхи screenshots. Не вимагати від Owner повторення суто механічної перевірки, якщо агент може безпечно виконати її та надати evidence. Architect зберігає незалежний technical review; Owner — суб'єктивне product/visual acceptance та рішення про publication/release. Owner input залишається обов'язковим для явно визначених Owner gates і рішень, що потребують суб'єктивної оцінки. Native smoke не надає дозволу змінювати реальні game files, user data, external services, release/publication state чи інші destructive/high-risk ресурси: без явної авторизації використовувати read-only дії, synthetic/temp fixtures або зупинятися перед destructive confirmation boundary. Screenshots не повинні без потреби розкривати приватні дані.
+
 ---
 
 ## §27 🧪 Тести
