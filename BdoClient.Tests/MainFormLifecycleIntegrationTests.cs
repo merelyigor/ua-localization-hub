@@ -112,6 +112,7 @@ public sealed class MainFormLifecycleIntegrationTests
             && !form.IsSwitchInProgress
             && form.ActivePersistenceRoot == fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").Root
             && FindWwmModeCards(form).Count == 3);
+        AssertGameSwitchSettled(fixture.Form);
         Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
         var cards = FindWwmModeCards(fixture.Form);
         Assert.Contains(cards, card => card.ModeSlug == "ukrainian" && card.ActionVisibleForTest && card.ActionEnabledForTest);
@@ -123,8 +124,42 @@ public sealed class MainFormLifecycleIntegrationTests
             && form.GameSectionCaption == "Black Desert Online"
             && !form.IsSwitchInProgress
             && form.ActivePersistenceRoot == fixture.AppPaths.GetGamePersistencePaths("black-desert-online").Root);
+        AssertGameSwitchSettled(fixture.Form);
         Assert.IsType<BdoGameSession>(fixture.Form.ActiveSessionForTest);
         Assert.Equal("Black Desert Online", fixture.Form.GameSelector.Text);
+
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && !form.IsSwitchInProgress
+            && FindWwmModeCards(form).Count == 3);
+        AssertGameSwitchSettled(fixture.Form);
+    }
+
+    [Fact]
+    public async Task SuccessfulGameSwitch_DoesNotClearWwmApiFailureMessage()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(
+                CreateTinyWwmArchive(), latestStatus: HttpStatusCode.BadGateway));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && !form.IsSwitchInProgress
+            && form.OperationStateForTest == OperationState.Idle
+            && !string.IsNullOrWhiteSpace(form.OperationMessageForTest));
+
+        Assert.DoesNotContain("Завантаження даних для обраної гри...", fixture.Form.OperationMessageForTest, StringComparison.Ordinal);
+    }
+
+    private static void AssertGameSwitchSettled(MainForm form)
+    {
+        Assert.Equal(OperationState.Idle, form.OperationStateForTest);
+        Assert.DoesNotContain("Завантаження даних для обраної гри...", form.OperationMessageForTest, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -217,6 +252,7 @@ public sealed class MainFormLifecycleIntegrationTests
             && form.WwmRecoveryBlockedForTest
             && FindWwmModeCards(form).Count == 3);
 
+        Assert.Equal(OperationState.Idle, fixture.Form.OperationStateForTest);
         Assert.Contains("Журнал відновлення WWM пошкоджено", fixture.Form.OperationMessageForTest, StringComparison.Ordinal);
         Assert.False(fixture.Form.WwmRestoreEnabledForTest);
         Assert.All(FindWwmModeCards(fixture.Form), card =>
@@ -1426,15 +1462,17 @@ internal sealed class MainFormTestFixture : IDisposable
         => new(HttpStatusCode.OK, "[]");
 
     internal static Func<HttpMessageHandler> CreateWwmApiHandlerFactory(byte[]? package = null, List<string>? requests = null,
-        Func<bool>? modeAvailable = null)
+        Func<bool>? modeAvailable = null, HttpStatusCode latestStatus = HttpStatusCode.OK)
         => () => new MainFormTestHttpHandler((request, _) =>
         {
             var path = request.RequestUri!.AbsolutePath;
             requests?.Add(path);
             if (path == "/api/public/v1/releases/latest")
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                return Task.FromResult(new HttpResponseMessage(latestStatus)
                 {
-                    Content = new StringContent(CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null), Encoding.UTF8, "application/json")
+                    Content = new StringContent(latestStatus == HttpStatusCode.OK
+                        ? CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null)
+                        : "{\"success\":false,\"error\":\"temporary_failure\"}", Encoding.UTF8, "application/json")
                 });
             if (path == "/releases/test.zip" && package != null)
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(package) });

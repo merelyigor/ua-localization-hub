@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 10 — IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED
-**Next:** Post-commit exact-SHA CI verification, then Owner native smoke
-**Implementation authorization:** No further product-code changes; commit/push of the reviewed patch is authorized.
+**Current phase:** Stage 10 corrective — IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE
+**Next:** Commit/push correction, exact-SHA CI, then final Architect acceptance; Owner acceptance remains pending
+**Implementation authorization:** No further product-code changes; corrective commit/push is authorized.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 — IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED | Exact-SHA CI, then Owner native smoke |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 corrective — IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE | Exact-SHA CI, then final Architect acceptance; Owner acceptance remains pending |
 
 Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
 
-Stage 9 read-only evidence and external acceptance plus Stage 10 implementation details are in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10 is implemented and locally validated; external pre-commit Architect review is accepted with BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0. Owner native smoke remains pending after exact-SHA CI. Stage 8B remains OPTIONAL / NOT STARTED; Stage 9 remains REVIEWED / ACCEPTED. Stable release is v1.2.9; Stage 10 is unreleased.
+Stage 9 read-only evidence and external acceptance plus Stage 10 implementation details are in [the WWM integration contract](../design/where-winds-meet-integration-contract.md). The plan remains ACTIVE / PRIMARY. Stage 10 corrective switch-presentation fix is implemented and validated; native Windows smoke passed for BDO↔WWM switching and tray restore. Final Architect acceptance and Owner acceptance remain pending. Stage 8B remains OPTIONAL / NOT STARTED; Stage 9 remains REVIEWED / ACCEPTED. Stable release is v1.2.9; Stage 10 is unreleased.
 
 ## Backlog
 

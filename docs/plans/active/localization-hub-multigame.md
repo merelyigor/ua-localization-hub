@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NO FURTHER PRODUCT-CODE CHANGES — PRE-COMMIT ARCHITECT REVIEW ACCEPTED; COMMIT/PUSH AUTHORIZED**
-Current phase: Stage 10 — IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED
-Next action: post-commit exact-SHA CI verification, then Owner native smoke.
+Implementation authorization: **NO FURTHER PRODUCT-CODE CHANGES — CORRECTIVE COMMIT/PUSH AUTHORIZED**
+Current phase: Stage 10 corrective — IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE
+Next action: corrective commit and exact-SHA CI, then final external Architect acceptance; Owner acceptance remains pending.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -163,9 +163,9 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 ### Stage 10 — Real Where Winds Meet Steam-first integration
 
-**IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED.** External review: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; reviewed full patch SHA-256 `be91c371ecd78d180303274bc0b9b22dba42d8c2dd386ab970b1b79edb85045e`. Added WWM as the second production game while preserving BDO-specific API/install/storage boundaries. Steam detection is manifest/library based with WWM EXE + locale markers. Dedicated latest API/DTO/package resolution keeps modes dynamic and requires a fresh available package before every mutation. ZIP outer size/SHA and strict two-target allow-list are verified in staging. `WwmInstallService` journals two-file transactions, keeps separate pre-Hub and per-operation snapshots, verifies writes, rolls back both files plus state, recovers interrupted transactions, and restores exact pre-Hub bytes/deletes previously absent files. Build ID is only a snapshot-staleness guard; API does not confirm compatibility, so mutation requires neutral confirmation. WWM state is game-scoped and versioned. Official launcher remains deferred. Owner native smoke remains pending; Stage 10 is unreleased.
+**IMPLEMENTED / VALIDATED; CORRECTIVE NATIVE SMOKE PASS; PENDING FINAL ARCHITECT ACCEPTANCE.** Base implementation pre-commit review was accepted: BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; reviewed full patch SHA-256 `be91c371ecd78d180303274bc0b9b22dba42d8c2dd386ab970b1b79edb85045e`. Added WWM as the second production game while preserving BDO-specific API/install/storage boundaries. Steam detection is manifest/library based with WWM EXE + locale markers. Dedicated latest API/DTO/package resolution keeps modes dynamic and requires a fresh available package before every mutation. ZIP outer size/SHA and strict two-target allow-list are verified in staging. `WwmInstallService` journals two-file transactions, keeps separate pre-Hub and per-operation snapshots, verifies writes, rolls back both files plus state, recovers interrupted transactions, and restores exact pre-Hub bytes/deletes previously absent files. Build ID is only a snapshot-staleness guard; API does not confirm compatibility, so mutation requires neutral confirmation. WWM state is game-scoped and versioned. Official launcher remains deferred. Corrective native smoke verified that the transient game-switch loading message is retired and operation state settles to `Idle` after BDO→WWM and WWM→BDO→WWM; API/recovery messages remain preserved. Owner acceptance and final Architect review remain pending; Stage 10 is unreleased.
 
-No real game install/restore was performed. This is high-risk multi-file mutation; the required external pre-commit Architect review is accepted and commit/push is authorized. Owner native smoke remains pending after exact-SHA CI.
+No real game install/restore was performed. This is high-risk multi-file mutation; the required external pre-commit Architect review of the base implementation is accepted. The switch-loading presentation correction passed local native smoke; final Architect acceptance remains pending. Owner acceptance is not claimed. Stage 10 remains unreleased.
 
 ## Acceptance criteria
 
@@ -186,11 +186,11 @@ No real game install/restore was performed. This is high-risk multi-file mutatio
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 established the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implements the bounded Steam-only runtime. External pre-commit review is accepted (BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0); commit/push is authorized. Owner native smoke remains pending after exact-SHA CI.
+Stage 9 established the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implements the bounded Steam-only runtime. The base implementation pre-commit review is accepted (BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0); the corrective switch-presentation change is locally validated and native-smoked. Next: corrective exact-SHA CI, then final external Architect acceptance; Owner acceptance remains pending.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 is **IMPLEMENTED / VALIDATED / PRE-COMMIT ARCHITECT REVIEW ACCEPTED**; Owner smoke remains pending after exact-SHA CI. Stable public release remains v1.2.9; this implementation is unreleased.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2 and 9 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 corrective switch-presentation change is **IMPLEMENTED / VALIDATED / NATIVE SMOKE PASS / PENDING FINAL ARCHITECT ACCEPTANCE**; Owner acceptance remains pending. Stable public release remains v1.2.9; this implementation is unreleased.
 
 ### v1.2.9 release cycle
 

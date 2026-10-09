@@ -13,6 +13,7 @@ namespace BdoClient;
 
 public partial class MainForm : Form
 {
+    private const string GameSwitchLoadingMessage = "Завантаження даних для обраної гри...";
     private ConfigStore _configStore = null!;
     private readonly ApplicationConfigStore _applicationConfigStore;
     private BdoUaApiClient _apiClient = null!;
@@ -299,6 +300,8 @@ public partial class MainForm : Form
             try
             {
                 await LoadCurrentGameSessionAsync(_gameSessionGeneration, _gameSessionCts!.Token, runGlobalStartup: false);
+                if (!_closing && IsCurrentGameSession(_gameSessionGeneration, _activeGameSession))
+                    RetireGameSwitchLoadingPresentation();
             }
             finally
             {
@@ -389,7 +392,15 @@ public partial class MainForm : Form
         SetGameSearching();
         ShowModeLoadingPlaceholder();
         SetProgress(0);
-        SetMessage("Завантаження даних для обраної гри...");
+        SetMessage(GameSwitchLoadingMessage);
+    }
+
+    private void RetireGameSwitchLoadingPresentation()
+    {
+        if (string.Equals(operationMessageLabel.Text, GameSwitchLoadingMessage, StringComparison.Ordinal))
+            SetMessage(string.Empty);
+
+        SetOperationState(OperationState.Idle);
     }
 
     internal GameDescriptor SelectedGame => _selectedGame;

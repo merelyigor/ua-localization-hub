@@ -30,7 +30,7 @@ public partial class MainForm
             _startupTimer?.Dispose();
             _startupTimer = null;
             _initializing = false;
-            SetOperationState(OperationState.Idle);
+            RetireGameSwitchLoadingPresentation();
             SetControlsDuringOperation(true);
             if (!_closing && IsCurrentGameSession(_gameSessionGeneration, _activeGameSession))
             {
