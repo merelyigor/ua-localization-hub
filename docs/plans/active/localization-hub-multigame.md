@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **BOUNDED EXECUTABLE IDENTITY MIGRATION AUTHORIZED**
-Current phase: public executable/release artifact identity migration — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW; Stage 10 — REVIEWED / ACCEPTED
-Next action: external review of the identity migration; no Release Candidate is started by this task.
+Implementation authorization: **NONE — OWNER DECISION REQUIRED**
+Current phase: Stage 10 — REVIEWED / ACCEPTED; v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
+Next action: Owner decision required; no executable roadmap step is currently authorized.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -163,11 +163,11 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 ### Stage 10 — Real Where Winds Meet Steam-first integration
 
-**REVIEWED / ACCEPTED.** Stage 10 WWM implementation and its corrective iterations passed external review and the authorized real install/restore E2E. The reviewed transaction restores the exact pre-Hub files/attributes; WWM remains Steam-first and unreleased in stable v1.2.9. Public executable identity migration is a separate bounded pre-v1.2.10 release/update-contract task and does not change localization runtime behavior.
+**REVIEWED / ACCEPTED.** Stage 10 WWM implementation and its corrective iterations passed external review and the authorized real install/restore E2E. The reviewed transaction restores the exact pre-Hub files/attributes; WWM remains Steam-first. This implementation is included in stable v1.2.10. The public executable identity migration shipped in the same release without changing localization runtime behavior.
 
 Owner UX addendum: unavailable modes are omitted, saved unavailable selection falls back to the first installable card, exact-current packages show `✓ Встановлено` without an action, and only a different package for the installed mode shows `Доступне оновлення` / `Оновити`. The restore button says `Відновити оригінал` while its validated data contract remains exact initial pre-Hub baseline—not asserted Steam stock. The action requires valid managed state, snapshot cycle ownership/integrity, unchanged targets and build-safety checks.
 
-Stage 10 real install/restore E2E and external review are accepted. Stage 10 remains unreleased in v1.2.9; the separate public executable identity migration is not a new localization stage and does not authorize an RC or release.
+Stage 10 real install/restore E2E and external review are accepted and included in v1.2.10. The separate public executable identity migration is complete and released; no next implementation step is authorized without an Owner decision.
 
 ## Acceptance criteria
 
@@ -188,11 +188,15 @@ Stage 10 real install/restore E2E and external review are accepted. Stage 10 rem
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 established the current production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. The bounded Stage 10 runtime has a real install/rollback blocker under correction. Current corrective patch remains uncommitted and requires external pre-commit Architect review. After review, the real failed transaction recovery and install/verify/restore E2E scenario still requires a separate explicit Owner authorization.
+Stage 9 established the production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implementation, external reviews and authorized real install/restore E2E are REVIEWED / ACCEPTED. The separate executable identity migration was reviewed and released in v1.2.10. No current blocker remains; Stage 8B is optional and no next implementation step is authorized without an Owner decision.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9 and 10 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 implementation and real-game E2E are accepted but unreleased in stable v1.2.9. The executable identity migration is a separate pre-v1.2.10 release-contract task.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9 and 10 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles. No further implementation task is authorized; next action requires an Owner decision.
+
+### v1.2.10 release cycle
+
+**v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED.** RC #38 / run `38056345425` succeeded from exact source SHA `fc7026311f3d79562e7558311441d829283930c9`. Annotated tag `v1.2.10` peels to that SHA. Public Release ID `409061408` was published at `2026-10-10T16:23:04Z`; it is neither draft nor prerelease. Canonical Actions artifact ID `11671731160` and public asset ID `628420557` (`BDO-WWM-UAClient-v1.2.10-win-x64.zip`, `67,976,196` bytes, SHA-256 `dbb03c6af7ee495eb8df863c7a9d5e2f6f158eea2958a375c0be3d1bb98775f1`); legacy Actions artifact ID `11672101551` and public asset ID `628420558` (`BDO-UA-Client-v1.2.10-win-x64.zip`, `67,976,176` bytes, SHA-256 `15d8e15a72bfdfe5fc9490faf8561fefd8fd0c2066c7c7df25becf0e499b1e4d`). Both bundles contain byte-identical EXE payloads (SHA-256 `de05993111ec6257a5e5fbecc1a2438af2060306f05972895f7256ec3b589490`), FileVersion `1.2.10.0`, ProductVersion `1.2.10`. Exact-SHA CI, RC validation/native smoke, public assets/body/download verification, Stage 10 real WWM E2E and final external Architect release review all passed. Evidence is archived in [`docs/releases/v1.2.10.md`](../../releases/v1.2.10.md). `NEXT.json` has been reset to empty schema-v1. No next implementation step is authorized; Owner decision required.
 
 ### v1.2.9 release cycle
 

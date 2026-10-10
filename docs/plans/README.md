@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 10 — REVIEWED / ACCEPTED; public executable identity migration — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW
-**Next:** External review of corrective patch; real-game recovery/E2E install/restore requires a separate Owner authorization
-**Implementation authorization:** Bounded identity migration is authorized; Stage 10 runtime changes are not in scope.
+**Current phase:** Stage 10 — REVIEWED / ACCEPTED; v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
+**Next:** OWNER DECISION REQUIRED; no approved executable implementation step remains
+**Implementation authorization:** None
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 — REVIEWED / ACCEPTED; executable identity migration — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW | External review of identity migration; RC v1.2.10 not started |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 10 — REVIEWED / ACCEPTED; v1.2.10 release cycle complete | OWNER DECISION REQUIRED |
 
-Release cycle: `v1.2.9 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED`; Owner live v1.2.8 → v1.2.9 self-update: `PASS / ACCEPTED`.
+Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9 analysis and Stage 10 WWM implementation/real E2E are REVIEWED / ACCEPTED. The plan remains ACTIVE / PRIMARY. The current bounded public identity migration is separate from localization runtime and remains pending external review. Stage 8B remains OPTIONAL / NOT STARTED; stable release is v1.2.9; no RC is authorized by this task.
+Stage 9 analysis and Stage 10 WWM implementation/real E2E are REVIEWED / ACCEPTED. v1.2.10 is RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. The plan remains ACTIVE / PRIMARY for future roadmap work, but Stage 8B remains OPTIONAL / NOT STARTED and no executable next step is approved. Implementation authorization is NONE; next work requires an Owner decision.
 
 ## Backlog
 
