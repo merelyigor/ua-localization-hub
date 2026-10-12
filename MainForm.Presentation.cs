@@ -315,6 +315,7 @@ public partial class MainForm
 
     private void SetControlsDuringOperation(bool enabled)
     {
+        enabled &= !_wwmManualDetectionInProgress;
         detectGameButton.Enabled = enabled;
         browseGameButton.Enabled = enabled;
         gameSelectorComboBox.Enabled = enabled
@@ -402,7 +403,7 @@ public partial class MainForm
 
     public void SetActionsEnabled(bool restoreOriginal)
     {
-        restoreOriginalButton.Enabled = restoreOriginal;
+        restoreOriginalButton.Enabled = restoreOriginal && !_wwmManualDetectionInProgress;
         UiTheme.RefreshButtonState(restoreOriginalButton);
     }
 

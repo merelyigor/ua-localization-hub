@@ -85,6 +85,7 @@ public partial class MainForm : Form
     private bool _initializing;
     private bool _suppressModeChanged;
     private volatile bool _operationInProgress;
+    private bool _wwmManualDetectionInProgress;
     private bool _awaitingGameTestConfirmation;
     private volatile bool _closing;
     private bool _exitAfterOperation;
@@ -265,7 +266,7 @@ public partial class MainForm : Form
 
     private async Task SwitchGameAsync(GameDescriptor target)
     {
-        if (_switchInProgress || _operationInProgress || _initializing || _closing)
+        if (_switchInProgress || IsUiWorkBlocked || _initializing || _closing)
             return;
 
         IGameSession? candidate = null;
@@ -415,6 +416,7 @@ public partial class MainForm : Form
     internal long GameSessionGeneration => _gameSessionGeneration;
     internal bool IsSwitchInProgress => _switchInProgress;
     internal bool IsOperationInProgress => _operationInProgress;
+    private bool IsUiWorkBlocked => _operationInProgress || _wwmManualDetectionInProgress;
     internal Task WaitForSwitchCompletionForTestAsync() => _switchCompletion.Task;
     internal Task WaitForStartupCompletionForTestAsync() => _startupCompletion.Task;
 
@@ -442,7 +444,7 @@ public partial class MainForm : Form
                 await completion.Task.ConfigureAwait(false);
                 return;
             }
-            if (!IsCurrentGameSession(generation, session) || _operationInProgress) return;
+            if (!IsCurrentGameSession(generation, session) || IsUiWorkBlocked) return;
             var oldFeed = _wwmFeed;
             _wwmFeed = feed;
             if (!string.Equals(JsonSerializer.Serialize(oldFeed), JsonSerializer.Serialize(feed), StringComparison.Ordinal))
@@ -473,6 +475,9 @@ public partial class MainForm : Form
     internal string WwmGamePathForTest => gamePathLabel.Text;
     internal bool WwmInstallActionsEnabledForTest => modesFlowPanel.Controls.OfType<WwmModeCard>().Any(card => card.ActionVisibleForTest && card.ActionEnabledForTest);
     internal bool WwmRestoreEnabledForTest => restoreOriginalButton.Enabled;
+    internal bool WwmManualDetectionInProgressForTest => _wwmManualDetectionInProgress;
+    internal bool WwmDetectEnabledForTest => detectGameButton.Enabled;
+    internal WwmDetectionResult? WwmCurrentDetectionForTest => _wwmSession?.CurrentDetection;
     internal string WwmRestoreTextForTest => restoreOriginalButton.Text;
     internal string? ModePlaceholderTextForTest => modesFlowPanel.Controls.OfType<Label>().FirstOrDefault()?.Text;
     internal string ActiveGameSelectorLabel => gameSelectorLabel.Text;
@@ -493,6 +498,13 @@ public partial class MainForm : Form
     internal string OperationMessageForTest => operationMessageLabel.Text;
     internal Task HandleInstallForTestAsync() => HandleInstallAsync();
     internal Task HandleWwmInstallForTestAsync(string slug, string variant) => HandleWwmInstallAsync(slug, variant);
+    internal Task<WwmMutationResult> HandleWwmRestoreForTestAsync() => HandleWwmRestoreAsync();
+    internal Task<WwmManualDetectionResult?> ResolveWwmManualPathForTestAsync(
+        string selectedPath, CancellationToken token = default)
+        => _wwmSession == null
+            ? Task.FromResult<WwmManualDetectionResult?>(null)
+            : ResolveWwmManualPathAsync(_wwmSession, _gameSessionGeneration, selectedPath, token);
+    internal Task DetectGameForTestAsync() => DetectGameAsync();
 
     private void InitializeGameSelector()
     {
@@ -522,7 +534,7 @@ public partial class MainForm : Form
         if (_suppressGameSelection)
             return;
 
-        if (_initializing || _switchInProgress || _operationInProgress
+        if (_initializing || _switchInProgress || IsUiWorkBlocked
             || _closing || _updateHandoffInProgress)
         {
             if (!_closing)

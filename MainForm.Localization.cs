@@ -105,7 +105,7 @@ public partial class MainForm
             SetMessage("Гру не знайдено. Натисніть «Знайти автоматично» або оберіть папку.");
             foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
                 card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
-                    stateTrusted: true, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: false, operationInProgress: _operationInProgress));
+                    stateTrusted: true, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: false, operationInProgress: IsUiWorkBlocked));
             ScheduleContentFit();
             return;
         }
@@ -118,7 +118,7 @@ public partial class MainForm
             SetMessage("Цю версію Where Winds Meet розпізнано, але встановлення через Хаб для неї ще не підтримується.");
             foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
                 card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
-                    stateTrusted: true, recoveryBlocked: false, gameDetected: false, operationInProgress: _operationInProgress));
+                    stateTrusted: true, recoveryBlocked: false, gameDetected: false, operationInProgress: IsUiWorkBlocked));
             ScheduleContentFit();
             return;
         }
@@ -134,7 +134,7 @@ public partial class MainForm
             ? (IsAvailable: false, Message: (string?)null)
             : await session.InstallService.CheckRestoreAvailabilityAsync(_gameRoot, session.SteamBuildId, cancellationToken).ConfigureAwait(true);
         if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
-        SetActionsEnabled(restoreAvailability.IsAvailable && !_operationInProgress);
+        SetActionsEnabled(restoreAvailability.IsAvailable && !IsUiWorkBlocked);
         if (!restoreAvailability.IsAvailable && !string.IsNullOrWhiteSpace(restoreAvailability.Message))
             SetMessage(restoreAvailability.Message);
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
@@ -146,7 +146,7 @@ public partial class MainForm
             if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
             var sameMode = installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant;
             var presentation = WwmModeCardPresentation.Create(sameMode, state.State,
-                stateTrusted: stateError == null, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: true, operationInProgress: _operationInProgress);
+                stateTrusted: stateError == null, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: true, operationInProgress: IsUiWorkBlocked);
             card.Present(presentation);
         }
         var overallState = installed == null
@@ -169,7 +169,7 @@ public partial class MainForm
         SetActionsEnabled(false);
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
             card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
-                stateTrusted: false, recoveryBlocked: true, gameDetected: false, operationInProgress: _operationInProgress));
+                stateTrusted: false, recoveryBlocked: true, gameDetected: false, operationInProgress: IsUiWorkBlocked));
         SetMessage(_wwmRecoveryMessage ?? "Не вдалося безпечно відновити незавершену операцію WWM.");
         ScheduleContentFit();
     }
@@ -222,7 +222,7 @@ public partial class MainForm
     private async Task HandleWwmInstallAsync(string slug, string variant)
     {
         var session = _wwmSession;
-        if (session == null || _operationInProgress || _gameRoot == null || !session.MutationSupported || _wwmRecoveryBlocked) return;
+        if (session == null || IsUiWorkBlocked || _gameRoot == null || !session.MutationSupported || _wwmRecoveryBlocked) return;
         _operationInProgress = true;
         _operationCts = CancellationTokenSource.CreateLinkedTokenSource(_gameSessionCts?.Token ?? CancellationToken.None);
         var token = _operationCts.Token;
@@ -303,7 +303,7 @@ public partial class MainForm
     private async Task<WwmMutationResult> HandleWwmRestoreAsync()
     {
         var session = _wwmSession;
-        if (session == null || _operationInProgress || _gameRoot == null || !session.MutationSupported || _wwmRecoveryBlocked)
+        if (session == null || IsUiWorkBlocked || _gameRoot == null || !session.MutationSupported || _wwmRecoveryBlocked)
             return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Встановлення для цієї версії Where Winds Meet не підтримується.");
         _operationInProgress = true;
         _operationCts = CancellationTokenSource.CreateLinkedTokenSource(_gameSessionCts?.Token ?? CancellationToken.None);
@@ -604,8 +604,11 @@ public partial class MainForm
 
 
     private async void DetectGameButton_Click(object? sender, EventArgs e)
+        => await DetectGameAsync();
+
+    private async Task DetectGameAsync()
     {
-        if (_operationInProgress || _switchInProgress || _initializing || _closing)
+        if (IsUiWorkBlocked || _switchInProgress || _initializing || _closing)
             return;
 
         var generation = _gameSessionGeneration;
@@ -686,28 +689,15 @@ public partial class MainForm
     {
         if (_wwmSession is { } wwm)
         {
+            if (IsUiWorkBlocked || _switchInProgress || _initializing || _closing)
+                return;
             using var wwmDialog = new FolderBrowserDialog { Description = "Оберіть папку Where Winds Meet або її батьківську папку" };
             if (wwmDialog.ShowDialog(this) != DialogResult.OK) return;
-            var searchToken = _gameSessionCts?.Token ?? CancellationToken.None;
-            var sessionGeneration = _gameSessionGeneration;
-            try
-            {
-                var resolution = await wwm.ResolveAndSaveManualPathAsync(wwmDialog.SelectedPath, searchToken);
-                if (!IsCurrentGameSession(sessionGeneration, wwm)) return;
-                if (resolution.Status != ManualResolveStatus.Found || resolution.Detection == null)
-                {
-                    SetMessage(GetWwmManualResolutionMessage(resolution.Status));
-                    return;
-                }
-                _gameRoot = wwm.GameRoot;
-                SetWwmGamePresentation(resolution.Detection);
-                await RefreshStateAsync(sessionGeneration, searchToken);
-            }
-            catch (OperationCanceledException) when (searchToken.IsCancellationRequested || !IsCurrentGameSession(sessionGeneration, wwm)) { }
-            catch (Exception ex) { _logger.Warning($"WWM manual path selection failed: {ex.Message}"); SetMessage("Не вдалося перевірити шлях Where Winds Meet."); }
+            await ResolveWwmManualPathAsync(wwm, _gameSessionGeneration, wwmDialog.SelectedPath,
+                _gameSessionCts?.Token ?? CancellationToken.None);
             return;
         }
-        if (_operationInProgress || _switchInProgress || _initializing || _closing)
+        if (IsUiWorkBlocked || _switchInProgress || _initializing || _closing)
             return;
 
         var generation = _gameSessionGeneration;
@@ -764,6 +754,65 @@ public partial class MainForm
         }
     }
 
+    private async Task<WwmManualDetectionResult?> ResolveWwmManualPathAsync(
+        WwmGameSession session, long sessionGeneration, string selectedPath, CancellationToken cancellationToken)
+    {
+        if (IsUiWorkBlocked || _switchInProgress || _initializing || _closing
+            || !IsCurrentGameSession(sessionGeneration, session))
+            return null;
+
+        _wwmManualDetectionInProgress = true;
+        SetControlsDuringOperation(false);
+        SetActionsEnabled(false);
+        SetOperationState(OperationState.DetectingGame);
+        SetMessage("Пошук папки Where Winds Meet...");
+
+        WwmManualDetectionResult? resolution = null;
+        string? finalMessage = null;
+        try
+        {
+            resolution = await session.ResolveAndSaveManualPathAsync(selectedPath, cancellationToken);
+            if (!IsCurrentGameSession(sessionGeneration, session))
+                return null;
+
+            if (resolution.Status == ManualResolveStatus.Found && resolution.Detection != null)
+                SetWwmGamePresentation(resolution.Detection);
+            else
+                finalMessage = GetWwmManualResolutionMessage(resolution.Status);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested
+            || !IsCurrentGameSession(sessionGeneration, session))
+        {
+            resolution = null;
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"WWM manual path selection failed: {ex.Message}");
+            finalMessage = "Не вдалося перевірити шлях Where Winds Meet.";
+        }
+        finally
+        {
+            _wwmManualDetectionInProgress = false;
+            if (!_closing && !IsDisposed && !Disposing)
+            {
+                SetOperationState(OperationState.Idle);
+                SetControlsDuringOperation(true);
+                if (IsCurrentGameSession(sessionGeneration, session))
+                {
+                    try
+                    {
+                        await RefreshWwmStateAsync(sessionGeneration, _gameSessionCts?.Token ?? default);
+                    }
+                    catch (OperationCanceledException) when (_gameSessionCts?.IsCancellationRequested == true) { }
+                    if (finalMessage != null)
+                        SetMessage(finalMessage);
+                }
+            }
+        }
+
+        return resolution;
+    }
+
     internal static string GetWwmManualResolutionMessage(ManualResolveStatus status) => status switch
     {
         ManualResolveStatus.Ambiguous => "У вибраній папці знайдено кілька встановлень Where Winds Meet. Оберіть папку конкретної гри.",
@@ -792,7 +841,7 @@ public partial class MainForm
         if (_suppressModeChanged) return;
         if (_wwmSession != null && sender is WwmModeCard selectedWwmCard)
         {
-            if (_operationInProgress) return;
+            if (IsUiWorkBlocked) return;
             SelectWwmMode(selectedWwmCard.ModeSlug, selectedWwmCard.ModeVariant);
             await PersistWwmModeSelectionAsync(selectedWwmCard);
             await RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
@@ -849,13 +898,13 @@ public partial class MainForm
     {
         if (_wwmSession != null && sender is WwmModeCard wwmCard)
         {
-            if (_initializing || _suppressModeChanged || _operationInProgress || !wwmCard.Mode.Available) return;
+            if (_initializing || _suppressModeChanged || IsUiWorkBlocked || !wwmCard.Mode.Available) return;
             SelectWwmMode(wwmCard.ModeSlug, wwmCard.ModeVariant);
             await PersistWwmModeSelectionAsync(wwmCard);
             await HandleWwmInstallAsync(wwmCard.ModeSlug, wwmCard.ModeVariant);
             return;
         }
-        if (_initializing || _suppressModeChanged || _operationInProgress || sender is not LocalizationModeCard card)
+        if (_initializing || _suppressModeChanged || IsUiWorkBlocked || sender is not LocalizationModeCard card)
             return;
 
         try
@@ -1031,7 +1080,7 @@ public partial class MainForm
         {
             _lastResolvedState = LocalizationState.NotInstalled;
             SetMessage(ApiErrorPresentation.GetUserMessage(_apiErrorKind, _apiErrorMessage));
-            SetActionsEnabled(!_operationInProgress);
+            SetActionsEnabled(!IsUiWorkBlocked);
             ScheduleContentFit();
             return;
         }
@@ -1092,7 +1141,7 @@ public partial class MainForm
         {
             var policy = InstallActionPolicy.Evaluate(
                 stateResult.State, installedModeSlug, installedPublicId,
-                selectedMode, selectedCurrent, compatResult, _operationInProgress);
+                selectedMode, selectedCurrent, compatResult, IsUiWorkBlocked);
 
             if (policy.AlreadyInstalledExactTarget && stateResult.State == LocalizationState.UpToDate)
                 diagnostic = "Встановлена остання доступна версія.";
@@ -1127,7 +1176,7 @@ public partial class MainForm
         // Action availability
         var actionPolicy = InstallActionPolicy.Evaluate(
             stateResult.State, installedModeSlug, installedPublicId,
-            selectedMode, selectedCurrent, compatResult, _operationInProgress);
+            selectedMode, selectedCurrent, compatResult, IsUiWorkBlocked);
 
         SetActionsEnabled(actionPolicy.CanRestoreOriginal
             && _releaseFeedSource == ReleaseFeedSource.Live

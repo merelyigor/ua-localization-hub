@@ -132,7 +132,7 @@ public partial class MainForm
             return;
         }
 
-        var state = UpdateButtonState.Compute(_pendingUpdateCandidate, _operationInProgress);
+        var state = UpdateButtonState.Compute(_pendingUpdateCandidate, IsUiWorkBlocked);
         updateButton.Text = state.Text;
         updateButton.Visible = state.Visible;
         updateButton.Enabled = state.Enabled;
@@ -154,7 +154,7 @@ public partial class MainForm
 
     private async Task HandleApplicationUpdateDownloadAsync()
     {
-        if (_operationInProgress) return;
+        if (IsUiWorkBlocked) return;
         if (_pendingUpdateCandidate == null) return;
 
         string? finalMessage = null;

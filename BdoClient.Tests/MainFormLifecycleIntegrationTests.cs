@@ -204,6 +204,130 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task WwmManualDetection_BlocksConflictingActionsAndRestoresSteamMutationAfterCompletion()
+    {
+        var traversalEntered = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var continueTraversal = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstEnumeration = 0;
+        IEnumerable<string> EnumerateWithPause(string path)
+        {
+            if (Interlocked.Exchange(ref firstEnumeration, 1) == 0)
+            {
+                traversalEntered.TrySetResult(null);
+                continueTraversal.Task.GetAwaiter().GetResult();
+            }
+            return Directory.EnumerateDirectories(path).ToArray();
+        }
+
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            includeSyntheticSecondGame: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmManualDirectoryEnumerator: EnumerateWithPause);
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.WwmInstallActionsEnabledForTest);
+
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        var detectionBeforeScan = session.CurrentDetection;
+        var installCalls = 0;
+        var scanTask = await fixture.BeginWwmManualPathSearchAsync(fixture.WwmSelectedParentForTest);
+        await traversalEntered.Task.WaitAsync(MainFormTestFixture.Timeout);
+
+        Assert.True(fixture.Form.WwmManualDetectionInProgressForTest);
+        Assert.False(fixture.Form.GameSelector.Enabled);
+        Assert.False(fixture.Form.WwmDetectEnabledForTest);
+        Assert.False(fixture.Form.WwmInstallActionsEnabledForTest);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+
+        var duplicateScan = await fixture.BeginWwmManualPathSearchAsync(fixture.WwmSelectedParentForTest);
+        Assert.Null(await duplicateScan.WaitAsync(MainFormTestFixture.Timeout));
+        Assert.True(fixture.Form.WwmManualDetectionInProgressForTest);
+
+        await fixture.InvokeWwmInstallAsync("ukrainian", "default", _ =>
+        {
+            Interlocked.Increment(ref installCalls);
+            return Task.FromResult(WwmMutationResult.Success());
+        });
+        var restoreResult = await fixture.InvokeWwmRestoreAsync();
+        await fixture.InvokeDetectGameAsync();
+        var selectedWhileBusy = await fixture.SelectGameAsync("synthetic-game");
+
+        Assert.Equal(0, installCalls);
+        Assert.Equal(WwmMutationError.InvalidRoot, restoreResult.Error);
+        Assert.Same(detectionBeforeScan, fixture.Form.WwmCurrentDetectionForTest);
+        Assert.Equal("where-winds-meet", fixture.Form.SelectedGame.Id);
+        Assert.Equal("where-winds-meet", selectedWhileBusy);
+        Assert.False(fixture.Form.IsSwitchInProgress);
+        Assert.True(fixture.Form.WwmManualDetectionInProgressForTest);
+
+        continueTraversal.TrySetResult(null);
+        var result = await scanTask.WaitAsync(MainFormTestFixture.Timeout);
+
+        Assert.NotNull(result);
+        Assert.Equal(ManualResolveStatus.Found, result!.Status);
+        await fixture.WaitForAsync(form => !form.WwmManualDetectionInProgressForTest
+            && form.WwmInstallActionsEnabledForTest
+            && form.WwmDetectEnabledForTest
+            && form.GameSelector.Enabled);
+        Assert.True(session.MutationSupported);
+        Assert.Equal(WwmInstallationSource.Steam, session.CurrentDetection.Source);
+        Assert.Equal(Path.GetFullPath(fixture.WwmGameRoot), session.GameRoot);
+        Assert.Equal(Path.GetFullPath(fixture.WwmGameRoot), fixture.Form.WwmGamePathForTest);
+    }
+
+    [Fact]
+    public async Task WwmManualDetection_CancellationDoesNotPersistOrApplyStaleResult()
+    {
+        var traversalEntered = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var continueTraversal = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstEnumeration = 0;
+        IEnumerable<string> EnumerateWithPause(string path)
+        {
+            if (Interlocked.Exchange(ref firstEnumeration, 1) == 0)
+            {
+                traversalEntered.TrySetResult(null);
+                continueTraversal.Task.GetAwaiter().GetResult();
+            }
+            return Directory.EnumerateDirectories(path).ToArray();
+        }
+
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmManualDirectoryEnumerator: EnumerateWithPause);
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.WwmManualDetectionInProgressForTest == false);
+
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        var originalDetection = session.CurrentDetection;
+        var originalRoot = session.GameRoot;
+        var originalConfigPath = session.ConfigStore.Load().Value?.GamePath;
+        using var cancellation = new CancellationTokenSource();
+        var scanTask = await fixture.BeginWwmManualPathSearchAsync(fixture.WwmSelectedParentForTest, cancellation.Token);
+        await traversalEntered.Task.WaitAsync(MainFormTestFixture.Timeout);
+
+        cancellation.Cancel();
+        continueTraversal.TrySetResult(null);
+        var result = await scanTask.WaitAsync(MainFormTestFixture.Timeout);
+
+        Assert.Null(result);
+        Assert.Same(originalDetection, session.CurrentDetection);
+        Assert.Equal(originalRoot, session.GameRoot);
+        Assert.Equal(originalConfigPath, session.ConfigStore.Load().Value?.GamePath);
+        await fixture.WaitForAsync(form => !form.WwmManualDetectionInProgressForTest
+            && form.WwmDetectEnabledForTest
+            && form.GameSelector.Enabled);
+    }
+
+    [Fact]
     public void WwmIncompleteManualSearch_HasTruthfulNonNotFoundMessage()
     {
         var message = MainForm.GetWwmManualResolutionMessage(ManualResolveStatus.Incomplete);
@@ -1360,6 +1484,7 @@ internal sealed class MainFormTestFixture : IDisposable
     private readonly bool _wwmHasSteamManifest;
     private readonly bool _wwmUsesLocalDataPatchLayout;
     private readonly bool _wwmGameMarkersPresent;
+    private readonly Func<string, IEnumerable<string>>? _wwmManualDirectoryEnumerator;
     private readonly TaskCompletionSource<MainForm> _formReady =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<object?> _hostCompleted =
@@ -1387,7 +1512,8 @@ internal sealed class MainFormTestFixture : IDisposable
         string? wwmConfigJson,
         bool wwmHasSteamManifest,
         bool wwmUsesLocalDataPatchLayout,
-        bool wwmGameMarkersPresent)
+        bool wwmGameMarkersPresent,
+        Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator)
     {
         _bdoHandler = bdoHandler;
         _includeSyntheticSecondGame = includeSyntheticSecondGame;
@@ -1397,6 +1523,7 @@ internal sealed class MainFormTestFixture : IDisposable
         _wwmHasSteamManifest = wwmHasSteamManifest;
         _wwmUsesLocalDataPatchLayout = wwmUsesLocalDataPatchLayout;
         _wwmGameMarkersPresent = wwmGameMarkersPresent;
+        _wwmManualDirectoryEnumerator = wwmManualDirectoryEnumerator;
         if (includeWwm && wwmHandlerFactory == null)
             throw new ArgumentException("A WWM API handler factory is required when WWM is included.", nameof(wwmHandlerFactory));
         _githubHandler = CreateSuccessfulGitHubHandler();
@@ -1483,6 +1610,7 @@ internal sealed class MainFormTestFixture : IDisposable
 
     internal string GameRoot { get; }
     internal string WwmGameRoot { get; }
+    internal string WwmSelectedParentForTest => _wwmSteamRoot;
     private string _wwmSteamRoot { get; }
     internal TestLogger Logger => _logger ?? throw new InvalidOperationException("Test logger is not ready.");
 
@@ -1603,6 +1731,56 @@ internal sealed class MainFormTestFixture : IDisposable
         return await completion.Task.WaitAsync(Timeout);
     }
 
+    internal async Task<Task<WwmManualDetectionResult?>> BeginWwmManualPathSearchAsync(
+        string selectedPath, CancellationToken token = default)
+    {
+        var completion = new TaskCompletionSource<Task<WwmManualDetectionResult?>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(() =>
+        {
+            try { completion.TrySetResult(Form.ResolveWwmManualPathForTestAsync(selectedPath, token)); }
+            catch (Exception ex) { completion.TrySetException(ex); }
+        });
+        return await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task InvokeWwmInstallAsync(string slug, string variant, Func<CancellationToken, Task<WwmMutationResult>> install)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(async () =>
+        {
+            try
+            {
+                Form.WwmInstallResultForTest = install;
+                await Form.HandleWwmInstallForTestAsync(slug, variant);
+                completion.TrySetResult(null);
+            }
+            catch (Exception ex) { completion.TrySetException(ex); }
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task<WwmMutationResult> InvokeWwmRestoreAsync()
+    {
+        var completion = new TaskCompletionSource<WwmMutationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(async () =>
+        {
+            try { completion.TrySetResult(await Form.HandleWwmRestoreForTestAsync()); }
+            catch (Exception ex) { completion.TrySetException(ex); }
+        });
+        return await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task InvokeDetectGameAsync()
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(async () =>
+        {
+            try { await Form.DetectGameForTestAsync(); completion.TrySetResult(null); }
+            catch (Exception ex) { completion.TrySetException(ex); }
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
     internal async Task SetOperationInProgressAsync(bool value)
     {
         var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1654,12 +1832,13 @@ internal sealed class MainFormTestFixture : IDisposable
         string? wwmConfigJson = null,
         bool wwmHasSteamManifest = true,
         bool wwmUsesLocalDataPatchLayout = false,
-        bool wwmGameMarkersPresent = true)
+        bool wwmGameMarkersPresent = true,
+        Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator = null)
     {
         var fixture = new MainFormTestFixture(
             bdoHandler, startInBackground, exitWhenShown, seedReleaseFeedCache, gamePatch, applicationConfigJson,
             includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal, wwmConfigJson,
-            wwmHasSteamManifest, wwmUsesLocalDataPatchLayout, wwmGameMarkersPresent);
+            wwmHasSteamManifest, wwmUsesLocalDataPatchLayout, wwmGameMarkersPresent, wwmManualDirectoryEnumerator);
         fixture._uiThread.Start();
 
         try
@@ -1961,7 +2140,8 @@ internal sealed class MainFormTestFixture : IDisposable
                 descriptor => descriptor.Id == "where-winds-meet"
                     ? WwmGameSession.CreateForTests(_appPaths, logger,
                         new HttpClient(_wwmHandlerFactory!(), disposeHandler: true), ownsHttpClient: true,
-                        steamRoots: _wwmHasSteamManifest ? new[] { _wwmSteamRoot } : Array.Empty<string>())
+                        steamRoots: _wwmHasSteamManifest ? new[] { _wwmSteamRoot } : Array.Empty<string>(),
+                        manualDirectoryEnumerator: _wwmManualDirectoryEnumerator)
                     : BdoGameSession.CreateForTests(
                         _appPaths, logger, appVersionInfo, new HttpClient(_bdoHandler), ownsHttpClient: true,
                         descriptor));
