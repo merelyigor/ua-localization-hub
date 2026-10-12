@@ -9,7 +9,7 @@ Owner decisions recorded: stable game ID `where-winds-meet`; initial implementat
 ## Evidence boundary
 
 - **Steam — LOCALLY VERIFIED:** Steam AppID `3564740`, manifest association, installed root markers, executable, and Steam locale directory were inspected read-only. The local Steam manifest reports build ID `25281753`.
-- **Official launcher — DOCUMENTED / NOT LOCALLY VERIFIED / DEFERRED:** Winds4UA documents its target directory, but this machine's installation does not establish that launcher layout or its detection markers. It is outside the initial Steam-first scope and needs separate Owner authorization/verification.
+- **Official launcher — detection only under Stage 11A; launcher provenance not established:** the Windows LocalDataPatch filesystem layout can be recognized from product markers, but this alone does not prove Official Launcher provenance. Official Launcher mutation remains deferred.
 - Public facts below were checked against the [Winds4UA download instructions](https://winds4ua.com.ua/download), the [current public API documentation](https://winds4ua.com.ua/docs/public-api/releases), and read-only requests to the production API. The API host is `winds4ua.com.ua`.
 - The current package was downloaded to isolated temporary storage, hash-checked and listed; entries were compared read-only with the local Steam locale directory. No archive content was copied to the game.
 
@@ -166,3 +166,13 @@ The versioned WWM state and pre-Hub snapshot are isolated under `games/where-win
 Only API modes with `available=true` and a valid matching current package are rendered. An exact-current installed mode shows `✓ Встановлено` without an Update action; a different current package for the same installed mode shows `Доступне оновлення` / `Оновити`; another installable mode shows `Доступно` / `Встановити`. The WWM action label is `Відновити оригінал`, while its safety contract remains the trusted first pre-Hub baseline of the management cycle—not independently verified Steam stock. Missing/invalid baseline, mismatched cycle/build, modified targets or unresolved recovery keep restore disabled.
 
 This is **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. Owner native smoke remains pending; no commit, push, RC, tag or release was created.
+
+## Stage 11A — Windows layout-aware detection and truthful presentation
+
+Stage 11A separates installation provenance from filesystem layout. The common product marker is `Engine/Binaries/Win64r/wwm.exe`; detection accepts either `Package/HD/oversea/locale/` or `LocalData/Patch/HD/oversea/locale/`. Folder names such as `Where Winds Meet`, `wwm_standard` or `wwm_lite` are not required. Package and LocalDataPatch may coexist, and layout alone never establishes Steam, Epic Games or Official Launcher provenance.
+
+Automatic detection remains Steam-only and requires the matching `appmanifest_3564740.acf` under a discovered Steam library, the matching AppID/install directory and the product markers. A manually selected ancestor is checked first as a root, then searched recursively within its tree with deterministic bounds, inaccessible-directory tolerance and no reparse-point traversal. A saved/manual root without a matching Steam manifest is `UnknownWindows`; there is no speculative Epic/Official automatic discovery.
+
+The UI labels only manifest-proven installations as Steam and shows the build as informational, explicitly unconfirmed compatibility. Other valid Windows roots are shown as `Знайдено Where Winds Meet`; missing roots are `Гру не знайдено`. Detection of LocalDataPatch or unknown provenance does not enable mutation: install/update/restore remain disabled, and the Steam installer’s Package-only root validation, managed targets, state and transaction contracts are unchanged. Epic/Official provenance remains unclaimed absent launcher-native evidence. Android is outside this Windows-client scope.
+
+Stage 11A is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW**. No WWM game files were modified. This detection/presentation scope does not authorize non-Steam installation or restore.

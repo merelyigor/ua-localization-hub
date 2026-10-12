@@ -116,6 +116,8 @@ public sealed class WwmStage10Tests
         var result = new WwmSteamDetector(Logger, new[] { steam }).Detect();
 
         Assert.Equal(Path.GetFullPath(root), result.GameRoot);
+        Assert.Equal(WwmInstallationSource.Steam, result.Source);
+        Assert.Equal(WwmInstallationLayout.Package, result.Layout);
         Assert.Equal("25281753", result.BuildId);
         Assert.Equal(Path.Combine(library, "steamapps", "appmanifest_3564740.acf"), result.ManifestPath);
     }
@@ -157,6 +159,161 @@ public sealed class WwmStage10Tests
         File.WriteAllBytes(Path.Combine(root, WwmGameDefinition.Default.ExecutableRelativePath), new byte[] { 1 });
         Directory.Delete(Path.Combine(root, WwmGameDefinition.Default.LocaleRelativePath), recursive: true);
         Assert.False(detector.Detect().IsFound);
+    }
+
+    [Fact]
+    public void ManualPackageRootWithoutSteamEvidence_IsUnknownWindows()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "arbitrary-folder-name");
+        CreateGameMarkers(root);
+        var detector = new WwmSteamDetector(Logger, Array.Empty<string>());
+
+        var resolution = detector.ResolveManualRoot(root);
+        var result = detector.DescribeRoot(resolution.GamePath!, "manual-folder-selection");
+
+        Assert.Equal(ManualResolveStatus.Found, resolution.Status);
+        Assert.Equal(Path.GetFullPath(root), result.GameRoot);
+        Assert.Equal(WwmInstallationSource.UnknownWindows, result.Source);
+        Assert.Equal(WwmInstallationLayout.Package, result.Layout);
+        Assert.False(result.IsMutationSupported);
+    }
+
+    [Fact]
+    public void LocalDataPatchLayout_IsRecognizedButNotPackageMutationRoot()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "random-parent", "wwm_lite");
+        CreateGameMarkers(root, localDataPatch: true);
+        var definition = WwmGameDefinition.Default;
+
+        Assert.True(definition.TryGetWindowsLayout(root, out var layout));
+        Assert.Equal(WwmInstallationLayout.LocalDataPatch, layout);
+        Assert.False(definition.ValidateGameRoot(root));
+        var result = new WwmSteamDetector(Logger, Array.Empty<string>()).DescribeRoot(root, "manual-folder-selection");
+        Assert.Equal(WwmInstallationSource.UnknownWindows, result.Source);
+        Assert.False(result.IsMutationSupported);
+    }
+
+    [Fact]
+    public void ManualResolver_SearchesSelectedAncestorRecursivelyWithoutRequiringKnownFolderNames()
+    {
+        using var temp = new TestTemp();
+        var selected = Path.Combine(temp.Root, "outer", "parent");
+        var root = Path.Combine(selected, "arbitrary", "nested", "game");
+        CreateGameMarkers(root);
+
+        var result = new WwmSteamDetector(Logger, Array.Empty<string>()).ResolveManualRoot(selected);
+
+        Assert.Equal(ManualResolveStatus.Found, result.Status);
+        Assert.Equal(Path.GetFullPath(root), result.GamePath);
+    }
+
+    [Fact]
+    public void ManualResolver_UsesSelectedDirectoryWhenItIsTheRoot()
+    {
+        using var temp = new TestTemp();
+        CreateGameMarkers(temp.Root);
+
+        var result = new WwmSteamDetector(Logger, Array.Empty<string>()).ResolveManualRoot(temp.Root);
+
+        Assert.Equal(ManualResolveStatus.Found, result.Status);
+        Assert.Equal(Path.GetFullPath(temp.Root), result.GamePath);
+    }
+
+    [Fact]
+    public void ManualResolver_ReturnsNotFoundForNoCandidates()
+    {
+        using var temp = new TestTemp();
+        Directory.CreateDirectory(Path.Combine(temp.Root, "deep", "empty"));
+
+        var result = new WwmSteamDetector(Logger, Array.Empty<string>()).ResolveManualRoot(temp.Root);
+
+        Assert.Equal(ManualResolveStatus.NotFound, result.Status);
+    }
+
+    [Fact]
+    public void ManualResolver_ReturnsAmbiguousForMultipleValidDescendants()
+    {
+        using var temp = new TestTemp();
+        CreateGameMarkers(Path.Combine(temp.Root, "first", "game"));
+        CreateGameMarkers(Path.Combine(temp.Root, "second", "game"));
+
+        var result = new WwmSteamDetector(Logger, Array.Empty<string>()).ResolveManualRoot(temp.Root);
+
+        Assert.Equal(ManualResolveStatus.Ambiguous, result.Status);
+        Assert.Null(result.GamePath);
+    }
+
+    [Fact]
+    public void ManualResolver_SkipsInaccessibleDirectoriesAndFindsOtherCandidate()
+    {
+        using var temp = new TestTemp();
+        var inaccessible = Path.Combine(temp.Root, "inaccessible");
+        Directory.CreateDirectory(inaccessible);
+        var root = Path.Combine(temp.Root, "available", "nested");
+        CreateGameMarkers(root);
+        IEnumerable<string> Enumerate(string path)
+        {
+            if (string.Equals(Path.GetFullPath(path), Path.GetFullPath(inaccessible), StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("synthetic access denied");
+            return Directory.GetDirectories(path);
+        }
+        var detector = new WwmSteamDetector(Logger, Array.Empty<string>(), null, Enumerate);
+
+        var result = detector.ResolveManualRoot(temp.Root);
+
+        Assert.Equal(ManualResolveStatus.Found, result.Status);
+        Assert.Equal(Path.GetFullPath(root), result.GamePath);
+    }
+
+    [Fact]
+    public void ManualResolver_DoesNotFollowDirectoryJunctions()
+    {
+        using var temp = new TestTemp();
+        var selected = Path.Combine(temp.Root, "selected");
+        var external = Path.Combine(temp.Root, "outside-tree", "valid-game");
+        var junction = Path.Combine(selected, "linked-game");
+        Directory.CreateDirectory(selected);
+        CreateGameMarkers(external);
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = $"/c mklink /J \"{junction}\" \"{external}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
+        })!;
+        process.WaitForExit();
+        Assert.Equal(0, process.ExitCode);
+
+        try
+        {
+            var result = new WwmSteamDetector(Logger, Array.Empty<string>()).ResolveManualRoot(selected);
+            Assert.Equal(ManualResolveStatus.NotFound, result.Status);
+        }
+        finally
+        {
+            Directory.Delete(junction);
+        }
+    }
+
+    [Fact]
+    public void CoexistingLayoutsAndSavedRootDoNotProvePlatform()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "custom-install");
+        CreateGameMarkers(root);
+        Directory.CreateDirectory(Path.Combine(root, WwmGameDefinition.Default.LocalDataPatchLocaleRelativePath));
+        var detector = new WwmSteamDetector(Logger, Array.Empty<string>());
+
+        var result = detector.Detect(root);
+
+        Assert.Equal(WwmInstallationLayout.Package | WwmInstallationLayout.LocalDataPatch, result.Layout);
+        Assert.Equal(WwmInstallationSource.UnknownWindows, result.Source);
+        Assert.Null(result.BuildId);
+        Assert.Equal("saved-config", result.EvidenceMarker);
     }
 
     [Fact]
@@ -1234,12 +1391,17 @@ public sealed class WwmStage10Tests
     private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
     private static void CreateGameMarkers(string root)
+        => CreateGameMarkers(root, localDataPatch: false);
+
+    private static void CreateGameMarkers(string root, bool localDataPatch)
     {
         Directory.CreateDirectory(root);
         var definition = WwmGameDefinition.Default;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(root, definition.ExecutableRelativePath))!);
         File.WriteAllBytes(Path.Combine(root, definition.ExecutableRelativePath), new byte[] { 1 });
-        Directory.CreateDirectory(Path.Combine(root, definition.LocaleRelativePath));
+        Directory.CreateDirectory(Path.Combine(root, localDataPatch
+            ? definition.LocalDataPatchLocaleRelativePath
+            : definition.LocaleRelativePath));
     }
 
     private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> response)

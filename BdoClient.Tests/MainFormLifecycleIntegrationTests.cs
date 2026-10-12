@@ -155,6 +155,75 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task WwmRecognizedUnknownWindowsRoot_IsNotPresentedAsSteamAndCannotMutate()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmHasSteamManifest: false,
+            wwmUsesLocalDataPatchLayout: true);
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && !form.IsSwitchInProgress
+            && FindWwmModeCards(form).Count == 1
+            && form.WwmGameStatusForTest == "Знайдено Where Winds Meet");
+
+        var card = Assert.Single(FindWwmModeCards(fixture.Form));
+        Assert.DoesNotContain("Steam", fixture.Form.WwmGameStatusForTest, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("не підтримується", fixture.Form.OperationMessageForTest, StringComparison.OrdinalIgnoreCase);
+        Assert.True(card.ActionVisibleForTest);
+        Assert.False(card.ActionEnabledForTest);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+        Assert.False(fixture.Form.WwmInstallActionsEnabledForTest);
+        Assert.Equal(Path.GetFullPath(fixture.WwmGameRoot), fixture.Form.WwmGamePathForTest);
+    }
+
+    [Fact]
+    public async Task WwmProvenSteamRoot_PresentsSteamBuildAndKeepsMutationEnabled()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.WwmGameStatusForTest.Contains("Знайдено Steam-гру · build 25281753", StringComparison.Ordinal)
+            && FindWwmModeCards(form).Count == 1);
+
+        var card = Assert.Single(FindWwmModeCards(fixture.Form));
+        Assert.True(card.ActionVisibleForTest);
+        Assert.True(card.ActionEnabledForTest);
+        Assert.Contains("сумісність не підтверджено", fixture.Form.WwmGameStatusForTest, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WwmNotFoundPresentation_DoesNotClaimSteamWasNotFound()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmGameMarkersPresent: false);
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && !form.IsSwitchInProgress
+            && form.WwmGameStatusForTest == "Гру не знайдено");
+
+        Assert.DoesNotContain("Steam", fixture.Form.WwmGameStatusForTest, StringComparison.OrdinalIgnoreCase);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+    }
+
+    [Fact]
     public async Task WwmSavedUnavailableMode_FallsBackToFirstVisibleInstallableMode()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
@@ -1277,6 +1346,9 @@ internal sealed class MainFormTestFixture : IDisposable
     private readonly bool _includeWwm;
     private readonly Func<HttpMessageHandler>? _wwmHandlerFactory;
     private readonly bool _seedMalformedWwmJournal;
+    private readonly bool _wwmHasSteamManifest;
+    private readonly bool _wwmUsesLocalDataPatchLayout;
+    private readonly bool _wwmGameMarkersPresent;
     private readonly TaskCompletionSource<MainForm> _formReady =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<object?> _hostCompleted =
@@ -1301,13 +1373,19 @@ internal sealed class MainFormTestFixture : IDisposable
         bool includeWwm,
         Func<HttpMessageHandler>? wwmHandlerFactory,
         bool seedMalformedWwmJournal,
-        string? wwmConfigJson)
+        string? wwmConfigJson,
+        bool wwmHasSteamManifest,
+        bool wwmUsesLocalDataPatchLayout,
+        bool wwmGameMarkersPresent)
     {
         _bdoHandler = bdoHandler;
         _includeSyntheticSecondGame = includeSyntheticSecondGame;
         _includeWwm = includeWwm;
         _wwmHandlerFactory = wwmHandlerFactory;
         _seedMalformedWwmJournal = seedMalformedWwmJournal;
+        _wwmHasSteamManifest = wwmHasSteamManifest;
+        _wwmUsesLocalDataPatchLayout = wwmUsesLocalDataPatchLayout;
+        _wwmGameMarkersPresent = wwmGameMarkersPresent;
         if (includeWwm && wwmHandlerFactory == null)
             throw new ArgumentException("A WWM API handler factory is required when WWM is included.", nameof(wwmHandlerFactory));
         _githubHandler = CreateSuccessfulGitHubHandler();
@@ -1346,13 +1424,24 @@ internal sealed class MainFormTestFixture : IDisposable
                 JsonSerializer.Serialize(new Config { GamePath = GameRoot }));
         }
 
-        WwmGameRoot = Path.Combine(_root, "fake-wwm-game");
+        _wwmSteamRoot = Path.Combine(_root, "fake-steam-library");
+        WwmGameRoot = Path.Combine(_wwmSteamRoot, "steamapps", "common", "fake-wwm-game");
         if (includeWwm)
         {
             var definition = WwmGameDefinition.Default;
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(WwmGameRoot, definition.ExecutableRelativePath))!);
-            File.WriteAllBytes(Path.Combine(WwmGameRoot, definition.ExecutableRelativePath), new byte[] { 1 });
-            Directory.CreateDirectory(Path.Combine(WwmGameRoot, definition.LocaleRelativePath));
+            if (wwmGameMarkersPresent)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(WwmGameRoot, definition.ExecutableRelativePath))!);
+                File.WriteAllBytes(Path.Combine(WwmGameRoot, definition.ExecutableRelativePath), new byte[] { 1 });
+                Directory.CreateDirectory(Path.Combine(WwmGameRoot,
+                    wwmUsesLocalDataPatchLayout ? definition.LocalDataPatchLocaleRelativePath : definition.LocaleRelativePath));
+                if (wwmHasSteamManifest && !wwmUsesLocalDataPatchLayout)
+                {
+                    Directory.CreateDirectory(Path.Combine(_wwmSteamRoot, "steamapps"));
+                    File.WriteAllText(Path.Combine(_wwmSteamRoot, "steamapps", $"appmanifest_{definition.SteamAppId}.acf"),
+                        $"\"AppState\" {{ \"appid\" \"{definition.SteamAppId}\" \"installdir\" \"fake-wwm-game\" \"buildid\" \"25281753\" }}");
+                }
+            }
             var wwmPaths = _appPaths.GetGamePersistencePaths(definition.Id);
             wwmPaths.EnsureDirectories();
             var wwmConfig = wwmConfigJson == null ? new Config() : JsonSerializer.Deserialize<Config>(wwmConfigJson) ?? new Config();
@@ -1383,6 +1472,7 @@ internal sealed class MainFormTestFixture : IDisposable
 
     internal string GameRoot { get; }
     internal string WwmGameRoot { get; }
+    private string _wwmSteamRoot { get; }
     internal TestLogger Logger => _logger ?? throw new InvalidOperationException("Test logger is not ready.");
 
     internal AppPaths AppPaths => _appPaths;
@@ -1550,11 +1640,15 @@ internal sealed class MainFormTestFixture : IDisposable
         bool includeWwm = false,
         Func<HttpMessageHandler>? wwmHandlerFactory = null,
         bool seedMalformedWwmJournal = false,
-        string? wwmConfigJson = null)
+        string? wwmConfigJson = null,
+        bool wwmHasSteamManifest = true,
+        bool wwmUsesLocalDataPatchLayout = false,
+        bool wwmGameMarkersPresent = true)
     {
         var fixture = new MainFormTestFixture(
             bdoHandler, startInBackground, exitWhenShown, seedReleaseFeedCache, gamePatch, applicationConfigJson,
-            includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal, wwmConfigJson);
+            includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal, wwmConfigJson,
+            wwmHasSteamManifest, wwmUsesLocalDataPatchLayout, wwmGameMarkersPresent);
         fixture._uiThread.Start();
 
         try
@@ -1855,7 +1949,8 @@ internal sealed class MainFormTestFixture : IDisposable
                 _bdoSession,
                 descriptor => descriptor.Id == "where-winds-meet"
                     ? WwmGameSession.CreateForTests(_appPaths, logger,
-                        new HttpClient(_wwmHandlerFactory!(), disposeHandler: true), ownsHttpClient: true)
+                        new HttpClient(_wwmHandlerFactory!(), disposeHandler: true), ownsHttpClient: true,
+                        steamRoots: _wwmHasSteamManifest ? new[] { _wwmSteamRoot } : Array.Empty<string>())
                     : BdoGameSession.CreateForTests(
                         _appPaths, logger, appVersionInfo, new HttpClient(_bdoHandler), ownsHttpClient: true,
                         descriptor));

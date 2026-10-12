@@ -110,6 +110,19 @@ public partial class MainForm
             return;
         }
 
+        if (!session.MutationSupported)
+        {
+            DisposeWwmFileMonitor();
+            restoreOriginalButton.Text = "Відновити оригінал";
+            SetActionsEnabled(false);
+            SetMessage("Цю версію Where Winds Meet розпізнано, але встановлення через Хаб для неї ще не підтримується.");
+            foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+                card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
+                    stateTrusted: true, recoveryBlocked: false, gameDetected: false, operationInProgress: _operationInProgress));
+            ScheduleContentFit();
+            return;
+        }
+
         var installed = session.StateStore.Load(out var stateError);
         if (stateError != null)
         {
@@ -181,16 +194,25 @@ public partial class MainForm
         if (result.GameRoot == null)
         {
             _gameDetectionSource = null;
-            gameStatusLabel.Text = "Steam-гру не знайдено";
+            gameStatusLabel.Text = "Гру не знайдено";
             gameStatusLabel.ForeColor = UiTheme.SecondaryText;
             gamePathLabel.Text = "";
         }
         else
         {
-            _gameDetectionSource = DetectionSource.Steam;
-            gameStatusLabel.Text = string.IsNullOrWhiteSpace(result.BuildId)
-                ? "Знайдено Steam-гру · build невідомий"
-                : $"Знайдено Steam-гру · build {result.BuildId} (сумісність не підтверджено)";
+            _gameDetectionSource = result.Source == WwmInstallationSource.Steam ? DetectionSource.Steam
+                : result.EvidenceMarker == "manual-folder-selection" ? DetectionSource.Manual
+                : DetectionSource.SavedConfig;
+            gameStatusLabel.Text = result.Source switch
+            {
+                WwmInstallationSource.Steam when string.IsNullOrWhiteSpace(result.BuildId)
+                    => "Знайдено Steam-гру · build невідомий",
+                WwmInstallationSource.Steam
+                    => $"Знайдено Steam-гру · build {result.BuildId} (сумісність не підтверджено)",
+                WwmInstallationSource.EpicGames => "Знайдено Epic Games-версію",
+                WwmInstallationSource.OfficialLauncher => "Знайдено гру з офіційного лаунчера",
+                _ => "Знайдено Where Winds Meet"
+            };
             gameStatusLabel.ForeColor = UiTheme.Success;
             gamePathLabel.Text = result.GameRoot;
         }
@@ -200,7 +222,7 @@ public partial class MainForm
     private async Task HandleWwmInstallAsync(string slug, string variant)
     {
         var session = _wwmSession;
-        if (session == null || _operationInProgress || _gameRoot == null || _wwmRecoveryBlocked) return;
+        if (session == null || _operationInProgress || _gameRoot == null || !session.MutationSupported || _wwmRecoveryBlocked) return;
         _operationInProgress = true;
         _operationCts = CancellationTokenSource.CreateLinkedTokenSource(_gameSessionCts?.Token ?? CancellationToken.None);
         var token = _operationCts.Token;
@@ -281,8 +303,8 @@ public partial class MainForm
     private async Task<WwmMutationResult> HandleWwmRestoreAsync()
     {
         var session = _wwmSession;
-        if (session == null || _operationInProgress || _gameRoot == null || _wwmRecoveryBlocked)
-            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Гру не знайдено.");
+        if (session == null || _operationInProgress || _gameRoot == null || !session.MutationSupported || _wwmRecoveryBlocked)
+            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Встановлення для цієї версії Where Winds Meet не підтримується.");
         _operationInProgress = true;
         _operationCts = CancellationTokenSource.CreateLinkedTokenSource(_gameSessionCts?.Token ?? CancellationToken.None);
         var token = _operationCts.Token;
@@ -668,13 +690,19 @@ public partial class MainForm
             if (wwmDialog.ShowDialog(this) != DialogResult.OK) return;
             try
             {
-                if (!await wwm.ValidateAndSaveManualPathAsync(wwmDialog.SelectedPath, _gameSessionCts?.Token ?? default))
+                var resolution = await wwm.ResolveAndSaveManualPathAsync(wwmDialog.SelectedPath, _gameSessionCts?.Token ?? default);
+                if (resolution.Status == ManualResolveStatus.Ambiguous)
+                {
+                    SetMessage("У вибраній папці знайдено кілька встановлень Where Winds Meet. Оберіть папку конкретної гри.");
+                    return;
+                }
+                if (resolution.Status != ManualResolveStatus.Found || resolution.Detection == null)
                 {
                     SetMessage("У вибраній папці не знайдено потрібні файли Where Winds Meet.");
                     return;
                 }
                 _gameRoot = wwm.GameRoot;
-                SetWwmGamePresentation(new WwmDetectionResult(wwm.GameRoot, wwm.SteamBuildId, null));
+                SetWwmGamePresentation(resolution.Detection);
                 await RefreshStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
             }
             catch (Exception ex) { _logger.Warning($"WWM manual path selection failed: {ex.Message}"); SetMessage("Не вдалося перевірити шлях Where Winds Meet."); }

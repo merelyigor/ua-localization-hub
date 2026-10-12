@@ -53,7 +53,7 @@ public partial class MainForm
         SetOperationState(OperationState.DetectingGame);
         var detection = session.DetectGame();
         SetWwmGamePresentation(detection);
-        if (detection.GameRoot != null)
+        if (detection.GameRoot != null && detection.IsMutationSupported)
         {
             var recovery = await session.InstallService.RecoverAsync(detection.GameRoot, detection.BuildId, token);
             if (!recovery.IsSuccess)

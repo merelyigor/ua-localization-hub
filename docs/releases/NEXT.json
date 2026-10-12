@@ -5,6 +5,8 @@
   "fixed": [],
   "reliability": [],
   "performance": [],
-  "changes": [],
+  "changes": [
+    "Розширено виявлення Where Winds Meet на відомі Windows-розкладки; встановлення й відновлення залишаються доступними лише для підтвердженої Steam-версії."
+  ],
   "limitations": []
 }

@@ -11,7 +11,7 @@ public sealed class WwmGameSession : IGameSession
     private readonly bool _ownsHttpClient;
     private bool _disposed;
 
-    private WwmGameSession(AppPaths paths, ILogger logger, HttpClient httpClient, bool ownsHttpClient)
+    private WwmGameSession(AppPaths paths, ILogger logger, HttpClient httpClient, bool ownsHttpClient, IEnumerable<string>? steamRoots = null)
     {
         _httpClient = httpClient;
         _ownsHttpClient = ownsHttpClient;
@@ -21,7 +21,7 @@ public sealed class WwmGameSession : IGameSession
         PersistencePaths.EnsureDirectories();
         ConfigStore = new ConfigStore(PersistencePaths, logger);
         StateStore = new WwmStateStore(PersistencePaths);
-        Detector = new WwmSteamDetector(logger);
+        Detector = new WwmSteamDetector(logger, steamRoots);
         ApiClient = new Winds4UaApiClient(httpClient, logger);
         InstallService = new WwmInstallService(httpClient, PersistencePaths, StateStore, logger, definition);
         Poller = new WwmReleaseFeedPoller(ApiClient);
@@ -37,27 +37,36 @@ public sealed class WwmGameSession : IGameSession
     public WwmReleaseFeedPoller Poller { get; }
     public string? GameRoot { get; private set; }
     public string? SteamBuildId { get; private set; }
+    public WwmDetectionResult CurrentDetection { get; private set; } = WwmDetectionResult.NotFound;
+    public bool MutationSupported => CurrentDetection.IsMutationSupported;
     public bool IsDisposed => _disposed;
 
     public WwmDetectionResult DetectGame()
     {
         var config = ConfigStore.Load().Value;
         var result = Detector.Detect(config?.GamePath);
+        CurrentDetection = result;
         GameRoot = result.GameRoot;
-        SteamBuildId = result.BuildId ?? (GameRoot == null ? null : Detector.ReadBuildIdForRoot(GameRoot));
-        return result with { BuildId = SteamBuildId };
+        SteamBuildId = result.BuildId;
+        return result;
     }
 
-    public async Task<bool> ValidateAndSaveManualPathAsync(string selectedPath, CancellationToken token = default)
+    public async Task<WwmManualDetectionResult> ResolveAndSaveManualPathAsync(string selectedPath, CancellationToken token = default)
     {
-        if (!Detector.TryResolveManualRoot(selectedPath, out var root) || root == null) return false;
+        var resolution = Detector.ResolveManualRoot(selectedPath);
+        if (resolution.Status != ManualResolveStatus.Found || resolution.GamePath == null)
+            return new WwmManualDetectionResult(resolution.Status, null);
+
+        var detection = Detector.DescribeRoot(resolution.GamePath, "manual-folder-selection");
+        if (!detection.IsFound) return new WwmManualDetectionResult(ManualResolveStatus.NotFound, null);
         var loaded = ConfigStore.Load();
         var config = loaded.Value ?? new Config();
-        config.GamePath = root;
+        config.GamePath = detection.GameRoot;
         await ConfigStore.SaveAsync(config, token).ConfigureAwait(false);
-        GameRoot = root;
-        SteamBuildId = Detector.ReadBuildIdForRoot(root);
-        return true;
+        CurrentDetection = detection;
+        GameRoot = detection.GameRoot;
+        SteamBuildId = detection.BuildId;
+        return new WwmManualDetectionResult(ManualResolveStatus.Found, detection);
     }
 
     public static WwmGameSession CreateProduction(AppPaths paths, ILogger logger)
@@ -67,8 +76,9 @@ public sealed class WwmGameSession : IGameSession
         catch { client.Dispose(); throw; }
     }
 
-    internal static WwmGameSession CreateForTests(AppPaths paths, ILogger logger, HttpClient client, bool ownsHttpClient = false)
-        => new(paths, logger, client, ownsHttpClient);
+    internal static WwmGameSession CreateForTests(AppPaths paths, ILogger logger, HttpClient client,
+        bool ownsHttpClient = false, IEnumerable<string>? steamRoots = null)
+        => new(paths, logger, client, ownsHttpClient, steamRoots);
 
     public Task StopAsync() => Poller.StopAsync();
     public void Dispose()
@@ -79,3 +89,5 @@ public sealed class WwmGameSession : IGameSession
         if (_ownsHttpClient) _httpClient.Dispose();
     }
 }
+
+public sealed record WwmManualDetectionResult(ManualResolveStatus Status, WwmDetectionResult? Detection);

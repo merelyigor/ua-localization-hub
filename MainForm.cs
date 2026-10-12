@@ -469,6 +469,9 @@ public partial class MainForm : Form
     internal string WwmTargetProject => wwmTargetProjectLabel.Text;
     internal string WwmTargetStatus => wwmTargetStatusLabel.Text;
     internal bool WwmRecoveryBlockedForTest => _wwmRecoveryBlocked;
+    internal string WwmGameStatusForTest => gameStatusLabel.Text;
+    internal string WwmGamePathForTest => gamePathLabel.Text;
+    internal bool WwmInstallActionsEnabledForTest => modesFlowPanel.Controls.OfType<WwmModeCard>().Any(card => card.ActionVisibleForTest && card.ActionEnabledForTest);
     internal bool WwmRestoreEnabledForTest => restoreOriginalButton.Enabled;
     internal string WwmRestoreTextForTest => restoreOriginalButton.Text;
     internal string? ModePlaceholderTextForTest => modesFlowPanel.Controls.OfType<Label>().FirstOrDefault()?.Text;

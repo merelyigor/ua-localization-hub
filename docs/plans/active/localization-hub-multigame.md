@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NONE — OWNER DECISION REQUIRED**
-Current phase: Stage 10 — REVIEWED / ACCEPTED; v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
-Next action: Owner decision required; no executable roadmap step is currently authorized.
+Implementation authorization: **NONE for further implementation; Stage 11A is awaiting external review**
+Current phase: Stage 11A — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW; v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
+Next action: External Architect review of Stage 11A; do not begin non-Steam mutation support.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -15,9 +15,9 @@ Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 ## Product targets
 
 - `Black Desert Online` — localization project `BDO UA Translate`, [bdo-ua.com.ua](https://bdo-ua.com.ua/), **INTEGRATED / AVAILABLE**.
-- `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **INTEGRATED / STEAM AVAILABLE**; Official launcher deferred.
+- `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **INTEGRATED / STEAM MUTATION AVAILABLE**; Windows Package and LocalDataPatch layouts can be detected, while non-Steam mutation remains unsupported.
 
-Where Winds Meet is registered as a second runtime game with Owner-approved stable ID `where-winds-meet`; initial support is Steam-only. Modes are dynamic and installable only when fresh API metadata marks the selected `slug + variant` available and supplies its matching package. Compatibility with a specific Steam build remains unconfirmed by API and requires neutral confirmation.
+Where Winds Meet is registered as a second runtime game with Owner-approved stable ID `where-winds-meet`. Detection recognizes both known Windows locale layouts, but only a matching Steam AppID/manifest proves Steam provenance and only proven Steam + Package roots are mutation-supported. Modes are dynamic and installable only when fresh API metadata marks the selected `slug + variant` available and supplies its matching package. Compatibility with a specific Steam build remains unconfirmed by API and requires neutral confirmation.
 
 ## Context
 
@@ -167,7 +167,11 @@ Acceptance: every Install/Update performs latest freshness validation before mut
 
 Owner UX addendum: unavailable modes are omitted, saved unavailable selection falls back to the first installable card, exact-current packages show `✓ Встановлено` without an action, and only a different package for the installed mode shows `Доступне оновлення` / `Оновити`. The restore button says `Відновити оригінал` while its validated data contract remains exact initial pre-Hub baseline—not asserted Steam stock. The action requires valid managed state, snapshot cycle ownership/integrity, unchanged targets and build-safety checks.
 
-Stage 10 real install/restore E2E and external review are accepted and included in v1.2.10. The separate public executable identity migration is complete and released; no next implementation step is authorized without an Owner decision.
+Stage 10 real install/restore E2E and external review are accepted and included in v1.2.10. The separate public executable identity migration is complete and released. The separately authorized Stage 11A detection/presentation boundary is documented below.
+
+### Stage 11A — WWM Windows platform/layout-aware detection
+
+**IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW.** Detection recognizes the common WWM executable marker plus either `Package/HD/oversea/locale/` or `LocalData/Patch/HD/oversea/locale/`. Steam provenance requires the matching Steam library manifest for AppID `3564740`; a saved/manual root and filesystem layout alone are not platform evidence. Manual folder selection searches recursively only inside the selected tree, tolerates inaccessible directories, skips reparse points, is bounded, and reports multiple roots as ambiguous. UI distinguishes proven Steam from unknown Windows provenance and uses a generic not-found label. Only proven Steam + Package roots remain install/update/restore-capable; all other recognized Windows roots are read-only in this stage. No Android detection/modeling and no game-file changes.
 
 ## Acceptance criteria
 
@@ -178,21 +182,21 @@ Stage 10 real install/restore E2E and external review are accepted and included 
 - Game mutation retains backup, restore and rollback guarantees.
 - Repository rename, if Owner proceeds, preserves redirects, releases and old-client update compatibility.
 - Public EXE/package identity is canonicalized with bridge-compatible legacy bundles; LocalAppData and autostart remain unchanged.
-- BDO ↔ WWM ↔ BDO lifecycle uses separate sessions and game-scoped state, with WWM Steam-only detection and two-file transaction recovery.
+- BDO ↔ WWM ↔ BDO lifecycle uses separate sessions and game-scoped state, with WWM Windows layout-aware detection, Steam-only mutation and two-file transaction recovery.
 
 ## Non-goals
 
-Не входять: Official-launcher WWM support; WWM compatibility claims unsupported by API; plugins/reflection/MEF/DLL loading; DI container; database; dynamic plugin registry; broad MVVM rewrite; invented universal API/schema; blanket namespace rename; automatic LocalAppData migration; unrelated refactoring; public release.
+Не входять: non-Steam WWM file mutation (including Official/Epic install semantics); WWM compatibility claims unsupported by API; Android detection; plugins/reflection/MEF/DLL loading; DI container; database; dynamic plugin registry; broad MVVM rewrite; invented universal API/schema; blanket namespace rename; automatic LocalAppData migration; unrelated refactoring; public release.
 
 ## Risks / dependencies
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 established the production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implementation, external reviews and authorized real install/restore E2E are REVIEWED / ACCEPTED. The separate executable identity migration was reviewed and released in v1.2.10. No current blocker remains; Stage 8B is optional and no next implementation step is authorized without an Owner decision.
+Stage 9 established the production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implementation, external reviews and authorized real install/restore E2E are REVIEWED / ACCEPTED. The separate executable identity migration was reviewed and released in v1.2.10. Stage 11A detection/presentation is implemented and locally validated, pending external Architect review; mutation remains proven-Steam/Package-only. Stage 8B is optional/not started. No further implementation is authorized until review and a subsequent Owner decision.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9 and 10 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 9 confirms `where-winds-meet`, Steam-first, exact pre-Hub restore, Official launcher deferred, and no hard compatibility claim. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles. No further implementation task is authorized; next action requires an Owner decision.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9 and 10 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 11A is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW**. It recognizes both known Windows layouts but keeps mutation limited to proven Steam/Package roots; Android is out of scope. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles. No further implementation is authorized during Stage 11A review.
 
 ### v1.2.10 release cycle
 
