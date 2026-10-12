@@ -35,7 +35,8 @@ public enum ManualResolveStatus
 {
     Found,
     NotFound,
-    Ambiguous
+    Ambiguous,
+    Incomplete
 }
 
 public sealed class ManualResolveResult
@@ -57,4 +58,7 @@ public sealed class ManualResolveResult
 
     public static ManualResolveResult Ambiguous() =>
         new(ManualResolveStatus.Ambiguous, null);
+
+    public static ManualResolveResult Incomplete() =>
+        new(ManualResolveStatus.Incomplete, null);
 }

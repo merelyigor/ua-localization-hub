@@ -246,7 +246,7 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
-    public void ManualResolver_SkipsInaccessibleDirectoriesAndFindsOtherCandidate()
+    public void ManualResolver_InaccessibleSubtreeNeverProducesConfidentFound()
     {
         using var temp = new TestTemp();
         var inaccessible = Path.Combine(temp.Root, "inaccessible");
@@ -263,8 +263,120 @@ public sealed class WwmStage10Tests
 
         var result = detector.ResolveManualRoot(temp.Root);
 
-        Assert.Equal(ManualResolveStatus.Found, result.Status);
-        Assert.Equal(Path.GetFullPath(root), result.GamePath);
+        Assert.Equal(ManualResolveStatus.Incomplete, result.Status);
+        Assert.Null(result.GamePath);
+    }
+
+    [Fact]
+    public async Task ManualResolverAsync_RunsRecursiveTraversalOffCallingThread()
+    {
+        using var temp = new TestTemp();
+        var selected = Path.Combine(temp.Root, "selected-parent");
+        var root = Path.Combine(selected, "nested", "arbitrary-root");
+        CreateGameMarkers(root);
+        var traversalThreadId = 0;
+
+        IEnumerable<string> Enumerate(string path)
+        {
+            Interlocked.CompareExchange(ref traversalThreadId, Environment.CurrentManagedThreadId, 0);
+            return Directory.EnumerateDirectories(path);
+        }
+
+        using var client = new HttpClient(new StubHandler());
+        using var session = WwmGameSession.CreateForTests(
+            new AppPaths(Path.Combine(temp.Root, "app")), Logger, client,
+            manualDirectoryEnumerator: Enumerate);
+
+        var completion = new TaskCompletionSource<(int CallerThreadId, WwmManualDetectionResult Result)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var callerThread = new Thread(() =>
+        {
+            try
+            {
+                var callerThreadId = Environment.CurrentManagedThreadId;
+                var result = session.ResolveAndSaveManualPathAsync(selected).GetAwaiter().GetResult();
+                completion.TrySetResult((callerThreadId, result));
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        });
+        callerThread.Start();
+        var outcome = await completion.Task;
+        callerThread.Join();
+
+        Assert.Equal(ManualResolveStatus.Found, outcome.Result.Status);
+        Assert.NotEqual(outcome.CallerThreadId, Volatile.Read(ref traversalThreadId));
+        Assert.Equal(Path.GetFullPath(root), session.ConfigStore.Load().Value!.GamePath);
+    }
+
+    [Fact]
+    public async Task ManualResolver_ObservesCancellationDuringTraversal()
+    {
+        using var temp = new TestTemp();
+        var selected = Path.Combine(temp.Root, "selected");
+        var first = Directory.CreateDirectory(Path.Combine(selected, "first")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(selected, "second")).FullName;
+        using var cancellation = new CancellationTokenSource();
+
+        IEnumerable<string> Enumerate(string path)
+        {
+            if (!string.Equals(Path.GetFullPath(path), Path.GetFullPath(selected), StringComparison.OrdinalIgnoreCase))
+                return Array.Empty<string>();
+
+            return YieldAndCancel();
+
+            IEnumerable<string> YieldAndCancel()
+            {
+                yield return first;
+                cancellation.Cancel();
+                yield return second;
+            }
+        }
+
+        using var client = new HttpClient(new StubHandler());
+        using var session = WwmGameSession.CreateForTests(
+            new AppPaths(Path.Combine(temp.Root, "app")), Logger, client,
+            manualDirectoryEnumerator: Enumerate);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            session.ResolveAndSaveManualPathAsync(selected, cancellation.Token));
+    }
+
+    [Fact]
+    public async Task ManualResolver_SafetyLimitWithCandidateAndPendingTreeReturnsIncomplete()
+    {
+        using var temp = new TestTemp();
+        var selected = Path.Combine(temp.Root, "selected");
+        CreateGameMarkers(Path.Combine(selected, "a-game"));
+        Directory.CreateDirectory(Path.Combine(selected, "b-branch", "unvisited-child"));
+        var detector = new WwmSteamDetector(Logger, Array.Empty<string>(), null,
+            path => Directory.EnumerateDirectories(path), maximumManualDirectories: 2);
+
+        var result = await Task.Run(() => detector.ResolveManualRoot(selected));
+
+        Assert.Equal(ManualResolveStatus.Incomplete, result.Status);
+        Assert.Null(result.GamePath);
+    }
+
+    [Fact]
+    public async Task ManualResolver_IncompleteResultDoesNotPersistSelectedGamePath()
+    {
+        using var temp = new TestTemp();
+        var selected = Path.Combine(temp.Root, "selected");
+        CreateGameMarkers(Path.Combine(selected, "a-game"));
+        Directory.CreateDirectory(Path.Combine(selected, "b-branch", "unvisited-child"));
+        using var client = new HttpClient(new StubHandler());
+        using var session = WwmGameSession.CreateForTests(
+            new AppPaths(Path.Combine(temp.Root, "app")), Logger, client,
+            maximumManualDirectories: 2);
+
+        var result = await session.ResolveAndSaveManualPathAsync(selected);
+
+        Assert.Equal(ManualResolveStatus.Incomplete, result.Status);
+        Assert.Null(result.Detection);
+        Assert.Null(session.ConfigStore.Load().Value?.GamePath);
     }
 
     [Fact]

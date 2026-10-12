@@ -35,7 +35,8 @@ public sealed class WwmGameDefinition
             if (HasSafeDirectory(root, LocalDataPatchLocaleRelativePath)) layout |= WwmInstallationLayout.LocalDataPatch;
             return layout != WwmInstallationLayout.Unknown;
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException
+            or NotSupportedException or System.Security.SecurityException)
         {
             layout = WwmInstallationLayout.Unknown;
             return false;
@@ -67,6 +68,8 @@ public sealed class WwmGameDefinition
         try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
         catch (FileNotFoundException) { return false; }
         catch (DirectoryNotFoundException) { return false; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+            or NotSupportedException or System.Security.SecurityException) { return true; }
     }
 }
 

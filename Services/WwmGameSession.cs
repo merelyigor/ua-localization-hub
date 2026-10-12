@@ -9,9 +9,14 @@ public sealed class WwmGameSession : IGameSession
 {
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
+    private readonly CancellationTokenSource _lifetimeCts = new();
+    private readonly SemaphoreSlim _manualDetectionGate = new(1, 1);
     private bool _disposed;
 
-    private WwmGameSession(AppPaths paths, ILogger logger, HttpClient httpClient, bool ownsHttpClient, IEnumerable<string>? steamRoots = null)
+    private WwmGameSession(AppPaths paths, ILogger logger, HttpClient httpClient, bool ownsHttpClient,
+        IEnumerable<string>? steamRoots = null, Func<string, IEnumerable<string>>? manualDirectoryEnumerator = null,
+        int maximumManualDirectories = WwmSteamDetector.DefaultMaximumManualDirectories,
+        int maximumManualDepth = WwmSteamDetector.DefaultMaximumManualDepth)
     {
         _httpClient = httpClient;
         _ownsHttpClient = ownsHttpClient;
@@ -21,7 +26,9 @@ public sealed class WwmGameSession : IGameSession
         PersistencePaths.EnsureDirectories();
         ConfigStore = new ConfigStore(PersistencePaths, logger);
         StateStore = new WwmStateStore(PersistencePaths);
-        Detector = new WwmSteamDetector(logger, steamRoots);
+        Detector = new WwmSteamDetector(logger, steamRoots, definition,
+            manualDirectoryEnumerator ?? (path => Directory.EnumerateDirectories(path)),
+            maximumManualDirectories, maximumManualDepth);
         ApiClient = new Winds4UaApiClient(httpClient, logger);
         InstallService = new WwmInstallService(httpClient, PersistencePaths, StateStore, logger, definition);
         Poller = new WwmReleaseFeedPoller(ApiClient);
@@ -53,7 +60,20 @@ public sealed class WwmGameSession : IGameSession
 
     public async Task<WwmManualDetectionResult> ResolveAndSaveManualPathAsync(string selectedPath, CancellationToken token = default)
     {
-        var resolution = Detector.ResolveManualRoot(selectedPath);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _lifetimeCts.Token);
+        var searchToken = linkedCts.Token;
+        await _manualDetectionGate.WaitAsync(searchToken).ConfigureAwait(false);
+        ManualResolveResult resolution;
+        try
+        {
+            resolution = await Task.Run(() => Detector.ResolveManualRoot(selectedPath, searchToken), searchToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _manualDetectionGate.Release();
+        }
+        searchToken.ThrowIfCancellationRequested();
         if (resolution.Status != ManualResolveStatus.Found || resolution.GamePath == null)
             return new WwmManualDetectionResult(resolution.Status, null);
 
@@ -62,7 +82,7 @@ public sealed class WwmGameSession : IGameSession
         var loaded = ConfigStore.Load();
         var config = loaded.Value ?? new Config();
         config.GamePath = detection.GameRoot;
-        await ConfigStore.SaveAsync(config, token).ConfigureAwait(false);
+        await ConfigStore.SaveAsync(config, searchToken).ConfigureAwait(false);
         CurrentDetection = detection;
         GameRoot = detection.GameRoot;
         SteamBuildId = detection.BuildId;
@@ -77,14 +97,20 @@ public sealed class WwmGameSession : IGameSession
     }
 
     internal static WwmGameSession CreateForTests(AppPaths paths, ILogger logger, HttpClient client,
-        bool ownsHttpClient = false, IEnumerable<string>? steamRoots = null)
-        => new(paths, logger, client, ownsHttpClient, steamRoots);
+        bool ownsHttpClient = false, IEnumerable<string>? steamRoots = null,
+        Func<string, IEnumerable<string>>? manualDirectoryEnumerator = null,
+        int maximumManualDirectories = WwmSteamDetector.DefaultMaximumManualDirectories,
+        int maximumManualDepth = WwmSteamDetector.DefaultMaximumManualDepth)
+        => new(paths, logger, client, ownsHttpClient, steamRoots, manualDirectoryEnumerator,
+            maximumManualDirectories, maximumManualDepth);
 
     public Task StopAsync() => Poller.StopAsync();
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
         Poller.Dispose();
         if (_ownsHttpClient) _httpClient.Dispose();
     }

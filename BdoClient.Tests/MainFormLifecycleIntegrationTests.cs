@@ -204,6 +204,17 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public void WwmIncompleteManualSearch_HasTruthfulNonNotFoundMessage()
+    {
+        var message = MainForm.GetWwmManualResolutionMessage(ManualResolveStatus.Incomplete);
+
+        Assert.Contains("Пошук не завершено", message, StringComparison.Ordinal);
+        Assert.Contains("Оберіть папку ближче", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("не знайдено", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("кілька встановлень", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task WwmNotFoundPresentation_DoesNotClaimSteamWasNotFound()
     {
         using var fixture = await MainFormTestFixture.StartAsync(

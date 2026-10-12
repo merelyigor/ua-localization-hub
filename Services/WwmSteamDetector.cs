@@ -5,15 +5,16 @@ namespace BdoClient.Services;
 
 public sealed class WwmSteamDetector
 {
-    private const int MaximumManualDirectories = 20_000;
-    private const int MaximumManualDepth = 32;
+    internal const int DefaultMaximumManualDirectories = 20_000;
+    internal const int DefaultMaximumManualDepth = 32;
     private readonly ILogger _logger;
     private readonly IReadOnlyList<string>? _steamRootsOverride;
     private readonly WwmGameDefinition _definition;
     private readonly Func<string, IEnumerable<string>> _enumerateDirectories;
 
     public WwmSteamDetector(ILogger logger, IEnumerable<string>? steamRoots = null, WwmGameDefinition? definition = null)
-        : this(logger, steamRoots, definition, Directory.GetDirectories)
+        : this(logger, steamRoots, definition, path => Directory.EnumerateDirectories(path),
+            DefaultMaximumManualDirectories, DefaultMaximumManualDepth)
     {
     }
 
@@ -21,13 +22,22 @@ public sealed class WwmSteamDetector
         ILogger logger,
         IEnumerable<string>? steamRoots,
         WwmGameDefinition? definition,
-        Func<string, IEnumerable<string>> enumerateDirectories)
+        Func<string, IEnumerable<string>> enumerateDirectories,
+        int maximumManualDirectories = DefaultMaximumManualDirectories,
+        int maximumManualDepth = DefaultMaximumManualDepth)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _steamRootsOverride = steamRoots?.ToList();
         _definition = definition ?? WwmGameDefinition.Default;
         _enumerateDirectories = enumerateDirectories ?? throw new ArgumentNullException(nameof(enumerateDirectories));
+        if (maximumManualDirectories <= 0) throw new ArgumentOutOfRangeException(nameof(maximumManualDirectories));
+        if (maximumManualDepth <= 0) throw new ArgumentOutOfRangeException(nameof(maximumManualDepth));
+        _maximumManualDirectories = maximumManualDirectories;
+        _maximumManualDepth = maximumManualDepth;
     }
+
+    private readonly int _maximumManualDirectories;
+    private readonly int _maximumManualDepth;
 
     public WwmDetectionResult Detect()
     {
@@ -71,8 +81,9 @@ public sealed class WwmSteamDetector
             : null;
     }
 
-    public ManualResolveResult ResolveManualRoot(string selectedPath)
+    public ManualResolveResult ResolveManualRoot(string selectedPath, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(selectedPath)) return ManualResolveResult.NotFound();
         string selected;
         try { selected = Path.GetFullPath(selectedPath); }
@@ -88,11 +99,18 @@ public sealed class WwmSteamDetector
         var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pending = new Stack<(string Path, int Depth)>();
         var visited = 0;
-        foreach (var child in GetChildDirectories(selected).OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase))
+        var inspectedDirectories = 0;
+        if (!TryGetChildDirectories(selected, _maximumManualDirectories, cancellationToken,
+                out var selectedChildren, out var inspected))
+            return ManualResolveResult.Incomplete();
+        inspectedDirectories += inspected;
+        foreach (var child in selectedChildren.OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase))
             pending.Push((child, 1));
 
-        while (pending.Count > 0 && visited < MaximumManualDirectories)
+        var incomplete = false;
+        while (pending.Count > 0 && visited < _maximumManualDirectories)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var (directory, depth) = pending.Pop();
             visited++;
             if (IsReparsePoint(directory)) continue;
@@ -101,17 +119,39 @@ public sealed class WwmSteamDetector
             {
                 try { candidates.Add(Path.GetFullPath(directory)); }
                 catch (Exception ex) when (IsPathException(ex)) { _logger.Debug($"WWM candidate path is invalid: {ex.Message}"); }
-                if (candidates.Count > 1) return ManualResolveResult.Ambiguous();
                 continue;
             }
 
-            if (depth >= MaximumManualDepth) continue;
-            foreach (var child in GetChildDirectories(directory).OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase))
+            if (depth >= _maximumManualDepth)
+            {
+                if (!TryGetChildDirectories(directory, _maximumManualDirectories - inspectedDirectories,
+                        cancellationToken, out var deeperChildren, out inspected)
+                    || deeperChildren.Length > 0)
+                    incomplete = true;
+                inspectedDirectories += inspected;
+                if (incomplete) break;
+                continue;
+            }
+
+            var availableSlots = _maximumManualDirectories - inspectedDirectories;
+            if (!TryGetChildDirectories(directory, availableSlots, cancellationToken, out var children, out inspected))
+            {
+                incomplete = true;
+                break;
+            }
+            inspectedDirectories += inspected;
+            foreach (var child in children.OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase))
                 pending.Push((child, depth + 1));
         }
 
+        if (pending.Count > 0) incomplete = true;
+        if (incomplete)
+        {
+            _logger.Warning("WWM manual search could not inspect the complete selected tree.");
+            return ManualResolveResult.Incomplete();
+        }
         if (candidates.Count == 1) return ManualResolveResult.Found(candidates.Single());
-        if (pending.Count > 0) _logger.Warning("WWM manual search reached its safety limit before completing.");
+        if (candidates.Count > 1) return ManualResolveResult.Ambiguous();
         return ManualResolveResult.NotFound();
     }
 
@@ -197,18 +237,38 @@ public sealed class WwmSteamDetector
         && !string.IsNullOrWhiteSpace(manifest.InstallDir)
         && !Path.IsPathRooted(manifest.InstallDir);
 
-    private IEnumerable<string> GetChildDirectories(string path)
+    private bool TryGetChildDirectories(
+        string path,
+        int maximumEntries,
+        CancellationToken cancellationToken,
+        out string[] children,
+        out int inspectedEntries)
     {
+        var result = new List<string>();
+        inspectedEntries = 0;
         try
         {
-            return _enumerateDirectories(path)
-                .Where(directory => !IsReparsePoint(directory))
-                .ToArray();
+            foreach (var directory in _enumerateDirectories(path))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (inspectedEntries >= maximumEntries)
+                {
+                    children = result.ToArray();
+                    inspectedEntries++;
+                    return false;
+                }
+                inspectedEntries++;
+                if (IsReparsePoint(directory)) continue;
+                result.Add(directory);
+            }
+            children = result.OrderBy(directory => directory, StringComparer.OrdinalIgnoreCase).ToArray();
+            return true;
         }
         catch (Exception ex) when (IsPathException(ex))
         {
             _logger.Debug($"WWM manual search skipped inaccessible directory: {ex.Message}");
-            return Array.Empty<string>();
+            children = result.ToArray();
+            return false;
         }
     }
 
@@ -284,7 +344,7 @@ public sealed class WwmSteamDetector
     }
 
     private static bool IsPathException(Exception exception) => exception is
-        ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException;
+        ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException or System.Security.SecurityException;
 }
 
 public sealed record WwmSteamManifest(string AppId, string InstallDir, string? BuildId);

@@ -688,23 +688,22 @@ public partial class MainForm
         {
             using var wwmDialog = new FolderBrowserDialog { Description = "Оберіть папку Where Winds Meet або її батьківську папку" };
             if (wwmDialog.ShowDialog(this) != DialogResult.OK) return;
+            var searchToken = _gameSessionCts?.Token ?? CancellationToken.None;
+            var sessionGeneration = _gameSessionGeneration;
             try
             {
-                var resolution = await wwm.ResolveAndSaveManualPathAsync(wwmDialog.SelectedPath, _gameSessionCts?.Token ?? default);
-                if (resolution.Status == ManualResolveStatus.Ambiguous)
-                {
-                    SetMessage("У вибраній папці знайдено кілька встановлень Where Winds Meet. Оберіть папку конкретної гри.");
-                    return;
-                }
+                var resolution = await wwm.ResolveAndSaveManualPathAsync(wwmDialog.SelectedPath, searchToken);
+                if (!IsCurrentGameSession(sessionGeneration, wwm)) return;
                 if (resolution.Status != ManualResolveStatus.Found || resolution.Detection == null)
                 {
-                    SetMessage("У вибраній папці не знайдено потрібні файли Where Winds Meet.");
+                    SetMessage(GetWwmManualResolutionMessage(resolution.Status));
                     return;
                 }
                 _gameRoot = wwm.GameRoot;
                 SetWwmGamePresentation(resolution.Detection);
-                await RefreshStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
+                await RefreshStateAsync(sessionGeneration, searchToken);
             }
+            catch (OperationCanceledException) when (searchToken.IsCancellationRequested || !IsCurrentGameSession(sessionGeneration, wwm)) { }
             catch (Exception ex) { _logger.Warning($"WWM manual path selection failed: {ex.Message}"); SetMessage("Не вдалося перевірити шлях Where Winds Meet."); }
             return;
         }
@@ -764,6 +763,13 @@ public partial class MainForm
             _operationInProgress = false;
         }
     }
+
+    internal static string GetWwmManualResolutionMessage(ManualResolveStatus status) => status switch
+    {
+        ManualResolveStatus.Ambiguous => "У вибраній папці знайдено кілька встановлень Where Winds Meet. Оберіть папку конкретної гри.",
+        ManualResolveStatus.Incomplete => "Пошук не завершено: папка завелика або частина підпапок недоступна. Оберіть папку ближче до встановлення Where Winds Meet.",
+        _ => "У вибраній папці не знайдено потрібні файли Where Winds Meet."
+    };
 
 
     private void SetManualFailureMessage(string message)
