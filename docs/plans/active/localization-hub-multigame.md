@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NONE; Stage 11B is awaiting pre-commit external Architect review**
-Current phase: Stage 11B — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW; v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
-Next action: External Architect pre-commit review of Stage 11B; do not commit/push before approval.
+Implementation authorization: **NONE — WORK CYCLE COMPLETE / OWNER DECISION REQUIRED**
+Current phase: Stage 11B — REVIEWED / ACCEPTED; v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
+Next action: **OWNER DECISION REQUIRED**. Do not start another stage, release cycle, audit or refactoring without explicit authorization.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -175,13 +175,13 @@ Stage 10 real install/restore E2E and external review are accepted and included 
 
 ### Stage 11B — WWM Windows multi-layout install/update/restore
 
-**IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW. HIGH-RISK FILE MUTATION.** Detection orchestration preserves Steam AppID/manifest association and adds Epic Launcher `.item` metadata discovery with defensive product identity/root validation. Official Launcher automatic provenance remains deferred; manual valid roots are `UnknownWindows`. Source is never inferred from folder name or layout.
+**REVIEWED / ACCEPTED. HIGH-RISK FILE MUTATION.** Accepted implementation: `0ee0d819eb6f3f6fb404eb283095944d955f2a7f`. Exact-SHA CI run `38470073111` succeeded; validation completed with **1180 passed / 0 failed / 0 skipped**. Detection orchestration preserves Steam AppID/manifest association and adds Epic Launcher `.item` metadata discovery with defensive product identity/root validation. Official Launcher automatic provenance remains deferred; manual valid roots are `UnknownWindows`. Source is never inferred from folder name or layout.
 
 Package and LocalDataPatch each map the same two logical Winds4UA files. Proven Steam/Epic select Package; proven Official would select LocalDataPatch only if reliable metadata exists; UnknownWindows selects a target only when exactly one layout exists. UnknownWindows with both layouts fails closed. Package archive validation/staging remains unchanged and the two entries are explicitly remapped to the selected target layout rather than blindly extracted.
 
-State, snapshot and journal now bind to normalized installation root, selected layout, exact target paths and a deterministic non-managed executable metadata fingerprint; source provenance is established from live detector evidence, not persisted as authorization. The fingerprint is an installation integrity/staleness guard, not a game compatibility version. Steam build-staleness protection remains. Existing v1.2.10 Steam Package state remains readable as legacy schema and is not reinterpreted as LocalDataPatch. Synthetic/temp tests cover Steam Package, Epic Package, Official-like Standard/Lite LocalDataPatch, UnknownWindows single/dual layouts, rollback and recovery. Real Epic/Official installations are not available locally; no real non-Steam game files were modified.
+State, snapshot and journal bind to canonical installation root, selected layout, exact target paths and a deterministic non-managed executable metadata fingerprint; source provenance is established from live detector evidence, not persisted as authorization. The fingerprint is an installation integrity/staleness guard, not a game compatibility version. Steam build-staleness protection remains. Existing v1.2.10 Steam Package state remains readable as legacy schema and is not reinterpreted as LocalDataPatch. Synthetic/temp tests cover Steam Package, Epic Package, Official-like Standard/Lite LocalDataPatch, UnknownWindows single/dual layouts, rollback and recovery. No real Steam, Epic or Official Launcher game files were mutated during Stage 11B development; non-Steam mutation validation used synthetic/temp roots.
 
-Stage 11B is in **HIGH-RISK PRE-COMMIT REVIEW MODE**. No commit/push until external Architect approval.
+External Architect implementation review: **APPROVED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. No new implementation or release work is authorized; next action is **OWNER DECISION REQUIRED**. Keep this roadmap ACTIVE pending Owner direction.
 
 ## Acceptance criteria
 
@@ -202,11 +202,11 @@ Stage 11B is in **HIGH-RISK PRE-COMMIT REVIEW MODE**. No commit/push until exter
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 established the production API, Steam-first detection, v2.6.2 package, pre-Hub restore, and unconfirmed-compatibility contracts. Stage 10 implementation, external reviews and authorized real install/restore E2E are REVIEWED / ACCEPTED. The separate executable identity migration was reviewed and released in v1.2.10. Stage 11A is REVIEWED / ACCEPTED. Stage 11B is implemented and locally validated in high-risk pre-commit mode, pending external Architect review; real Epic/Official game files were not modified and their native E2E was not available. Stage 8B is optional/not started.
+Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2E, Stage 11A and Stage 11B are **REVIEWED / ACCEPTED**. Stage 11B exact implementation SHA is `0ee0d819eb6f3f6fb404eb283095944d955f2a7f`; exact-SHA CI run `38470073111` passed with 1180/1180 tests. The separate executable identity migration was reviewed and released in v1.2.10. Stage 8B remains **OPTIONAL / NOT STARTED**. No real Steam/Epic/Official game files were mutated during Stage 11B development; non-Steam mutation validation used synthetic/temp fixtures. Next action is **OWNER DECISION REQUIRED**; no release or further stage is authorized.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9 and 10 are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 11A is **REVIEWED / ACCEPTED**. Stage 11B is **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW**, with high-risk layout-aware mutation and no real non-Steam game changes. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 11B exact implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f` passed CI run `38470073111`; 1180 tests passed. Real game files were not mutated during Stage 11B development; synthetic/temp fixtures provided non-Steam mutation coverage. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles. No implementation is currently authorized; **OWNER DECISION REQUIRED**.
 
 ### v1.2.10 release cycle
 
