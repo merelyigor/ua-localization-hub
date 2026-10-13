@@ -16,7 +16,8 @@ public sealed class WwmGameSession : IGameSession
     private WwmGameSession(AppPaths paths, ILogger logger, HttpClient httpClient, bool ownsHttpClient,
         IEnumerable<string>? steamRoots = null, Func<string, IEnumerable<string>>? manualDirectoryEnumerator = null,
         int maximumManualDirectories = WwmSteamDetector.DefaultMaximumManualDirectories,
-        int maximumManualDepth = WwmSteamDetector.DefaultMaximumManualDepth)
+        int maximumManualDepth = WwmSteamDetector.DefaultMaximumManualDepth,
+        string? epicManifestDirectory = null)
     {
         _httpClient = httpClient;
         _ownsHttpClient = ownsHttpClient;
@@ -28,7 +29,7 @@ public sealed class WwmGameSession : IGameSession
         StateStore = new WwmStateStore(PersistencePaths);
         Detector = new WwmSteamDetector(logger, steamRoots, definition,
             manualDirectoryEnumerator ?? (path => Directory.EnumerateDirectories(path)),
-            maximumManualDirectories, maximumManualDepth);
+            maximumManualDirectories, maximumManualDepth, epicManifestDirectory);
         ApiClient = new Winds4UaApiClient(httpClient, logger);
         InstallService = new WwmInstallService(httpClient, PersistencePaths, StateStore, logger, definition);
         Poller = new WwmReleaseFeedPoller(ApiClient);
@@ -100,9 +101,10 @@ public sealed class WwmGameSession : IGameSession
         bool ownsHttpClient = false, IEnumerable<string>? steamRoots = null,
         Func<string, IEnumerable<string>>? manualDirectoryEnumerator = null,
         int maximumManualDirectories = WwmSteamDetector.DefaultMaximumManualDirectories,
-        int maximumManualDepth = WwmSteamDetector.DefaultMaximumManualDepth)
+        int maximumManualDepth = WwmSteamDetector.DefaultMaximumManualDepth,
+        string? epicManifestDirectory = null)
         => new(paths, logger, client, ownsHttpClient, steamRoots, manualDirectoryEnumerator,
-            maximumManualDirectories, maximumManualDepth);
+            maximumManualDirectories, maximumManualDepth, epicManifestDirectory);
 
     public Task StopAsync() => Poller.StopAsync();
     public void Dispose()

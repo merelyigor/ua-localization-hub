@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using BdoClient.Logging;
 
 namespace BdoClient.Services;
@@ -11,6 +12,7 @@ public sealed class WwmSteamDetector
     private readonly IReadOnlyList<string>? _steamRootsOverride;
     private readonly WwmGameDefinition _definition;
     private readonly Func<string, IEnumerable<string>> _enumerateDirectories;
+    private readonly string? _epicManifestDirectoryOverride;
 
     public WwmSteamDetector(ILogger logger, IEnumerable<string>? steamRoots = null, WwmGameDefinition? definition = null)
         : this(logger, steamRoots, definition, path => Directory.EnumerateDirectories(path),
@@ -24,12 +26,14 @@ public sealed class WwmSteamDetector
         WwmGameDefinition? definition,
         Func<string, IEnumerable<string>> enumerateDirectories,
         int maximumManualDirectories = DefaultMaximumManualDirectories,
-        int maximumManualDepth = DefaultMaximumManualDepth)
+        int maximumManualDepth = DefaultMaximumManualDepth,
+        string? epicManifestDirectory = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _steamRootsOverride = steamRoots?.ToList();
         _definition = definition ?? WwmGameDefinition.Default;
         _enumerateDirectories = enumerateDirectories ?? throw new ArgumentNullException(nameof(enumerateDirectories));
+        _epicManifestDirectoryOverride = epicManifestDirectory;
         if (maximumManualDirectories <= 0) throw new ArgumentOutOfRangeException(nameof(maximumManualDirectories));
         if (maximumManualDepth <= 0) throw new ArgumentOutOfRangeException(nameof(maximumManualDepth));
         _maximumManualDirectories = maximumManualDirectories;
@@ -41,6 +45,7 @@ public sealed class WwmSteamDetector
 
     public WwmDetectionResult Detect()
     {
+        var candidates = new Dictionary<string, WwmDetectionResult>(StringComparer.OrdinalIgnoreCase);
         foreach (var steamRoot in GetSteamRoots())
         {
             foreach (var library in GetLibraries(steamRoot))
@@ -49,22 +54,43 @@ public sealed class WwmSteamDetector
                 var manifest = ReadManifest(manifestPath);
                 if (!IsUsableManifest(manifest)) continue;
 
-                var common = Path.GetFullPath(Path.Combine(library, "steamapps", "common"));
-                var candidate = Path.GetFullPath(Path.Combine(common, manifest!.InstallDir));
+                var common = WwmGameDefinition.NormalizeInstallationRoot(Path.Combine(library, "steamapps", "common"));
+                var candidate = WwmGameDefinition.NormalizeInstallationRoot(Path.Combine(common, manifest!.InstallDir));
                 if (!IsWithin(candidate, common) || !_definition.TryGetWindowsLayout(candidate, out var layout)
                     || !layout.HasFlag(WwmInstallationLayout.Package))
                     continue;
-                return new WwmDetectionResult(candidate, WwmInstallationSource.Steam, layout,
+                candidates[candidate] = new WwmDetectionResult(candidate, WwmInstallationSource.Steam, layout,
                     manifest.BuildId, Path.GetFullPath(manifestPath));
             }
         }
-        return WwmDetectionResult.NotFound;
+        foreach (var manifestPath in GetEpicManifestFiles())
+        {
+            var manifest = ReadEpicManifest(manifestPath);
+            if (manifest == null || !IsWwmEpicManifest(manifest)) continue;
+            try
+            {
+                var candidate = WwmGameDefinition.NormalizeInstallationRoot(manifest.InstallLocation);
+                if (!_definition.TryGetWindowsLayout(candidate, out var layout)) continue;
+                candidates.TryAdd(candidate, new WwmDetectionResult(candidate, WwmInstallationSource.EpicGames,
+                    layout, null, Path.GetFullPath(manifestPath)));
+            }
+            catch (Exception ex) when (IsPathException(ex))
+            {
+                _logger.Debug($"WWM Epic manifest installation path was rejected: {ex.Message}");
+            }
+        }
+        return candidates.Count switch
+        {
+            0 => WwmDetectionResult.NotFound,
+            1 => candidates.Values.Single(),
+            _ => WwmDetectionResult.Ambiguous
+        };
     }
 
     public WwmDetectionResult Detect(string? savedRoot)
     {
         if (TryDescribeRoot(savedRoot, "saved-config", out var savedDetection))
-            return savedDetection;
+            return savedDetection with { PersistedGamePath = WwmGameDefinition.NormalizeInstallationRoot(savedRoot!) };
         return Detect();
     }
 
@@ -86,7 +112,7 @@ public sealed class WwmSteamDetector
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(selectedPath)) return ManualResolveResult.NotFound();
         string selected;
-        try { selected = Path.GetFullPath(selectedPath); }
+        try { selected = WwmGameDefinition.NormalizeInstallationRoot(selectedPath); }
         catch (Exception ex) when (IsPathException(ex))
         {
             _logger.Debug($"WWM manual path is invalid: {ex.Message}");
@@ -117,7 +143,7 @@ public sealed class WwmSteamDetector
 
             if (TryGetLayout(directory, out _))
             {
-                try { candidates.Add(Path.GetFullPath(directory)); }
+                try { candidates.Add(WwmGameDefinition.NormalizeInstallationRoot(directory)); }
                 catch (Exception ex) when (IsPathException(ex)) { _logger.Debug($"WWM candidate path is invalid: {ex.Message}"); }
                 continue;
             }
@@ -178,12 +204,19 @@ public sealed class WwmSteamDetector
         if (string.IsNullOrWhiteSpace(path)) return false;
         try
         {
-            var fullPath = Path.GetFullPath(path);
+            var fullPath = WwmGameDefinition.NormalizeInstallationRoot(path);
             if (!TryGetLayout(fullPath, out var layout)) return false;
             if (TryGetSteamManifestForRoot(fullPath, out var manifest, out var manifestPath))
             {
                 result = new WwmDetectionResult(fullPath, WwmInstallationSource.Steam, layout,
                     manifest!.BuildId, manifestPath);
+                return true;
+            }
+
+            if (TryGetEpicManifestForRoot(fullPath, out var epicManifestPath))
+            {
+                result = new WwmDetectionResult(fullPath, WwmInstallationSource.EpicGames, layout,
+                    null, epicManifestPath);
                 return true;
             }
 
@@ -198,6 +231,83 @@ public sealed class WwmSteamDetector
         }
     }
 
+    private IEnumerable<string> GetEpicManifestFiles()
+    {
+        var directory = _epicManifestDirectoryOverride ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Epic", "EpicGamesLauncher", "Data", "Manifests");
+        try
+        {
+            if (!Directory.Exists(directory) || IsReparsePoint(directory)) return Array.Empty<string>();
+            return Directory.EnumerateFiles(directory, "*.item", SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+        catch (Exception ex) when (IsPathException(ex))
+        {
+            _logger.Debug($"WWM Epic manifests could not be enumerated: {ex.Message}");
+            return Array.Empty<string>();
+        }
+    }
+
+    private EpicManifest? ReadEpicManifest(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length <= 0 || info.Length > 2_000_000 || IsReparsePoint(path)) return null;
+            using var document = JsonDocument.Parse(File.ReadAllText(path), new JsonDocumentOptions { MaxDepth = 32 });
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return null;
+            var install = GetString(document.RootElement, "InstallLocation");
+            if (string.IsNullOrWhiteSpace(install) || !Path.IsPathFullyQualified(install)) return null;
+            return new EpicManifest(install, GetString(document.RootElement, "AppName"),
+                GetString(document.RootElement, "DisplayName"), GetString(document.RootElement, "ArtifactId"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException)
+        {
+            _logger.Debug($"WWM Epic manifest was ignored: {ex.Message}");
+            return null;
+        }
+    }
+
+    private bool TryGetEpicManifestForRoot(string root, out string? evidence)
+    {
+        evidence = null;
+        foreach (var path in GetEpicManifestFiles())
+        {
+            var manifest = ReadEpicManifest(path);
+            if (manifest == null || !IsWwmEpicManifest(manifest)) continue;
+            try
+            {
+                if (string.Equals(WwmGameDefinition.NormalizeInstallationRoot(manifest.InstallLocation),
+                    WwmGameDefinition.NormalizeInstallationRoot(root), StringComparison.OrdinalIgnoreCase))
+                { evidence = Path.GetFullPath(path); return true; }
+            }
+            catch (Exception ex) when (IsPathException(ex)) { _logger.Debug($"WWM Epic root association was rejected: {ex.Message}"); }
+        }
+        return false;
+    }
+
+    private static bool IsWwmEpicManifest(EpicManifest manifest)
+        => IsWwmProductIdentity(manifest.AppName) || IsWwmProductIdentity(manifest.DisplayName)
+            || IsWwmProductIdentity(manifest.ArtifactId);
+
+    private static bool IsWwmProductIdentity(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var normalized = new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        return normalized is "wherewindsmeet" or "wwm";
+    }
+
+    private static string? GetString(JsonElement element, string name)
+    {
+        foreach (var property in element.EnumerateObject())
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind == JsonValueKind.String)
+                return property.Value.GetString();
+        return null;
+    }
+
+    private sealed record EpicManifest(string InstallLocation, string? AppName, string? DisplayName, string? ArtifactId);
+
     private bool TryGetLayout(string path, out WwmInstallationLayout layout)
         => _definition.TryGetWindowsLayout(path, out layout);
 
@@ -206,7 +316,7 @@ public sealed class WwmSteamDetector
         matchingManifest = null;
         manifestPath = null;
         string normalizedRoot;
-        try { normalizedRoot = Path.GetFullPath(gameRoot); }
+        try { normalizedRoot = WwmGameDefinition.NormalizeInstallationRoot(gameRoot); }
         catch (Exception ex) when (IsPathException(ex)) { return false; }
 
         foreach (var library in GetSteamRoots().SelectMany(GetLibraries))
@@ -216,8 +326,8 @@ public sealed class WwmSteamDetector
             if (!IsUsableManifest(manifest)) continue;
             try
             {
-                var common = Path.GetFullPath(Path.Combine(library, "steamapps", "common"));
-                var candidate = Path.GetFullPath(Path.Combine(common, manifest!.InstallDir));
+                var common = WwmGameDefinition.NormalizeInstallationRoot(Path.Combine(library, "steamapps", "common"));
+                var candidate = WwmGameDefinition.NormalizeInstallationRoot(Path.Combine(common, manifest!.InstallDir));
                 if (!IsWithin(candidate, common) || !string.Equals(candidate, normalizedRoot, StringComparison.OrdinalIgnoreCase))
                     continue;
                 matchingManifest = manifest;
@@ -309,7 +419,7 @@ public sealed class WwmSteamDetector
 
     private IEnumerable<string> GetLibraries(string steamRoot)
     {
-        var libraries = new List<string> { Path.GetFullPath(steamRoot) };
+        var libraries = new List<string> { WwmGameDefinition.NormalizeInstallationRoot(steamRoot) };
         var file = Path.Combine(steamRoot, "steamapps", "libraryfolders.vdf");
         if (File.Exists(file))
         {
@@ -320,13 +430,13 @@ public sealed class WwmSteamDetector
                 foreach (Match match in matches)
                 {
                     var path = match.Groups["p"].Value.Replace("\\\\", "\\").Replace('/', '\\');
-                    if (Path.IsPathRooted(path)) libraries.Add(Path.GetFullPath(path));
+                    if (Path.IsPathRooted(path)) libraries.Add(WwmGameDefinition.NormalizeInstallationRoot(path));
                 }
                 var legacyMatches = Regex.Matches(content, "\\\"\\d+\\\"\\s+\\\"(?<p>[^\\\"]+)\\\"", RegexOptions.IgnoreCase);
                 foreach (Match match in legacyMatches)
                 {
                     var path = match.Groups["p"].Value.Replace("\\\\", "\\").Replace('/', '\\');
-                    if (Path.IsPathRooted(path)) libraries.Add(Path.GetFullPath(path));
+                    if (Path.IsPathRooted(path)) libraries.Add(WwmGameDefinition.NormalizeInstallationRoot(path));
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -339,8 +449,12 @@ public sealed class WwmSteamDetector
 
     private static bool IsWithin(string candidate, string parent)
     {
-        var prefix = Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        var normalizedParent = WwmGameDefinition.NormalizeInstallationRoot(parent);
+        var normalizedCandidate = WwmGameDefinition.NormalizeInstallationRoot(candidate);
+        var prefix = Path.EndsInDirectorySeparator(normalizedParent)
+            ? normalizedParent
+            : normalizedParent + Path.DirectorySeparatorChar;
+        return normalizedCandidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsPathException(Exception exception) => exception is
@@ -356,10 +470,24 @@ public sealed record WwmDetectionResult(
     string? BuildId,
     string? EvidenceMarker)
 {
+    public bool IsAmbiguous { get; init; }
+    public string? PersistedGamePath { get; init; }
     public static WwmDetectionResult NotFound { get; } = new(null, WwmInstallationSource.UnknownWindows,
         WwmInstallationLayout.Unknown, null, null);
+    public static WwmDetectionResult Ambiguous { get; } = new(null, WwmInstallationSource.UnknownWindows,
+        WwmInstallationLayout.Unknown, null, null) { IsAmbiguous = true };
     public bool IsFound => GameRoot != null;
-    public bool IsMutationSupported => IsFound && Source == WwmInstallationSource.Steam
-        && Layout.HasFlag(WwmInstallationLayout.Package);
+    public WwmInstallationLayout TargetLayout => Source switch
+    {
+        WwmInstallationSource.Steam or WwmInstallationSource.EpicGames when Layout.HasFlag(WwmInstallationLayout.Package)
+            => WwmInstallationLayout.Package,
+        WwmInstallationSource.OfficialLauncher when Layout.HasFlag(WwmInstallationLayout.LocalDataPatch)
+            => WwmInstallationLayout.LocalDataPatch,
+        WwmInstallationSource.UnknownWindows when Layout is WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch
+            => Layout,
+        _ => WwmInstallationLayout.Unknown
+    };
+    public bool HasAmbiguousTargetLayout => IsFound && TargetLayout == WwmInstallationLayout.Unknown;
+    public bool IsMutationSupported => IsFound && TargetLayout != WwmInstallationLayout.Unknown;
     public string? ManifestPath => Source == WwmInstallationSource.Steam ? EvidenceMarker : null;
 }

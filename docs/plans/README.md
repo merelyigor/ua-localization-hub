@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 11A — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW; v1.2.10 remains RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
-**Next:** External Architect review of Stage 11A
-**Implementation authorization:** None for further implementation; Stage 11A changes are awaiting review
+**Current phase:** Stage 11B — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW; v1.2.10 remains RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
+**Next:** External Architect pre-commit review of Stage 11B
+**Implementation authorization:** None; Stage 11B is in high-risk pre-commit review
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11A — IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW | EXTERNAL ARCHITECT REVIEW |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11B — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW | EXTERNAL ARCHITECT REVIEW |
 
 Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9 analysis and Stage 10 WWM implementation/real E2E are REVIEWED / ACCEPTED. v1.2.10 is RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. Stage 11A adds detection/presentation for known Windows WWM layouts without authorizing non-Steam mutation. Stage 8B remains OPTIONAL / NOT STARTED. Stage 11A awaits external review; no additional implementation is authorized.
+Stage 9 analysis and Stage 10 WWM implementation/real E2E are REVIEWED / ACCEPTED. v1.2.10 is RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. Stage 11A is REVIEWED / ACCEPTED. Stage 11B adds high-risk layout-aware Windows mutation and is pending pre-commit external Architect review; no commit/push or real non-Steam game mutation is authorized. Stage 8B remains OPTIONAL / NOT STARTED.
 
 ## Backlog
 

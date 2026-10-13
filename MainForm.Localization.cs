@@ -102,7 +102,9 @@ public partial class MainForm
         {
             DisposeWwmFileMonitor();
             SetActionsEnabled(false);
-            SetMessage("Гру не знайдено. Натисніть «Знайти автоматично» або оберіть папку.");
+            SetMessage(session.CurrentDetection.IsAmbiguous
+                ? "Знайдено кілька встановлень Where Winds Meet. Оберіть потрібну папку вручну."
+                : "Гру не знайдено. Натисніть «Знайти автоматично» або оберіть папку.");
             foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
                 card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
                     stateTrusted: true, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: false, operationInProgress: IsUiWorkBlocked));
@@ -115,7 +117,9 @@ public partial class MainForm
             DisposeWwmFileMonitor();
             restoreOriginalButton.Text = "Відновити оригінал";
             SetActionsEnabled(false);
-            SetMessage("Цю версію Where Winds Meet розпізнано, але встановлення через Хаб для неї ще не підтримується.");
+            SetMessage(session.CurrentDetection.HasAmbiguousTargetLayout
+                ? "У цій інсталяції знайдено кілька цільових розкладок Where Winds Meet. Встановлення заблоковано, щоб не вгадувати теку локалізації."
+                : "Цю інсталяцію Where Winds Meet не вдалося безпечно пов’язати з однією підтримуваною цільовою розкладкою.");
             foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
                 card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
                     stateTrusted: true, recoveryBlocked: false, gameDetected: false, operationInProgress: IsUiWorkBlocked));
@@ -132,7 +136,7 @@ public partial class MainForm
         restoreOriginalButton.Text = "Відновити оригінал";
         var restoreAvailability = stateError != null
             ? (IsAvailable: false, Message: (string?)null)
-            : await session.InstallService.CheckRestoreAvailabilityAsync(_gameRoot, session.SteamBuildId, cancellationToken).ConfigureAwait(true);
+            : await session.InstallService.CheckRestoreAvailabilityAsync(session.CurrentDetection, cancellationToken).ConfigureAwait(true);
         if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
         SetActionsEnabled(restoreAvailability.IsAvailable && !IsUiWorkBlocked);
         if (!restoreAvailability.IsAvailable && !string.IsNullOrWhiteSpace(restoreAvailability.Message))
@@ -142,7 +146,7 @@ public partial class MainForm
             var hasPackage = WwmPackageResolver.TryResolve(_wwmFeed, card.ModeSlug, card.ModeVariant, out var package, out _);
             var state = installed == null
                 ? new WwmInstalledStateResult(WwmInstalledStateKind.Unknown)
-                : await session.InstallService.ResolveStateAsync(_gameRoot, hasPackage ? package : null, cancellationToken).ConfigureAwait(true);
+                : await session.InstallService.ResolveStateAsync(session.CurrentDetection, hasPackage ? package : null, cancellationToken).ConfigureAwait(true);
             if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
             var sameMode = installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant;
             var presentation = WwmModeCardPresentation.Create(sameMode, state.State,
@@ -151,7 +155,7 @@ public partial class MainForm
         }
         var overallState = installed == null
             ? new WwmInstalledStateResult(WwmInstalledStateKind.Unknown)
-            : await session.InstallService.ResolveStateAsync(_gameRoot, null, cancellationToken).ConfigureAwait(true);
+            : await session.InstallService.ResolveStateAsync(session.CurrentDetection, null, cancellationToken).ConfigureAwait(true);
         if (stateError == null && installed != null && overallState.State == WwmInstalledStateKind.Modified)
         {
             SetMessage("Керовані файли WWM змінені поза Хабом. Автоматичні операції заблоковано.");
@@ -191,7 +195,14 @@ public partial class MainForm
     private void SetWwmGamePresentation(WwmDetectionResult result)
     {
         _gameRoot = result.GameRoot;
-        if (result.GameRoot == null)
+        if (result.IsAmbiguous)
+        {
+            _gameDetectionSource = null;
+            gameStatusLabel.Text = "Знайдено кілька встановлень Where Winds Meet";
+            gameStatusLabel.ForeColor = UiTheme.AccentSecondaryText;
+            gamePathLabel.Text = "Оберіть потрібну інсталяцію вручну.";
+        }
+        else if (result.GameRoot == null)
         {
             _gameDetectionSource = null;
             gameStatusLabel.Text = "Гру не знайдено";
@@ -248,7 +259,7 @@ public partial class MainForm
                 return;
             }
             if (!(WwmCompatibilityConfirmationForTest?.Invoke() ?? GameTestConfirmationDialog.ShowNeutralConfirmation(this,
-                    "Сумісність із поточним Steam build не підтверджена",
+                    "Сумісність із поточною версією гри не підтверджена",
                     "API не підтверджує сумісність цього перекладу з конкретною версією гри. Ви можете продовжити або повернутися назад.")))
             {
                 SetOperationState(OperationState.Cancelled);
@@ -262,7 +273,7 @@ public partial class MainForm
             cancelButton.Enabled = true;
             var result = WwmInstallResultForTest != null
                 ? await WwmInstallResultForTest(token)
-                : await session.InstallService.InstallAsync(_gameRoot, session.SteamBuildId, package!, token);
+                : await session.InstallService.InstallAsync(session.CurrentDetection, package!, token);
             SetOperationState(result.IsSuccess ? OperationState.Completed : OperationState.Failed);
             if (RequiresWwmRecoveryBlock(result))
             {
@@ -315,7 +326,7 @@ public partial class MainForm
         cancelButton.Enabled = true;
         try
         {
-            var result = await session.InstallService.RestorePreHubAsync(_gameRoot, session.SteamBuildId, token);
+            var result = await session.InstallService.RestorePreHubAsync(session.CurrentDetection, token);
             SetOperationState(result.IsSuccess ? OperationState.Completed : OperationState.Failed);
             if (RequiresWwmRecoveryBlock(result))
             {

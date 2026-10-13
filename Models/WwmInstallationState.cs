@@ -13,6 +13,9 @@ public sealed class WwmInstallationState
     [JsonPropertyName("archive_sha256")] public string? ArchiveSha256 { get; set; }
     [JsonPropertyName("pre_hub_snapshot_cycle_id")] public string PreHubSnapshotCycleId { get; set; } = "";
     [JsonPropertyName("game_build_id")] public string? GameBuildId { get; set; }
+    [JsonPropertyName("installation_root")] public string? InstallationRoot { get; set; }
+    [JsonPropertyName("target_layout")] public string? TargetLayout { get; set; }
+    [JsonPropertyName("installation_fingerprint")] public string? InstallationFingerprint { get; set; }
     [JsonPropertyName("installed_at")] public DateTimeOffset InstalledAt { get; set; }
     [JsonPropertyName("targets")] public List<WwmTargetManifestEntry> Targets { get; set; } = new();
 }

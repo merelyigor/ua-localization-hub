@@ -55,7 +55,7 @@ public partial class MainForm
         SetWwmGamePresentation(detection);
         if (detection.GameRoot != null && detection.IsMutationSupported)
         {
-            var recovery = await session.InstallService.RecoverAsync(detection.GameRoot, detection.BuildId, token);
+            var recovery = await session.InstallService.RecoverAsync(detection, token);
             if (!recovery.IsSuccess)
             {
                 _logger.Error($"WWM startup recovery blocked: {recovery.Error}: {recovery.Message}");

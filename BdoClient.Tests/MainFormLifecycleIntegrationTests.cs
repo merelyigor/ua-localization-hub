@@ -155,7 +155,7 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
-    public async Task WwmRecognizedUnknownWindowsRoot_IsNotPresentedAsSteamAndCannotMutate()
+    public async Task WwmRecognizedUnknownWindowsRoot_IsNotPresentedAsSteamAndUsesUnambiguousLayout()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
             MainFormTestFixture.CreateSuccessfulApiHandler(),
@@ -174,11 +174,13 @@ public sealed class MainFormLifecycleIntegrationTests
 
         var card = Assert.Single(FindWwmModeCards(fixture.Form));
         Assert.DoesNotContain("Steam", fixture.Form.WwmGameStatusForTest, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("не підтримується", fixture.Form.OperationMessageForTest, StringComparison.OrdinalIgnoreCase);
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        Assert.Equal(WwmInstallationSource.UnknownWindows, session.CurrentDetection.Source);
+        Assert.True(session.MutationSupported);
         Assert.True(card.ActionVisibleForTest);
-        Assert.False(card.ActionEnabledForTest);
+        Assert.True(card.ActionEnabledForTest);
         Assert.False(fixture.Form.WwmRestoreEnabledForTest);
-        Assert.False(fixture.Form.WwmInstallActionsEnabledForTest);
+        Assert.True(fixture.Form.WwmInstallActionsEnabledForTest);
         Assert.Equal(Path.GetFullPath(fixture.WwmGameRoot), fixture.Form.WwmGamePathForTest);
     }
 
@@ -201,6 +203,54 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.True(card.ActionVisibleForTest);
         Assert.True(card.ActionEnabledForTest);
         Assert.Contains("сумісність не підтверджено", fixture.Form.WwmGameStatusForTest, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WwmEpicRoot_IsPresentedAsEpicOnlyWithMatchingLauncherMetadata()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmHasSteamManifest: false,
+            wwmHasEpicManifest: true);
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.WwmGameStatusForTest == "Знайдено Epic Games-версію"
+            && form.WwmInstallActionsEnabledForTest);
+
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        Assert.Equal(WwmInstallationSource.EpicGames, session.CurrentDetection.Source);
+        Assert.Equal(WwmInstallationLayout.Package, session.CurrentDetection.TargetLayout);
+        Assert.True(fixture.Form.WwmInstallActionsEnabledForTest);
+    }
+
+    [Fact]
+    public async Task WwmUnknownDualLayout_IsPresentedButAllMutationActionsStayDisabled()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmHasSteamManifest: false,
+            wwmAlsoHasLocalDataPatchLayout: true);
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && form.WwmGameStatusForTest == "Знайдено Where Winds Meet"
+            && form.OperationMessageForTest.Contains("кілька цільових розкладок", StringComparison.Ordinal));
+
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        Assert.Equal(WwmInstallationSource.UnknownWindows, session.CurrentDetection.Source);
+        Assert.True(session.CurrentDetection.HasAmbiguousTargetLayout);
+        Assert.False(session.MutationSupported);
+        Assert.False(fixture.Form.WwmInstallActionsEnabledForTest);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
     }
 
     [Fact]
@@ -1483,6 +1533,8 @@ internal sealed class MainFormTestFixture : IDisposable
     private readonly bool _seedMalformedWwmJournal;
     private readonly bool _wwmHasSteamManifest;
     private readonly bool _wwmUsesLocalDataPatchLayout;
+    private readonly bool _wwmHasEpicManifest;
+    private readonly bool _wwmAlsoHasLocalDataPatchLayout;
     private readonly bool _wwmGameMarkersPresent;
     private readonly Func<string, IEnumerable<string>>? _wwmManualDirectoryEnumerator;
     private readonly TaskCompletionSource<MainForm> _formReady =
@@ -1513,7 +1565,9 @@ internal sealed class MainFormTestFixture : IDisposable
         bool wwmHasSteamManifest,
         bool wwmUsesLocalDataPatchLayout,
         bool wwmGameMarkersPresent,
-        Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator)
+        Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator,
+        bool wwmHasEpicManifest,
+        bool wwmAlsoHasLocalDataPatchLayout)
     {
         _bdoHandler = bdoHandler;
         _includeSyntheticSecondGame = includeSyntheticSecondGame;
@@ -1522,6 +1576,8 @@ internal sealed class MainFormTestFixture : IDisposable
         _seedMalformedWwmJournal = seedMalformedWwmJournal;
         _wwmHasSteamManifest = wwmHasSteamManifest;
         _wwmUsesLocalDataPatchLayout = wwmUsesLocalDataPatchLayout;
+        _wwmHasEpicManifest = wwmHasEpicManifest;
+        _wwmAlsoHasLocalDataPatchLayout = wwmAlsoHasLocalDataPatchLayout;
         _wwmGameMarkersPresent = wwmGameMarkersPresent;
         _wwmManualDirectoryEnumerator = wwmManualDirectoryEnumerator;
         if (includeWwm && wwmHandlerFactory == null)
@@ -1573,6 +1629,9 @@ internal sealed class MainFormTestFixture : IDisposable
                 File.WriteAllBytes(Path.Combine(WwmGameRoot, definition.ExecutableRelativePath), new byte[] { 1 });
                 Directory.CreateDirectory(Path.Combine(WwmGameRoot,
                     wwmUsesLocalDataPatchLayout ? definition.LocalDataPatchLocaleRelativePath : definition.LocaleRelativePath));
+                if (wwmAlsoHasLocalDataPatchLayout)
+                    Directory.CreateDirectory(Path.Combine(WwmGameRoot,
+                        wwmUsesLocalDataPatchLayout ? definition.LocaleRelativePath : definition.LocalDataPatchLocaleRelativePath));
                 if (wwmHasSteamManifest && !wwmUsesLocalDataPatchLayout)
                 {
                     Directory.CreateDirectory(Path.Combine(_wwmSteamRoot, "steamapps"));
@@ -1582,6 +1641,13 @@ internal sealed class MainFormTestFixture : IDisposable
             }
             var wwmPaths = _appPaths.GetGamePersistencePaths(definition.Id);
             wwmPaths.EnsureDirectories();
+            if (_wwmHasEpicManifest)
+            {
+                var epicManifests = Path.Combine(_root, "epic-manifests");
+                Directory.CreateDirectory(epicManifests);
+                File.WriteAllText(Path.Combine(epicManifests, "wwm.item"),
+                    JsonSerializer.Serialize(new { AppName = "WhereWindsMeet", DisplayName = "Where Winds Meet", InstallLocation = WwmGameRoot }));
+            }
             var wwmConfig = wwmConfigJson == null ? new Config() : JsonSerializer.Deserialize<Config>(wwmConfigJson) ?? new Config();
             wwmConfig.GamePath ??= WwmGameRoot;
             File.WriteAllText(wwmPaths.ConfigFile, JsonSerializer.Serialize(wwmConfig));
@@ -1833,12 +1899,15 @@ internal sealed class MainFormTestFixture : IDisposable
         bool wwmHasSteamManifest = true,
         bool wwmUsesLocalDataPatchLayout = false,
         bool wwmGameMarkersPresent = true,
-        Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator = null)
+        Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator = null,
+        bool wwmHasEpicManifest = false,
+        bool wwmAlsoHasLocalDataPatchLayout = false)
     {
         var fixture = new MainFormTestFixture(
             bdoHandler, startInBackground, exitWhenShown, seedReleaseFeedCache, gamePatch, applicationConfigJson,
             includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal, wwmConfigJson,
-            wwmHasSteamManifest, wwmUsesLocalDataPatchLayout, wwmGameMarkersPresent, wwmManualDirectoryEnumerator);
+            wwmHasSteamManifest, wwmUsesLocalDataPatchLayout, wwmGameMarkersPresent, wwmManualDirectoryEnumerator,
+            wwmHasEpicManifest, wwmAlsoHasLocalDataPatchLayout);
         fixture._uiThread.Start();
 
         try
@@ -2141,7 +2210,8 @@ internal sealed class MainFormTestFixture : IDisposable
                     ? WwmGameSession.CreateForTests(_appPaths, logger,
                         new HttpClient(_wwmHandlerFactory!(), disposeHandler: true), ownsHttpClient: true,
                         steamRoots: _wwmHasSteamManifest ? new[] { _wwmSteamRoot } : Array.Empty<string>(),
-                        manualDirectoryEnumerator: _wwmManualDirectoryEnumerator)
+                        manualDirectoryEnumerator: _wwmManualDirectoryEnumerator,
+                        epicManifestDirectory: _wwmHasEpicManifest ? Path.Combine(_root, "epic-manifests") : Path.Combine(_root, "no-epic-manifests"))
                     : BdoGameSession.CreateForTests(
                         _appPaths, logger, appVersionInfo, new HttpClient(_bdoHandler), ownsHttpClient: true,
                         descriptor));

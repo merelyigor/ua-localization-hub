@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using BdoClient.Logging;
 using BdoClient.Models;
 using BdoClient.Storage;
@@ -29,6 +30,7 @@ public sealed class WwmInstallService
     private readonly WwmStateStore _store;
     private readonly ILogger _logger;
     private readonly WwmGameDefinition _definition;
+    private readonly AsyncLocal<WwmInstallationBinding?> _bindingContext = new();
     internal Action<int>? AfterTargetAppliedForTest { get; set; }
     internal Action? BeforeStateSaveForTest { get; set; }
     internal Action? BeforeRestoreJournalForTest { get; set; }
@@ -45,9 +47,14 @@ public sealed class WwmInstallService
         _definition = definition ?? WwmGameDefinition.Default;
     }
 
-    public async Task<WwmMutationResult> RecoverAsync(string gameRoot, string? currentBuildId, CancellationToken token = default)
+    public async Task<WwmMutationResult> RecoverAsync(string gameRoot, string? currentBuildId, CancellationToken token = default,
+        WwmInstallationBinding? explicitBinding = null)
     {
-        if (!_definition.ValidateGameRoot(gameRoot)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірений шлях Where Winds Meet недоступний.");
+        using var bindingScope = PushBinding(gameRoot, currentBuildId, explicitBinding);
+        var binding = _bindingContext.Value!;
+        if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірена розкладка Where Winds Meet недоступна.");
+        var legacyBinding = await BindLegacyMetadataAsync(token).ConfigureAwait(false);
+        if (legacyBinding != null) return legacyBinding;
         WwmTransactionJournal? journal;
         string? error;
         try { journal = _store.LoadJournal(out error); }
@@ -59,6 +66,9 @@ public sealed class WwmInstallService
         if (error != null) return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Журнал відновлення WWM пошкоджено; файли не змінювалися.");
         if (journal == null)
             return await RecoverAbortedSnapshotCycleAsync(gameRoot, currentBuildId, token).ConfigureAwait(false);
+
+        if (!JournalMatchesBinding(journal, binding))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Журнал WWM належить іншому шляху або цільовій розкладці; відновлення заблоковано.");
 
         var opDir = Path.Combine(_store.TransactionDirectory, journal.OperationId);
         bool committed;
@@ -80,8 +90,9 @@ public sealed class WwmInstallService
             return WwmMutationResult.Success();
         }
 
-        if (journal.GameBuildId != null && !string.Equals(journal.GameBuildId, currentBuildId, StringComparison.Ordinal))
-            return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, "Steam build змінився під час незавершеної операції; потрібна ручна перевірка.");
+        if (binding.Source == WwmInstallationSource.Steam && journal.GameBuildId != null
+            && !string.Equals(journal.GameBuildId, currentBuildId, StringComparison.Ordinal))
+            return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
 
         bool targetsAreTransactional;
         try { targetsAreTransactional = await MatchesJournalKnownTargetStatesAsync(gameRoot, journal, token).ConfigureAwait(false); }
@@ -96,19 +107,30 @@ public sealed class WwmInstallService
         var rollback = await CompleteRollbackAsync(gameRoot, journal, opDir).ConfigureAwait(false);
         if (!rollback)
             return WwmMutationResult.Failure(WwmMutationError.RollbackFailed, "Не вдалося відновити всі файли WWM. Журнал і резервні дані збережено.");
+        legacyBinding = await BindLegacyMetadataAsync(token).ConfigureAwait(false);
+        if (legacyBinding != null) return legacyBinding;
         _logger.Warning("Recovered incomplete WWM transaction to its exact pre-operation state.");
         return WwmMutationResult.Success();
     }
 
+    public Task<WwmMutationResult> RecoverAsync(WwmDetectionResult detection, CancellationToken token = default)
+        => detection.IsMutationSupported
+            ? RecoverAsync(detection.GameRoot!, detection.BuildId, token, WwmInstallationBinding.FromDetection(detection))
+            : Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Для Where Winds Meet не визначено однозначну підтримувану цільову розкладку."));
+
     public async Task<WwmMutationResult> InstallAsync(string gameRoot, string? buildId, WwmApiPackage package,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, WwmInstallationBinding? explicitBinding = null)
     {
-        if (!_definition.ValidateGameRoot(gameRoot)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірений шлях Where Winds Meet недоступний.");
+        using var bindingScope = PushBinding(gameRoot, buildId, explicitBinding);
+        var binding = _bindingContext.Value!;
+        if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірена розкладка Where Winds Meet недоступна.");
         var recovered = await RecoverAsync(gameRoot, buildId, cancellationToken).ConfigureAwait(false);
         if (!recovered.IsSuccess) return recovered;
 
         var state = _store.Load(out var stateError);
         if (stateError != null) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM пошкоджено; встановлення заблоковано.");
+        if (state != null && !StateMatchesBinding(state, binding)) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Збережений стан WWM належить іншій інсталяції або розкладці.");
+        if (state != null && IsStateStale(state, binding)) return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
         if (state != null && !await MatchesManifestAsync(gameRoot, state.Targets, cancellationToken).ConfigureAwait(false))
             return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles, "Файли локалізації змінені поза Хабом. Операцію заблоковано.");
 
@@ -126,13 +148,16 @@ public sealed class WwmInstallService
             state = _store.Load(out stateError);
             if (stateError != null)
                 return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM змінився або пошкоджений; встановлення заблоковано.");
+            if (state != null && !StateMatchesBinding(state, binding)) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Збережений стан WWM належить іншій інсталяції або розкладці.");
+            if (state != null && IsStateStale(state, binding)) return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
             if (state != null && !await MatchesManifestAsync(gameRoot, state.Targets, cancellationToken).ConfigureAwait(false))
                 return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles, "Файли локалізації змінилися під час підготовки пакета. Операцію заблоковано.");
             var operationId = Guid.NewGuid().ToString("N");
             var snapshotResult = await EnsurePreHubSnapshotAsync(gameRoot, buildId, state != null, operationId, cancellationToken).ConfigureAwait(false);
             if (snapshotResult.Snapshot == null)
                 return WwmMutationResult.Failure(WwmMutationError.Snapshot, "Знімок попереднього стану відсутній або не належить активному циклу Хабу. Встановлення заблоковано.");
-            return await RunTransactionAsync(gameRoot, buildId, staged, snapshotResult.Snapshot,
+            var mapped = MapStagedTargets(staged, binding);
+            return await RunTransactionAsync(gameRoot, buildId, mapped, snapshotResult.Snapshot,
                 snapshotResult.Created, operationId, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -141,30 +166,52 @@ public sealed class WwmInstallService
         }
     }
 
-    public async Task<WwmMutationResult> RestorePreHubAsync(string gameRoot, string? currentBuildId, CancellationToken token = default)
+    public Task<WwmMutationResult> InstallAsync(WwmDetectionResult detection, WwmApiPackage package,
+        CancellationToken cancellationToken = default)
+        => detection.IsMutationSupported
+            ? InstallAsync(detection.GameRoot!, detection.BuildId, package, cancellationToken, WwmInstallationBinding.FromDetection(detection))
+            : Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Для Where Winds Meet не визначено однозначну підтримувану цільову розкладку."));
+
+    public async Task<WwmMutationResult> RestorePreHubAsync(string gameRoot, string? currentBuildId, CancellationToken token = default,
+        WwmInstallationBinding? explicitBinding = null)
     {
-        if (!_definition.ValidateGameRoot(gameRoot)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірений шлях Where Winds Meet недоступний.");
+        using var bindingScope = PushBinding(gameRoot, currentBuildId, explicitBinding);
+        var binding = _bindingContext.Value!;
+        if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірена розкладка Where Winds Meet недоступна.");
+        var legacyBinding = await BindLegacyMetadataAsync(token).ConfigureAwait(false);
+        if (legacyBinding != null) return legacyBinding;
         var recovered = await RecoverAsync(gameRoot, currentBuildId, token).ConfigureAwait(false);
         if (!recovered.IsSuccess) return recovered;
         var state = _store.Load(out var stateError);
         if (stateError != null) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM пошкоджено; відновлення заблоковано.");
         if (state == null) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Керований стан WWM не знайдено.");
+        if (!StateMatchesBinding(state, binding)) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Збережений стан або знімок належить іншій інсталяції чи розкладці.");
+        if (IsStateStale(state, binding)) return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
         if (!await MatchesManifestAsync(gameRoot, state.Targets, token).ConfigureAwait(false))
             return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles, "Керовані файли змінені поза Хабом; безпечне відновлення заблоковано.");
 
         var snapshot = LoadPreHubSnapshot(out var snapshotError);
         if (snapshot == null) return WwmMutationResult.Failure(WwmMutationError.Snapshot, snapshotError ?? "Знімок попереднього стану відсутній або пошкоджений.");
-        if (string.IsNullOrWhiteSpace(snapshot.GameBuildId) || string.IsNullOrWhiteSpace(currentBuildId)
-            || !string.Equals(snapshot.GameBuildId, currentBuildId, StringComparison.Ordinal))
-            return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, "Steam build відрізняється від build знімка. Відновлення заблоковано, щоб не замінити файли новішої гри.");
+        if (IsSnapshotStale(snapshot, binding))
+            return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
         return await RestoreSnapshotTransactionAsync(gameRoot, currentBuildId, snapshot, token).ConfigureAwait(false);
     }
 
+    public Task<WwmMutationResult> RestorePreHubAsync(WwmDetectionResult detection, CancellationToken token = default)
+        => detection.IsMutationSupported
+            ? RestorePreHubAsync(detection.GameRoot!, detection.BuildId, token, WwmInstallationBinding.FromDetection(detection))
+            : Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Для Where Winds Meet не визначено однозначну підтримувану цільову розкладку."));
+
     public async Task<(bool IsAvailable, string? Message)> CheckRestoreAvailabilityAsync(
-        string gameRoot, string? currentBuildId, CancellationToken token = default)
+        string gameRoot, string? currentBuildId, CancellationToken token = default, WwmInstallationBinding? explicitBinding = null)
     {
-        if (!_definition.ValidateGameRoot(gameRoot))
+        using var bindingScope = PushBinding(gameRoot, currentBuildId, explicitBinding);
+        var binding = _bindingContext.Value!;
+        if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout))
             return (false, "Відновлення оригіналу неможливе: перевірену теку гри не знайдено.");
+
+        var legacyBinding = await BindLegacyMetadataAsync(token).ConfigureAwait(false);
+        if (legacyBinding != null) return (false, legacyBinding.Message);
 
         var state = _store.Load(out var stateError);
         if (stateError != null)
@@ -173,24 +220,38 @@ public sealed class WwmInstallService
             return (false, Directory.Exists(_store.SnapshotDirectory)
                 ? "Відновлення оригіналу неможливе: початковий знімок не пов'язаний із довіреним станом встановлення."
                 : "Відновлення оригіналу неможливе: початковий знімок ще не створено.");
+        if (!StateMatchesBinding(state, binding)) return (false, "Збережений стан або знімок належить іншій інсталяції чи розкладці.");
+        if (IsStateStale(state, binding)) return (false, GetSnapshotStaleMessage(binding));
         if (!await MatchesManifestAsync(gameRoot, state.Targets, token).ConfigureAwait(false))
             return (false, "Керовані файли WWM змінені поза Хабом. Безпечне відновлення заблоковано.");
 
         var snapshot = LoadPreHubSnapshot(out var snapshotError);
         if (snapshot == null || !string.Equals(snapshot.CycleOperationId, state.PreHubSnapshotCycleId, StringComparison.Ordinal))
             return (false, $"Відновлення оригіналу неможливе: початковий знімок відсутній, пошкоджений або не належить цій установці.{(string.IsNullOrWhiteSpace(snapshotError) ? string.Empty : $" Деталі: {snapshotError}")}");
-        if (string.IsNullOrWhiteSpace(snapshot.GameBuildId) || string.IsNullOrWhiteSpace(currentBuildId)
-            || !string.Equals(snapshot.GameBuildId, currentBuildId, StringComparison.Ordinal))
-            return (false, "Steam build відрізняється від build початкового знімка. Відновлення заблоковано, щоб не замінити файли новішої гри.");
+        if (IsSnapshotStale(snapshot, binding))
+            return (false, GetSnapshotStaleMessage(binding));
 
         return (true, null);
     }
 
-    public async Task<WwmInstalledStateResult> ResolveStateAsync(string gameRoot, WwmApiPackage? current, CancellationToken token = default)
+    public Task<(bool IsAvailable, string? Message)> CheckRestoreAvailabilityAsync(
+        WwmDetectionResult detection, CancellationToken token = default)
+        => detection.IsMutationSupported
+            ? CheckRestoreAvailabilityAsync(detection.GameRoot!, detection.BuildId, token, WwmInstallationBinding.FromDetection(detection))
+            : Task.FromResult<(bool IsAvailable, string? Message)>((false, "Для цієї інсталяції WWM не визначено однозначну цільову розкладку."));
+
+    public async Task<WwmInstalledStateResult> ResolveStateAsync(string gameRoot, WwmApiPackage? current, CancellationToken token = default,
+        WwmInstallationBinding? explicitBinding = null)
     {
+        using var bindingScope = PushBinding(gameRoot, null, explicitBinding);
+        var binding = _bindingContext.Value!;
+        var legacyBinding = await BindLegacyMetadataAsync(token).ConfigureAwait(false);
+        if (legacyBinding != null) return new(WwmInstalledStateKind.Modified, legacyBinding.Message);
         var state = _store.Load(out var error);
         if (error != null) return new(WwmInstalledStateKind.Modified, "Збережений стан WWM пошкоджено.");
         if (state == null) return new(WwmInstalledStateKind.Unknown);
+        if (!StateMatchesBinding(state, binding)) return new(WwmInstalledStateKind.Modified, "Збережений стан належить іншій інсталяції або розкладці.");
+        if (IsStateStale(state, binding)) return new(WwmInstalledStateKind.Modified, GetSnapshotStaleMessage(binding));
         if (!await MatchesManifestAsync(gameRoot, state.Targets, token).ConfigureAwait(false))
             return new(WwmInstalledStateKind.Modified, "Файли локалізації змінено або втрачено.");
         if (current != null && state.ModeSlug == current.Mode.Slug && state.ModeVariant == current.Mode.Variant
@@ -199,6 +260,12 @@ public sealed class WwmInstallService
             return new(WwmInstalledStateKind.Current);
         return new(WwmInstalledStateKind.UpdateAvailable);
     }
+
+    public Task<WwmInstalledStateResult> ResolveStateAsync(WwmDetectionResult detection, WwmApiPackage? current,
+        CancellationToken token = default)
+        => detection.IsMutationSupported
+            ? ResolveStateAsync(detection.GameRoot!, current, token, WwmInstallationBinding.FromDetection(detection))
+            : Task.FromResult(new WwmInstalledStateResult(WwmInstalledStateKind.Unknown));
 
     private async Task<WwmMutationResult> RunTransactionAsync(string gameRoot, string? buildId, WwmStagedPackage staged,
         WwmPreHubSnapshot snapshot, bool createdPreHubSnapshot, string operationId, CancellationToken token)
@@ -229,6 +296,7 @@ public sealed class WwmInstallService
             var previous = await CaptureTargetsAsync(gameRoot, operationDir, token).ConfigureAwait(false);
             var newState = new WwmInstallationState
             {
+                SchemaVersion = 2,
                 ModeSlug = staged.Package.Mode.Slug,
                 ModeVariant = staged.Package.Mode.Variant,
                 ReleaseVersion = staged.Package.Version,
@@ -236,12 +304,16 @@ public sealed class WwmInstallService
                 ArchiveSha256 = staged.Package.Sha256,
                 PreHubSnapshotCycleId = snapshot.CycleOperationId,
                 GameBuildId = buildId,
+                InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(gameRoot),
+                TargetLayout = CurrentBinding.Layout.ToString(),
+                InstallationFingerprint = CurrentBinding.Fingerprint,
                 InstalledAt = DateTimeOffset.UtcNow,
                 Targets = staged.Targets.ToList()
             };
             var stateJson = WwmStateStore.SerializeState(newState);
             journal = new WwmTransactionJournal
             {
+                SchemaVersion = 2,
                 OperationId = operationId,
                 Operation = "install",
                 CreatedPreHubSnapshot = createdPreHubSnapshot,
@@ -250,7 +322,10 @@ public sealed class WwmInstallService
                 PreviousTargets = previous,
                 TargetManifest = staged.Targets.ToList(),
                 ExpectedStateSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stateJson))).ToLowerInvariant(),
-                GameBuildId = buildId
+                GameBuildId = buildId,
+                InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(gameRoot),
+                TargetLayout = CurrentBinding.Layout.ToString(),
+                InstallationFingerprint = CurrentBinding.Fingerprint
             };
             phase = "write_journal";
             await _store.WriteJournalAsync(journal, token).ConfigureAwait(false);
@@ -260,7 +335,8 @@ public sealed class WwmInstallService
             {
                 token.ThrowIfCancellationRequested();
                 activeTarget = item.RelativePath;
-                var source = SafeCombine(Path.Combine(staged.WorkDirectory, "staged"), item.RelativePath);
+                var packageRelative = _definition.ManagedRelativePaths[Array.IndexOf(CurrentTargets, item.RelativePath)];
+                var source = SafeCombine(Path.Combine(staged.WorkDirectory, "staged"), packageRelative);
                 var target = SafeGameTarget(gameRoot, item.RelativePath);
                 phase = "create_target_directory";
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
@@ -462,6 +538,7 @@ public sealed class WwmInstallService
             }
             journal = new WwmTransactionJournal
             {
+                SchemaVersion = 2,
                 OperationId = id,
                 Operation = "restore",
                 PreviousStateExisted = previousState != null,
@@ -470,7 +547,10 @@ public sealed class WwmInstallService
                 TargetManifest = restoredTargets,
                 ExpectedAbsentTargets = absent,
                 GameBuildId = buildId,
-                ExpectedStateSha256 = "absent"
+                ExpectedStateSha256 = "absent",
+                InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(gameRoot),
+                TargetLayout = CurrentBinding.Layout.ToString(),
+                InstallationFingerprint = CurrentBinding.Fingerprint
             };
             BeforeRestoreJournalForTest?.Invoke();
             phase = "write_journal";
@@ -618,7 +698,7 @@ public sealed class WwmInstallService
         try
         {
             var index = 0;
-            foreach (var relative in _definition.ManagedRelativePaths)
+            foreach (var relative in CurrentTargets)
             {
                 token.ThrowIfCancellationRequested();
                 var path = SafeGameTarget(root, relative);
@@ -647,7 +727,12 @@ public sealed class WwmInstallService
                 index++;
             }
             foreach (var pair in temporaryFiles) File.Move(pair.Temp, pair.Final, overwrite: false);
-            var snapshot = new WwmPreHubSnapshot { CycleOperationId = cycleOperationId, GameBuildId = buildId, Targets = targets };
+            var snapshot = new WwmPreHubSnapshot
+            {
+                SchemaVersion = 2, CycleOperationId = cycleOperationId, GameBuildId = buildId, Targets = targets,
+                InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(root), TargetLayout = CurrentBinding.Layout.ToString(),
+                InstallationFingerprint = CurrentBinding.Fingerprint
+            };
             await File.WriteAllTextAsync(Path.Combine(_store.SnapshotDirectory, "snapshot.json.tmp"), JsonSerializer.Serialize(snapshot, JsonOptions), token).ConfigureAwait(false);
             File.Move(Path.Combine(_store.SnapshotDirectory, "snapshot.json.tmp"), Path.Combine(_store.SnapshotDirectory, "snapshot.json"), overwrite: false);
             return (snapshot, true);
@@ -672,7 +757,13 @@ public sealed class WwmInstallService
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан WWM пошкоджено; перевірку незавершеного циклу заблоковано.");
         if (state != null)
         {
+            if (!StateMatchesBinding(state, CurrentBinding))
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Керований стан WWM належить іншій інсталяції або розкладці.");
+            if (IsStateStale(state, CurrentBinding))
+                return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(CurrentBinding));
             var activeSnapshot = LoadPreHubSnapshot(out _);
+            if (activeSnapshot != null && IsSnapshotStale(activeSnapshot, CurrentBinding))
+                return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(CurrentBinding));
             return activeSnapshot != null && string.Equals(activeSnapshot.CycleOperationId, state.PreHubSnapshotCycleId, StringComparison.Ordinal)
                 ? WwmMutationResult.Success()
                 : WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
@@ -684,8 +775,8 @@ public sealed class WwmInstallService
         if (snapshot == null)
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
                 "Знімок WWM існує без керованого стану й не має валідного доказу незавершеного циклу; потрібна ручна перевірка.");
-        if (snapshot.GameBuildId != null && !string.Equals(snapshot.GameBuildId, currentBuildId, StringComparison.Ordinal))
-            return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, "Steam build змінився після створення незавершеного знімка WWM.");
+        if (IsSnapshotStale(snapshot, CurrentBinding))
+            return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(CurrentBinding));
         if (!await MatchesSnapshotBaselineAsync(root, snapshot, token).ConfigureAwait(false))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
                 "Файли WWM відрізняються від знімка незавершеного циклу; знімок збережено для ручної перевірки.");
@@ -744,13 +835,159 @@ public sealed class WwmInstallService
         }
     }
 
+    private async Task<WwmMutationResult?> BindLegacyMetadataAsync(CancellationToken token)
+    {
+        var state = _store.Load(out var stateError);
+        if (stateError != null) return null; // The owning operation reports the existing typed state error.
+
+        WwmTransactionJournal? journal = null;
+        if (File.Exists(_store.JournalFile))
+        {
+            journal = _store.LoadJournal(out var journalError);
+            if (journalError != null)
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Журнал відновлення WWM пошкоджено; legacy прив’язка не виконувалася, докази збережено.");
+        }
+
+        WwmPreHubSnapshot? snapshot = null;
+        if (Directory.Exists(_store.SnapshotDirectory))
+        {
+            try
+            {
+                var snapshotPath = Path.Combine(_store.SnapshotDirectory, "snapshot.json");
+                if (File.Exists(snapshotPath))
+                    snapshot = JsonSerializer.Deserialize<WwmPreHubSnapshot>(await File.ReadAllTextAsync(snapshotPath, token).ConfigureAwait(false), JsonOptions);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or OperationCanceledException)
+            {
+                if (ex is OperationCanceledException) throw;
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Знімок WWM неможливо безпечно прочитати; докази збережено.");
+            }
+        }
+
+        var hasLegacyState = state?.SchemaVersion == 1;
+        var hasLegacySnapshot = snapshot?.SchemaVersion == 1;
+        var hasLegacyJournal = journal?.SchemaVersion == 1;
+        if (!hasLegacyState && !hasLegacySnapshot && !hasLegacyJournal) return null;
+        if (!HasTrustedLegacyRoot(CurrentBinding))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                "Старі дані WWM не прив’язані до підтвердженого збереженого шляху цієї Steam-інсталяції; автоматичну операцію заблоковано.");
+
+        if (state != null && state.SchemaVersion == 2 && !StateMatchesBinding(state, CurrentBinding))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан WWM належить іншій інсталяції; legacy binding заблоковано.");
+        if (journal != null && journal.SchemaVersion == 2 && !JournalMatchesBinding(journal, CurrentBinding))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Журнал WWM належить іншій інсталяції; legacy binding заблоковано.");
+        if (snapshot?.SchemaVersion == 2 && !ValidateSnapshotFiles(snapshot))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Знімок WWM має некоректну прив’язку або файли; legacy binding заблоковано.");
+        if (hasLegacySnapshot && (snapshot == null || !ValidateSnapshotFiles(snapshot)))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Legacy-знімок WWM не пройшов перевірку цілі, циклу або резервних файлів.");
+        if (hasLegacyState && (snapshot == null || state == null
+            || !string.Equals(state.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal)))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Legacy-стан WWM не має знімка того самого довіреного циклу.");
+        if (hasLegacySnapshot && !SnapshotCycleIsProven(snapshot!, state, journal))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Неможливо довести належність legacy-знімка активному циклу WWM.");
+
+        if (hasLegacyState)
+        {
+            state!.SchemaVersion = 2;
+            state.InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(CurrentBinding.GameRoot);
+            state.TargetLayout = WwmInstallationLayout.Package.ToString();
+            state.InstallationFingerprint = CurrentBinding.Fingerprint;
+            try { await _store.SaveAsync(state, token).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
+            {
+                if (ex is OperationCanceledException) throw;
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Не вдалося безпечно закріпити legacy-стан за цією інсталяцією.");
+            }
+        }
+
+        if (hasLegacySnapshot)
+        {
+            snapshot!.SchemaVersion = 2;
+            snapshot.InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(CurrentBinding.GameRoot);
+            snapshot.TargetLayout = WwmInstallationLayout.Package.ToString();
+            snapshot.InstallationFingerprint = CurrentBinding.Fingerprint;
+            try { await SaveSnapshotMetadataAsync(snapshot, token).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+            {
+                if (ex is OperationCanceledException) throw;
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Не вдалося безпечно закріпити legacy-знімок за цією інсталяцією.");
+            }
+        }
+
+        if (hasLegacyJournal)
+        {
+            journal!.SchemaVersion = 2;
+            journal.InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(CurrentBinding.GameRoot);
+            journal.TargetLayout = WwmInstallationLayout.Package.ToString();
+            journal.InstallationFingerprint = CurrentBinding.Fingerprint;
+            try { await _store.WriteJournalAsync(journal, token).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
+            {
+                if (ex is OperationCanceledException) throw;
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Не вдалося безпечно закріпити legacy-журнал за цією інсталяцією.");
+            }
+        }
+
+        _logger.Info("Bound verified legacy WWM Package metadata to the exact persisted Steam installation root.");
+        return null;
+    }
+
+    private bool SnapshotCycleIsProven(WwmPreHubSnapshot snapshot, WwmInstallationState? state, WwmTransactionJournal? journal)
+    {
+        if (state != null && string.Equals(state.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal)) return true;
+        if (Guid.TryParseExact(snapshot.CycleOperationId, "N", out _))
+        {
+            try
+            {
+                var orphanOperation = Path.GetFullPath(Path.Combine(_store.TransactionDirectory, snapshot.CycleOperationId));
+                if (string.Equals(Path.GetDirectoryName(orphanOperation), Path.GetFullPath(_store.TransactionDirectory), StringComparison.OrdinalIgnoreCase)
+                    && Directory.Exists(orphanOperation)
+                    && (File.GetAttributes(orphanOperation) & FileAttributes.ReparsePoint) == 0)
+                    return true;
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException or System.Security.SecurityException)
+            {
+                _logger.Debug($"WWM orphan snapshot operation evidence was rejected: {ex.Message}");
+            }
+        }
+        if (journal == null) return false;
+        if (journal.CreatedPreHubSnapshot && string.Equals(journal.OperationId, snapshot.CycleOperationId, StringComparison.Ordinal)) return true;
+        if (!journal.PreviousStateExisted) return false;
+        try
+        {
+            var bytes = Convert.FromBase64String(journal.PreviousStateBase64);
+            var json = new System.Text.UTF8Encoding(false, true).GetString(bytes);
+            return WwmStateStore.TryDeserializeState(json, out var previous, out _)
+                && string.Equals(previous!.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is FormatException or System.Text.DecoderFallbackException) { return false; }
+    }
+
+    private async Task SaveSnapshotMetadataAsync(WwmPreHubSnapshot snapshot, CancellationToken token)
+    {
+        var path = Path.Combine(_store.SnapshotDirectory, "snapshot.json");
+        var temp = path + ".binding.tmp";
+        try
+        {
+            await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(snapshot, JsonOptions), token).ConfigureAwait(false);
+            if (File.Exists(path)) File.Replace(temp, path, null);
+            else File.Move(temp, path);
+        }
+        finally
+        {
+            if (File.Exists(temp)) File.Delete(temp);
+        }
+    }
+
     private async Task<List<WwmPreviousTarget>> CaptureTargetsAsync(string root, string operationDir, CancellationToken token)
     {
         var result = new List<WwmPreviousTarget>();
-        for (var i = 0; i < _definition.ManagedRelativePaths.Length; i++)
+        for (var i = 0; i < CurrentTargets.Length; i++)
         {
             token.ThrowIfCancellationRequested();
-            var relative = _definition.ManagedRelativePaths[i];
+            var relative = CurrentTargets[i];
             var target = SafeGameTarget(root, relative);
             if (!File.Exists(target)) { result.Add(new WwmPreviousTarget { RelativePath = relative, Existed = false }); continue; }
             var backupName = i + ".bin";
@@ -852,7 +1089,7 @@ public sealed class WwmInstallService
     private bool CleanupGameTemps(string root, string operationId)
     {
         if (!Guid.TryParseExact(operationId, "N", out _)) return false;
-        foreach (var relativePath in _definition.ManagedRelativePaths)
+        foreach (var relativePath in CurrentTargets)
         {
             foreach (var kind in new[] { ".hub-", ".rollback-" })
             {
@@ -960,15 +1197,21 @@ public sealed class WwmInstallService
 
     private bool ValidateSnapshotFiles(WwmPreHubSnapshot snapshot)
     {
-        if (snapshot.SchemaVersion != 1 || !Guid.TryParseExact(snapshot.CycleOperationId, "N", out _)
-            || snapshot.Targets == null || snapshot.Targets.Count != _definition.ManagedRelativePaths.Length
+        if (snapshot.SchemaVersion == 2 && !WwmStateStore.IsValidBinding(
+                snapshot.InstallationRoot, snapshot.TargetLayout, snapshot.InstallationFingerprint,
+                snapshot.Targets?.Where(item => item != null).Select(item => item.RelativePath).ToArray() ?? Array.Empty<string>()))
+            return false;
+
+        if (snapshot.SchemaVersion is not (1 or 2) || !Guid.TryParseExact(snapshot.CycleOperationId, "N", out _)
+            || snapshot.Targets == null || snapshot.Targets.Count != CurrentTargets.Length
             || snapshot.Targets.Any(item => item == null || !WwmStateStore.IsAllowedPath(item.RelativePath)
                 || (item.Existed
                     ? item.SizeBytes <= 0 || !IsSha(item.Sha256)
                         || (item.Attributes is { } attributes && (((FileAttributes)attributes) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
-                        || item.BackupFile != (Array.IndexOf(_definition.ManagedRelativePaths, item.RelativePath) + ".bin")
+                        || item.BackupFile != (Array.IndexOf(CurrentTargets, item.RelativePath) + ".bin")
                     : item.SizeBytes != null || item.Sha256 != null || item.BackupFile != null || item.Attributes != null))
-            || snapshot.Targets.Select(item => item.RelativePath).Distinct(StringComparer.Ordinal).Count() != _definition.ManagedRelativePaths.Length)
+            || snapshot.Targets.Select(item => item.RelativePath).Distinct(StringComparer.Ordinal).Count() != CurrentTargets.Length
+            || !SnapshotMatchesBinding(snapshot, CurrentBinding))
             return false;
 
         try
@@ -995,6 +1238,132 @@ public sealed class WwmInstallService
             _logger.Warning($"WWM snapshot validation failed: {ex.Message}");
             return false;
         }
+    }
+
+    private WwmInstallationBinding CurrentBinding => _bindingContext.Value
+        ?? throw new InvalidOperationException("WWM transaction binding is not active.");
+
+    private string[] CurrentTargets => CurrentBinding.ManagedRelativePaths;
+
+    private IDisposable PushBinding(string root, string? buildId, WwmInstallationBinding? explicitBinding)
+    {
+        var prior = _bindingContext.Value;
+        var normalizedRoot = WwmGameDefinition.NormalizeInstallationRoot(root);
+        if (explicitBinding != null)
+        {
+            if (!string.Equals(WwmGameDefinition.NormalizeInstallationRoot(explicitBinding.GameRoot), normalizedRoot, StringComparison.OrdinalIgnoreCase)
+                || explicitBinding.Layout is not (WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch)
+                || explicitBinding.ManagedRelativePaths.Any(path => WwmStateStore.GetLayoutForPath(path) != explicitBinding.Layout))
+                throw new InvalidDataException("Invalid explicit WWM installation binding.");
+            _bindingContext.Value = explicitBinding;
+        }
+        else if (prior == null || !string.Equals(WwmGameDefinition.NormalizeInstallationRoot(prior.GameRoot), normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            // The legacy overload remains Package-only for existing Steam callers/tests.
+            _bindingContext.Value = new WwmInstallationBinding(normalizedRoot, WwmInstallationSource.Steam,
+                WwmInstallationLayout.Package, buildId, WwmGameDefinition.ComputeInstallationFingerprint(normalizedRoot));
+        }
+        return new BindingScope(_bindingContext, prior);
+    }
+
+    private static WwmStagedPackage MapStagedTargets(WwmStagedPackage staged, WwmInstallationBinding binding)
+    {
+        var paths = binding.ManagedRelativePaths;
+        var mapped = staged.Targets.OrderBy(item => item.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .Select((item, index) => new WwmTargetManifestEntry
+            {
+                RelativePath = paths[index], SizeBytes = item.SizeBytes, Sha256 = item.Sha256
+            }).ToArray();
+        return new WwmStagedPackage(staged.WorkDirectory, mapped, staged.Package);
+    }
+
+    private static bool StateMatchesBinding(WwmInstallationState state, WwmInstallationBinding binding)
+    {
+        if (state.SchemaVersion == 1)
+            return HasTrustedLegacyRoot(binding) && binding.Source == WwmInstallationSource.Steam && binding.Layout == WwmInstallationLayout.Package
+                && (state.GameBuildId == null || binding.BuildId == null
+                    || string.Equals(state.GameBuildId, binding.BuildId, StringComparison.Ordinal))
+                && state.Targets.Select(item => item.RelativePath).OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .SequenceEqual(binding.ManagedRelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        if (!WwmStateStore.IsValidBinding(state.InstallationRoot, state.TargetLayout, state.InstallationFingerprint,
+                state.Targets.Select(item => item.RelativePath).ToArray())) return false;
+        return TrySameFullPath(state.InstallationRoot, binding.GameRoot)
+            && string.Equals(state.TargetLayout, binding.Layout.ToString(), StringComparison.Ordinal)
+            && state.Targets is { } stateTargets
+            && stateTargets.All(item => WwmStateStore.GetLayoutForPath(item.RelativePath) == binding.Layout);
+    }
+
+    private static bool SnapshotMatchesBinding(WwmPreHubSnapshot snapshot, WwmInstallationBinding binding)
+    {
+        if (snapshot.SchemaVersion == 1)
+            return HasTrustedLegacyRoot(binding) && binding.Source == WwmInstallationSource.Steam && binding.Layout == WwmInstallationLayout.Package
+                && (snapshot.GameBuildId == null || string.Equals(snapshot.GameBuildId, binding.BuildId, StringComparison.Ordinal))
+                && snapshot.Targets.Select(item => item.RelativePath).OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .SequenceEqual(binding.ManagedRelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        if (!WwmStateStore.IsValidBinding(snapshot.InstallationRoot, snapshot.TargetLayout, snapshot.InstallationFingerprint,
+                snapshot.Targets?.Where(item => item != null).Select(item => item.RelativePath).ToArray() ?? Array.Empty<string>())) return false;
+        return TrySameFullPath(snapshot.InstallationRoot, binding.GameRoot)
+            && string.Equals(snapshot.TargetLayout, binding.Layout.ToString(), StringComparison.Ordinal)
+            && snapshot.Targets is { } snapshotTargets
+            && snapshotTargets.All(item => WwmStateStore.GetLayoutForPath(item.RelativePath) == binding.Layout);
+    }
+
+    private static bool JournalMatchesBinding(WwmTransactionJournal journal, WwmInstallationBinding binding)
+    {
+        var paths = journal.PreviousTargets.Select(item => item.RelativePath)
+            .Concat(journal.TargetManifest.Select(item => item.RelativePath)).Concat(journal.ExpectedAbsentTargets).ToArray();
+        if (journal.SchemaVersion == 1)
+            return HasTrustedLegacyRoot(binding) && binding.Source == WwmInstallationSource.Steam && binding.Layout == WwmInstallationLayout.Package
+                && paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 2
+                && paths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .SequenceEqual(binding.ManagedRelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        var uniquePaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (!WwmStateStore.IsValidBinding(journal.InstallationRoot, journal.TargetLayout, journal.InstallationFingerprint, uniquePaths)) return false;
+        return TrySameFullPath(journal.InstallationRoot, binding.GameRoot)
+            && string.Equals(journal.TargetLayout, binding.Layout.ToString(), StringComparison.Ordinal)
+            && string.Equals(journal.InstallationFingerprint, binding.Fingerprint, StringComparison.OrdinalIgnoreCase)
+            && paths.All(path => WwmStateStore.GetLayoutForPath(path) == binding.Layout);
+    }
+
+    private static bool HasTrustedLegacyRoot(WwmInstallationBinding binding)
+        => binding.Source == WwmInstallationSource.Steam
+            && binding.Layout == WwmInstallationLayout.Package
+            && !string.IsNullOrWhiteSpace(binding.LegacyPersistedRootEvidence)
+            && TrySameFullPath(binding.LegacyPersistedRootEvidence, binding.GameRoot);
+
+    private static bool TrySameFullPath(string? left, string right)
+    {
+        try
+        {
+            return !string.IsNullOrWhiteSpace(left)
+                && string.Equals(WwmGameDefinition.NormalizeInstallationRoot(left),
+                    WwmGameDefinition.NormalizeInstallationRoot(right), StringComparison.OrdinalIgnoreCase);
+        }
+            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException or System.Security.SecurityException)
+        {
+            return false;
+        }
+    }
+
+    private static string GetSnapshotStaleMessage(WwmInstallationBinding binding)
+        => binding.Source == WwmInstallationSource.Steam
+            ? "Steam build відрізняється від build початкового знімка. Відновлення заблоковано, щоб не замінити файли новішої гри."
+            : "Інсталяція Where Winds Meet змінилася після створення початкового знімка. Відновлення заблоковано, щоб не застосувати застарілі файли.";
+
+    private static bool IsSnapshotStale(WwmPreHubSnapshot snapshot, WwmInstallationBinding binding)
+        => binding.Source == WwmInstallationSource.Steam
+            ? string.IsNullOrWhiteSpace(snapshot.GameBuildId) || string.IsNullOrWhiteSpace(binding.BuildId)
+                || !string.Equals(snapshot.GameBuildId, binding.BuildId, StringComparison.Ordinal)
+            : !string.Equals(snapshot.InstallationFingerprint, binding.Fingerprint, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsStateStale(WwmInstallationState state, WwmInstallationBinding binding)
+        => binding.Source != WwmInstallationSource.Steam
+            && state.SchemaVersion == 2
+            && !string.Equals(state.InstallationFingerprint, binding.Fingerprint, StringComparison.OrdinalIgnoreCase);
+
+    private sealed class BindingScope(AsyncLocal<WwmInstallationBinding?> context, WwmInstallationBinding? prior) : IDisposable
+    {
+        public void Dispose() => context.Value = prior;
     }
 
     private async Task<bool> MatchesExpectedOutcomeAsync(string root, WwmTransactionJournal journal, CancellationToken token)
@@ -1095,7 +1464,7 @@ public sealed class WwmInstallService
         var expectedByPath = journal.TargetManifest.ToDictionary(item => item.RelativePath, StringComparer.OrdinalIgnoreCase);
         var expectedAbsent = journal.ExpectedAbsentTargets.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var relative in _definition.ManagedRelativePaths)
+        foreach (var relative in CurrentTargets)
         {
             token.ThrowIfCancellationRequested();
             if (!previousByPath.TryGetValue(relative, out var previous))
@@ -1186,16 +1555,22 @@ public sealed class WwmInstallService
         if (File.Exists(_store.StateFile)) File.Replace(temp, _store.StateFile, null); else File.Move(temp, _store.StateFile);
     }
 
-    private static string SafeGameTarget(string root, string relative)
+    private string SafeGameTarget(string root, string relative)
     {
         if (!WwmStateStore.IsAllowedPath(relative)) throw new InvalidDataException("WWM target is not allowlisted.");
-        var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        RejectReparsePoint(Path.GetFullPath(root));
-        var target = Path.GetFullPath(Path.Combine(root, relative));
+        if (WwmStateStore.GetLayoutForPath(relative) != CurrentBinding.Layout)
+            throw new InvalidDataException("WWM target does not belong to the selected installation layout.");
+        var normalizedRoot = WwmGameDefinition.NormalizeInstallationRoot(root);
+        var fullRoot = Path.EndsInDirectorySeparator(normalizedRoot) ? normalizedRoot : normalizedRoot + Path.DirectorySeparatorChar;
+        RejectReparsePoint(normalizedRoot);
+        var target = Path.GetFullPath(Path.Combine(normalizedRoot, relative));
         if (!target.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("WWM target escaped game root.");
-        var locale = Path.GetFullPath(Path.Combine(root, WwmGameDefinition.Default.LocaleRelativePath)).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var localeRelative = CurrentBinding.Layout == WwmInstallationLayout.Package
+            ? WwmGameDefinition.Default.LocaleRelativePath : WwmGameDefinition.Default.LocalDataPatchLocaleRelativePath;
+        var normalizedLocale = WwmGameDefinition.NormalizeInstallationRoot(Path.Combine(normalizedRoot, localeRelative));
+        var locale = Path.EndsInDirectorySeparator(normalizedLocale) ? normalizedLocale : normalizedLocale + Path.DirectorySeparatorChar;
         if (!target.StartsWith(locale, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("WWM target escaped locale directory.");
-        var current = Path.GetFullPath(root);
+        var current = normalizedRoot;
         foreach (var segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
         {
             current = Path.Combine(current, segment);

@@ -112,7 +112,10 @@ public partial class MainForm
     private void StartWwmFileMonitorIfEligible()
     {
         if (_wwmSession == null || _gameRoot == null || _closing || IsDisposed || Disposing) return;
-        var directory = Path.Combine(_gameRoot, WwmGameDefinition.Default.LocaleRelativePath);
+        var layout = _wwmSession.CurrentDetection.TargetLayout;
+        if (layout is not (WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch)) return;
+        var directory = Path.Combine(_gameRoot, layout == WwmInstallationLayout.Package
+            ? WwmGameDefinition.Default.LocaleRelativePath : WwmGameDefinition.Default.LocalDataPatchLocaleRelativePath);
         if (!Directory.Exists(directory)) return;
         if (_wwmFileWatcher == null)
         {
@@ -137,7 +140,9 @@ public partial class MainForm
 
     private void QueueWwmFileRefresh(string path)
     {
-        var expected = WwmGameDefinition.Default.ManagedRelativePaths
+        var layout = _wwmSession?.CurrentDetection.TargetLayout ?? WwmInstallationLayout.Unknown;
+        if (layout is not (WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch)) return;
+        var expected = WwmGameDefinition.Default.GetManagedRelativePaths(layout)
             .Select(relative => Path.GetFullPath(Path.Combine(_gameRoot ?? "", relative)));
         if (!expected.Contains(Path.GetFullPath(path), StringComparer.OrdinalIgnoreCase)
             || _closing || IsDisposed || !IsHandleCreated) return;
