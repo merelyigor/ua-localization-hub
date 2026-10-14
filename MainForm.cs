@@ -488,7 +488,7 @@ public partial class MainForm : Form
     internal int InitialClientHeightForTest => _initialClientHeight;
     internal int ModeSectionHeightForTest => modeGroupBox.Height;
     internal Func<CurrentRelease, bool>? GameTestConfirmationForTest { get; set; }
-    internal Func<bool>? WwmCompatibilityConfirmationForTest { get; set; }
+    internal Func<string, string, bool>? WwmCompatibilityConfirmationForTest { get; set; }
     internal Func<CancellationToken, Task<WwmMutationResult>>? WwmInstallResultForTest { get; set; }
     internal string? SelectedModeCardStateTextForTest => modesFlowPanel.Controls
         .OfType<LocalizationModeCard>()

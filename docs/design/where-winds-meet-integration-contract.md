@@ -177,12 +177,23 @@ The UI labels only manifest-proven installations as Steam and shows the build as
 
 Stage 11A is **REVIEWED / ACCEPTED**. Its detection-only mutation boundary was superseded by the separately authorized Stage 11B work below; no Stage 11A historical evidence is reinterpreted as mutation testing.
 
-## Stage 11B — multi-layout Windows mutation handoff
+## Stage 11B — multi-layout Windows mutation (reviewed / accepted)
 
-Stage 11B implementation is **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW**. Android remains out of scope. The target layouts are `Package/HD/oversea/locale/` and `LocalData/Patch/HD/oversea/locale/`, each managing the same two logical Winds4UA files. The validated package remains Package-relative and is staged/verified before mapping those logical entries to the selected target; ZIP paths are never blindly extracted into the game.
+Stage 11B implementation is **REVIEWED / ACCEPTED** (implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f`; exact-SHA CI run `38470073111` succeeded with 1,180/1,180 tests). Android remains out of scope. The target layouts are `Package/HD/oversea/locale/` and `LocalData/Patch/HD/oversea/locale/`, each managing the same two logical Winds4UA files. The validated package remains Package-relative and is staged/verified before mapping those logical entries to the selected target; ZIP paths are never blindly extracted into the game.
 
 Steam provenance requires the matching AppID `3564740` manifest and selects Package. Epic provenance requires a matching Epic Launcher `.item` manifest under `%ProgramData%/Epic/EpicGamesLauncher/Data/Manifests/`, WWM product identity and a validated install root; it selects Package. Official Launcher source is not automatically proven because no reliable launcher-native metadata source was available; manual roots remain `UnknownWindows`. UnknownWindows can mutate only when exactly one target layout exists. For an UnknownWindows root containing both layouts, target selection fails closed. No source is inferred from folder names or layout alone.
 
 The persisted Stage 11B installation binding records normalized root, selected layout, exact managed relative paths and a deterministic fingerprint of non-managed executable metadata; provenance is established by the current detector evidence, not persisted as an authorization shortcut. This fingerprint is an installation-integrity/staleness binding, not a semantic game version or localization compatibility claim. Steam build-ID safeguards remain in force. Existing v1.2.10 Steam Package state/snapshot/journal remains readable as the legacy schema and is never reinterpreted as LocalDataPatch; newly written state uses the bound schema. Snapshot, rollback, journal recovery, exact prior existence/bytes/hash/size and relevant attributes continue to apply to both targets.
 
-Automated mutation/recovery evidence is from isolated synthetic/temp roots for Steam Package, Epic Package, Official-like Standard/Lite LocalDataPatch, and UnknownWindows single/dual-layout cases. Real Steam files were read-only; real Epic/Official native E2E was not performed. This is **HIGH-RISK FILE MUTATION / PRE-COMMIT ARCHITECT REVIEW REQUIRED**. No commit or push was created; Stage 11B remains pending external review.
+Automated mutation/recovery evidence is from isolated synthetic/temp roots for Steam Package, Epic Package, Official-like Standard/Lite LocalDataPatch, and UnknownWindows single/dual-layout cases. Real Steam files were read-only; real Epic/Official native E2E was not performed. External Architect implementation review accepted Stage 11B with BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. The bounded compatibility UX follow-up below is separate from that accepted Stage 11B implementation and awaits its own exact-SHA CI and external review.
+
+## Current compatibility UX handoff — API-driven confirmation
+
+This Owner-authorized follow-up supersedes the earlier interim policy above that unconditionally requested confirmation because compatibility with a specific Steam build was not mapped. Before each WWM install/update, the Hub uses the fresh response returned by `GET https://winds4ua.com.ua/api/public/v1/releases/latest` for package resolution and confirmation policy; it does not use a previously displayed/cached feed for this decision.
+
+- `data.current.game_tested == true`: proceed without a compatibility confirmation.
+- `game_tested == false` or omitted/defaulted false on an otherwise valid installable current package: show neutral confirmation stating that Winds4UA API does not mark the release as tested with the current game version. Declining cancels before package download or game mutation. If the current release/package itself is absent or invalid, package resolution blocks before confirmation.
+- The Steam build ID remains informational and a snapshot-staleness safeguard. It does not itself cause a compatibility warning. `data.current.game_version` is not compared with Steam `buildid`; no authoritative mapping is defined.
+- Steam, Epic Games and UnknownWindows use this same API-driven policy. The confirmation does not claim a launcher-specific build mismatch.
+
+The historical Stage 9 observations and decisions remain as recorded; this section is the current implementation handoff for confirmation behavior.

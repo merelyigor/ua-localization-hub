@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NONE — WORK CYCLE COMPLETE / OWNER DECISION REQUIRED**
-Current phase: Stage 11B — REVIEWED / ACCEPTED; v1.2.10 — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED
-Next action: **OWNER DECISION REQUIRED**. Do not start another stage, release cycle, audit or refactoring without explicit authorization.
+Implementation authorization: **NONE beyond the completed bounded follow-up; no release publication authorized**
+Current phase: Stage 11B — REVIEWED / ACCEPTED; WWM API-driven compatibility UX follow-up — IMPLEMENTED / LOCALLY VALIDATED, pending exact-SHA CI and external Architect review
+Next action: **v1.2.11 RELEASE PREPARATION** as a separate task after review; not started. No Stage 11C.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -15,9 +15,9 @@ Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 ## Product targets
 
 - `Black Desert Online` — localization project `BDO UA Translate`, [bdo-ua.com.ua](https://bdo-ua.com.ua/), **INTEGRATED / AVAILABLE**.
-- `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **INTEGRATED / WINDOWS MULTI-LAYOUT MUTATION IMPLEMENTED; PENDING PRE-COMMIT REVIEW**.
+- `Where Winds Meet` — localization project `Winds4UA (W4U)`, [winds4ua.com.ua](https://winds4ua.com.ua/), **INTEGRATED / WINDOWS MULTI-LAYOUT MUTATION REVIEWED / ACCEPTED**.
 
-Where Winds Meet is registered as a second runtime game with Owner-approved stable ID `where-winds-meet`. Detection separates source provenance from target layout: matching Steam metadata proves Steam; a matching Epic `.item` manifest plus WWM product identity proves Epic; otherwise a valid root is `UnknownWindows`. Steam/Epic select Package; an UnknownWindows root is mutation-supported only when exactly one known target layout is present. Official Launcher provenance is not automatically claimed. Modes are dynamic and installable only when fresh API metadata marks the selected `slug + variant` available and supplies its matching package. Compatibility with a specific game build remains unconfirmed by API and requires neutral confirmation.
+Where Winds Meet is registered as a second runtime game with Owner-approved stable ID `where-winds-meet`. Detection separates source provenance from target layout: matching Steam metadata proves Steam; a matching Epic `.item` manifest plus WWM product identity proves Epic; otherwise a valid root is `UnknownWindows`. Steam/Epic select Package; an UnknownWindows root is mutation-supported only when exactly one known target layout is present. Official Launcher provenance is not automatically claimed. Modes are dynamic and installable only when fresh API metadata marks the selected `slug + variant` available and supplies its matching package. Before install/update, the fresh latest response controls compatibility confirmation: `data.current.game_tested == true` skips it; false/missing metadata requires a neutral confirmation. Steam build ID is observational/staleness metadata and does not itself cause a warning.
 
 ## Context
 
@@ -77,7 +77,11 @@ Autostart and local-data identity migration are out of scope and remain legacy-s
 
 ### Second-game onboarding gate
 
-Stage 10 implements the Owner-approved stable ID `where-winds-meet`, Steam-first detection, exact pre-Hub restore semantics, and neutral confirmation because compatibility is not confirmed by API. Official launcher remains deferred. Current API availability controls mode actions; unavailable or unresolvable modes are hidden. Exact-current installation shows `✓ Встановлено` without an Update action; a changed package for that same mode alone offers `Оновити`; another installable mode offers `Встановити`. The restore button is labeled `Відновити оригінал`, but restores the trusted initial pre-Hub baseline, not proven stock Steam bytes; invalid/missing baseline disables it. `english-items` and `english-terms` stay unavailable until matching current artifacts are provided. The historical v2.9 content observation is not a current blocker.
+Stage 10 implements the Owner-approved stable ID `where-winds-meet`, Steam-first detection, exact pre-Hub restore semantics, and the API-driven confirmation policy recorded below. Official launcher remains deferred. Current API availability controls mode actions; unavailable or unresolvable modes are hidden. Exact-current installation shows `✓ Встановлено` without an Update action; a changed package for that same mode alone offers `Оновити`; another installable mode offers `Встановити`. The restore button is labeled `Відновити оригінал`, but restores the trusted initial pre-Hub baseline, not proven stock Steam bytes; invalid/missing baseline disables it. `english-items` and `english-terms` stay unavailable until matching current artifacts are provided. The historical v2.9 content observation is not a current blocker.
+
+### WWM API-driven compatibility UX follow-up
+
+Owner-authorized bounded correction: install/update confirmation is based only on the same fresh latest API response used to resolve the package. For a valid installable current package, `data.current.game_tested == true` skips confirmation; `false` or an omitted field (DTO default false) prompts neutrally, and decline cancels before download/mutation. An absent/invalid current package is blocked earlier by package resolution. The Steam build ID is informational and a snapshot-staleness guard only; neither its presence nor `game_version` comparison triggers a compatibility warning. This applies equally to proven Steam, Epic and UnknownWindows roots. This is not a new roadmap stage and does not authorize release publication. Intended dependent next task is v1.2.11 release preparation.
 
 ## Roadmap
 
@@ -181,7 +185,7 @@ Package and LocalDataPatch each map the same two logical Winds4UA files. Proven 
 
 State, snapshot and journal bind to canonical installation root, selected layout, exact target paths and a deterministic non-managed executable metadata fingerprint; source provenance is established from live detector evidence, not persisted as authorization. The fingerprint is an installation integrity/staleness guard, not a game compatibility version. Steam build-staleness protection remains. Existing v1.2.10 Steam Package state remains readable as legacy schema and is not reinterpreted as LocalDataPatch. Synthetic/temp tests cover Steam Package, Epic Package, Official-like Standard/Lite LocalDataPatch, UnknownWindows single/dual layouts, rollback and recovery. No real Steam, Epic or Official Launcher game files were mutated during Stage 11B development; non-Steam mutation validation used synthetic/temp roots.
 
-External Architect implementation review: **APPROVED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. No new implementation or release work is authorized; next action is **OWNER DECISION REQUIRED**. Keep this roadmap ACTIVE pending Owner direction.
+External Architect implementation review: **APPROVED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. The separate bounded API-driven compatibility UX follow-up is recorded above and is not a new roadmap stage.
 
 ## Acceptance criteria
 
@@ -202,11 +206,11 @@ External Architect implementation review: **APPROVED**, BLOCKER `0`, IMPORTANT `
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2E, Stage 11A and Stage 11B are **REVIEWED / ACCEPTED**. Stage 11B exact implementation SHA is `0ee0d819eb6f3f6fb404eb283095944d955f2a7f`; exact-SHA CI run `38470073111` passed with 1180/1180 tests. The separate executable identity migration was reviewed and released in v1.2.10. Stage 8B remains **OPTIONAL / NOT STARTED**. No real Steam/Epic/Official game files were mutated during Stage 11B development; non-Steam mutation validation used synthetic/temp fixtures. Next action is **OWNER DECISION REQUIRED**; no release or further stage is authorized.
+Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2E, Stage 11A and Stage 11B are **REVIEWED / ACCEPTED**. Stage 11B exact implementation SHA is `0ee0d819eb6f3f6fb404eb283095944d955f2a7f`; exact-SHA CI run `38470073111` passed with 1180/1180 tests. The separate executable identity migration was reviewed and released in v1.2.10. Stage 8B remains **OPTIONAL / NOT STARTED**. No real Steam/Epic/Official game files were mutated during Stage 11B development; non-Steam mutation validation used synthetic/temp fixtures. The current API-driven compatibility UX follow-up is locally validated and requires exact-SHA CI plus external review; after review, the intended next task is v1.2.11 release preparation, not publication.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 11B exact implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f` passed CI run `38470073111`; 1180 tests passed. Real game files were not mutated during Stage 11B development; synthetic/temp fixtures provided non-Steam mutation coverage. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles. No implementation is currently authorized; **OWNER DECISION REQUIRED**.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 11B exact implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f` passed CI run `38470073111`; 1180 tests passed. Real game files were not mutated during Stage 11B development; synthetic/temp fixtures provided non-Steam mutation coverage. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles. The bounded API-driven compatibility UX follow-up is locally validated and requires exact-SHA CI/external review; then v1.2.11 release preparation is the intended separate task. No Stage 11C or publication is authorized.
 
 ### v1.2.10 release cycle
 

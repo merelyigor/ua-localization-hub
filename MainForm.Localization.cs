@@ -219,7 +219,7 @@ public partial class MainForm
                 WwmInstallationSource.Steam when string.IsNullOrWhiteSpace(result.BuildId)
                     => "Знайдено Steam-гру · build невідомий",
                 WwmInstallationSource.Steam
-                    => $"Знайдено Steam-гру · build {result.BuildId} (сумісність не підтверджено)",
+                    => $"Знайдено Steam-гру · build {result.BuildId}",
                 WwmInstallationSource.EpicGames => "Знайдено Epic Games-версію",
                 WwmInstallationSource.OfficialLauncher => "Знайдено гру з офіційного лаунчера",
                 _ => "Знайдено Where Winds Meet"
@@ -258,9 +258,13 @@ public partial class MainForm
                 BuildWwmModes();
                 return;
             }
-            if (!(WwmCompatibilityConfirmationForTest?.Invoke() ?? GameTestConfirmationDialog.ShowNeutralConfirmation(this,
-                    "Сумісність із поточною версією гри не підтверджена",
-                    "API не підтверджує сумісність цього перекладу з конкретною версією гри. Ви можете продовжити або повернутися назад.")))
+            if (latest.Feed.Data?.Current?.GameTested != true
+                && !(WwmCompatibilityConfirmationForTest?.Invoke(
+                    "Сумісність релізу з поточною версією гри не підтверджена",
+                    "Winds4UA API не позначає цей реліз як протестований із поточною версією гри. Ви можете продовжити встановлення або повернутися назад.")
+                    ?? GameTestConfirmationDialog.ShowNeutralConfirmation(this,
+                        "Сумісність релізу з поточною версією гри не підтверджена",
+                        "Winds4UA API не позначає цей реліз як протестований із поточною версією гри. Ви можете продовжити встановлення або повернутися назад.")))
             {
                 SetOperationState(OperationState.Cancelled);
                 SetMessage("Встановлення скасовано.");
