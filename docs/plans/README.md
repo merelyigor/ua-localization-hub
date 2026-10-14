@@ -3,7 +3,7 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 11B — REVIEWED / ACCEPTED; bounded WWM API-driven compatibility UX follow-up — IMPLEMENTED / LOCALLY VALIDATED, pending exact-SHA CI and external Architect review
+**Current phase:** Stage 11B — REVIEWED / ACCEPTED; bounded WWM API-driven compatibility UX follow-up — IMPLEMENTED / VALIDATED; exact-SHA CI PASS, pending external Architect review
 **Next:** v1.2.11 RELEASE PREPARATION (separate task; not started)
 **Implementation authorization:** NONE beyond the completed bounded follow-up; no release publication authorized
 
@@ -11,11 +11,11 @@
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11B — REVIEWED / ACCEPTED; compatibility UX follow-up pending CI/review | v1.2.11 RELEASE PREPARATION (not started) |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11B — REVIEWED / ACCEPTED; compatibility UX follow-up CI PASS, Architect review pending | v1.2.11 RELEASE PREPARATION (not started) |
 
 Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A and Stage 11B are REVIEWED / ACCEPTED. Stage 11B implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f` passed exact-SHA CI run `38470073111` (1180/1180 tests). v1.2.10 is RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. Stage 8B remains OPTIONAL / NOT STARTED. The current bounded follow-up makes WWM confirmation depend on fresh `game_tested`; exact-SHA CI and external Architect review are required gates. The dependent intended next task is v1.2.11 release preparation, not publication. Do not invent Stage 11C or start unrelated work.
+Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A and Stage 11B are REVIEWED / ACCEPTED. Stage 11B implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f` passed exact-SHA CI run `38470073111` (1180/1180 tests). v1.2.10 is RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. Stage 8B remains OPTIONAL / NOT STARTED. The current bounded follow-up makes WWM confirmation depend on fresh `game_tested`; its commit `e9834bf2cd80fee3137b2349ac547752e7af20e3` passed exact-SHA CI run `38531685694` (1188/1188 tests), and awaits external Architect review. The dependent intended next task is v1.2.11 release preparation, not publication. Do not invent Stage 11C or start unrelated work.
 
 ## Backlog
 
