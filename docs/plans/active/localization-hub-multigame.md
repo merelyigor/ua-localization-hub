@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NONE beyond the completed bounded follow-up; no release publication authorized**
-Current phase: Stage 11B — REVIEWED / ACCEPTED; WWM API-driven compatibility UX follow-up — IMPLEMENTED / VALIDATED, exact-SHA CI PASS, pending external Architect review
-Next action: **v1.2.11 RELEASE PREPARATION** as a separate task after review; not started. No Stage 11C.
+Implementation authorization: **v1.2.11 Release Candidate preparation only; final publication remains an Owner gate**
+Current phase: Stage 11B — REVIEWED / ACCEPTED; WWM API-driven compatibility UX — REVIEWED / ACCEPTED
+Next action: **v1.2.11 RELEASE PREPARATION**. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -81,7 +81,7 @@ Stage 10 implements the Owner-approved stable ID `where-winds-meet`, Steam-first
 
 ### WWM API-driven compatibility UX follow-up
 
-Owner-authorized bounded correction: install/update confirmation is based only on the same fresh latest API response used to resolve the package. For a valid installable current package, `data.current.game_tested == true` skips confirmation; `false` or an omitted field (DTO default false) prompts neutrally, and decline cancels before download/mutation. An absent/invalid current package is blocked earlier by package resolution. The Steam build ID is informational and a snapshot-staleness guard only; neither its presence nor `game_version` comparison triggers a compatibility warning. This applies equally to proven Steam, Epic and UnknownWindows roots. This is not a new roadmap stage and does not authorize release publication. Intended dependent next task is v1.2.11 release preparation.
+Owner-authorized bounded correction: install/update confirmation is based only on the same fresh latest API response used to resolve the package. For a valid installable current package, `data.current.game_tested == true` skips confirmation; `false` or an omitted field (DTO default false) prompts neutrally, and decline cancels before download/mutation. An absent/invalid current package is blocked earlier by package resolution. The Steam build ID is informational and a snapshot-staleness guard only; neither its presence nor `game_version` comparison triggers a compatibility warning. This applies equally to proven Steam, Epic and UnknownWindows roots. External Architect review: **REVIEWED / ACCEPTED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; implementation SHA `e9834bf2cd80fee3137b2349ac547752e7af20e3`; exact-SHA CI run `38531685694` — SUCCESS, 1188/1188. This is not a new roadmap stage. Dependent work is v1.2.11 Release Candidate preparation; final release publication remains an Owner gate.
 
 ## Roadmap
 
