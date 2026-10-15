@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 11B and WWM API-driven compatibility UX — REVIEWED / ACCEPTED; v1.2.11 RC #39 correction — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
-**Next:** External review of the corrective patch; RC #39 Owner smoke FAILED and is not accepted
-**Implementation authorization:** No further implementation, new RC, tag or publication until corrective review/Owner direction
+**Current phase:** Stage 11B, WWM API-driven compatibility UX, and v1.2.11 RC #39 migration correction — REVIEWED / ACCEPTED
+**Next:** Prepare a new v1.2.11 Release Candidate from accepted `main`; RC #39 remains FAILED / NOT ACCEPTED / DO NOT REUSE
+**Implementation authorization:** Release Candidate preparation only; no final tag, GitHub Release, asset publication, or NEXT reset
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11B and WWM API-driven compatibility UX — REVIEWED / ACCEPTED; v1.2.11 RC correction pending review | External review of corrective patch; RC #39 failed Owner smoke |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11B, WWM API-driven compatibility UX, and RC #39 correction — REVIEWED / ACCEPTED | New v1.2.11 Release Candidate; never reuse RC #39 |
 
 Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A, Stage 11B, and the WWM API-driven compatibility UX are REVIEWED / ACCEPTED. v1.2.11 RC #39 / run `38552297818` failed Owner smoke because an authentic v1.2.10 auto-detected Steam legacy cycle lacked persisted GamePath evidence; RC #39 is not accepted. This bounded high-risk persistence/recovery correction is implemented/validated pending external pre-commit Architect review; no new RC, tag or publication is authorized. Stage 8B remains OPTIONAL / NOT STARTED. Do not invent Stage 11C or start unrelated work.
+Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A, Stage 11B, WWM API-driven compatibility UX, and the v1.2.11 RC #39 legacy migration correction are REVIEWED / ACCEPTED. Correction commit `b5dae12272cafdc638949a4ab1ef7230e4c59fd0` has exact-SHA CI #259 / run `38817070315` SUCCESS (1200/1200 tests); external verdict was 0 blockers / 0 important / 0 optional. RC #39 / run `38552297818` remains FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. The next action is a new v1.2.11 Release Candidate. Stage 8B remains OPTIONAL / NOT STARTED. Do not invent Stage 11C or start unrelated work.
 
 ## Backlog
 

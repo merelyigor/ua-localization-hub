@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **bounded v1.2.11 RC legacy migration correction only; no commit/push until external pre-commit review, and no new RC/publication authorization**
-Current phase: Stage 11B and WWM API-driven compatibility UX — REVIEWED / ACCEPTED; v1.2.11 RC #39 correction — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
-Next action: **external pre-commit review of the corrective patch**; RC #39 Owner smoke FAILED and is not accepted. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
+Implementation authorization: **new v1.2.11 Release Candidate preparation only; no final tag or publication**
+Current phase: Stage 11B, WWM API-driven compatibility UX, and v1.2.11 RC #39 migration correction — REVIEWED / ACCEPTED
+Next action: **prepare a new v1.2.11 Release Candidate from accepted main**; RC #39 Owner smoke FAILED / NOT ACCEPTED / DO NOT REUSE. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -206,13 +206,13 @@ External Architect implementation review: **APPROVED**, BLOCKER `0`, IMPORTANT `
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2E, Stage 11A, Stage 11B and WWM API-driven compatibility UX are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. v1.2.11 RC #39 / run `38552297818` failed Owner smoke because legacy v1.2.10 auto-detected Steam state lacked persisted root evidence; it is not accepted. The current corrective patch includes same-session manual-root trust only after config save, plus exact active-journal-to-snapshot-cycle ownership checks; it is **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW** (full Release suite 1198/1198). No new RC, tag or publication is authorized. Real game files remain untouched; commit/push: none.
+Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2E, Stage 11A, Stage 11B, WWM API-driven compatibility UX, and the v1.2.11 RC #39 migration correction are **REVIEWED / ACCEPTED**. The correction is commit `b5dae12272cafdc638949a4ab1ef7230e4c59fd0` (parent `abbad8adb0c63777b187c6d26df379111163856c`), exact-SHA CI #259 / run `38817070315` SUCCESS, 1200/1200 tests; external verdict BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39 / run `38552297818` remains **FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE**. Next action: prepare a new v1.2.11 Release Candidate; no final tag or publication is authorized. No Stage 11C.
 
 ## Current progress
 
-v1.2.11 RC correction v4 preserves the exact pre-migration committed outcome of an active legacy journal (state SHA plus target manifests): committed installs remain cleanup-only after binding, and committed restores retain absent-state semantics. Synthetic committed install/restore regressions pass; Release build has 0 warnings/errors, focused WWM + MainForm tests pass 163/163, and the full Release suite passes 1200/1200. The patch remains pending pre-commit external Architect review; RC #39 remains unaccepted. No real game files, commit, push, tag or release were changed.
+v1.2.11 RC correction v4 preserves the exact pre-migration committed outcome of an active legacy journal (state SHA plus target manifests): committed installs remain cleanup-only after binding, and committed restores retain absent-state semantics. Synthetic committed install/restore regressions pass; Release build has 0 warnings/errors, focused WWM + MainForm tests pass 163/163, and the full Release suite passes 1200/1200. External Architect accepted the correction with zero findings. RC #39 remains unaccepted; next action is a new RC from accepted main.
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B and the compatibility UX are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. v1.2.11 RC #39 failed Owner smoke on migration of an authentic legacy v1.2.10 automatic Steam cycle without saved GamePath; RC #39 is not accepted. The bounded correction is pending pre-commit Architect review. No subsequent RC/publication is authorized here; no Stage 11C is created.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and the v1.2.11 legacy migration correction are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39 failed Owner smoke and must not be reused. The next authorized action is a new v1.2.11 Release Candidate; final publication remains an Owner gate. No Stage 11C.
 
 ### v1.2.10 release cycle
 
