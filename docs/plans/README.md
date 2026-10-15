@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Stage 11B — REVIEWED / ACCEPTED; WWM API-driven compatibility UX — REVIEWED / ACCEPTED
-**Next:** v1.2.11 RELEASE PREPARATION
-**Implementation authorization:** Release Candidate preparation only; final publication remains an Owner gate
+**Current phase:** Stage 11B and WWM API-driven compatibility UX — REVIEWED / ACCEPTED; v1.2.11 RC #39 correction — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
+**Next:** External review of the corrective patch; RC #39 Owner smoke FAILED and is not accepted
+**Implementation authorization:** No further implementation, new RC, tag or publication until corrective review/Owner direction
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11B and WWM API-driven compatibility UX — REVIEWED / ACCEPTED | v1.2.11 RELEASE PREPARATION |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | Stage 11B and WWM API-driven compatibility UX — REVIEWED / ACCEPTED; v1.2.11 RC correction pending review | External review of corrective patch; RC #39 failed Owner smoke |
 
 Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A, Stage 11B, and the WWM API-driven compatibility UX are REVIEWED / ACCEPTED. Compatibility UX implementation SHA `e9834bf2cd80fee3137b2349ac547752e7af20e3` passed exact-SHA CI run `38531685694` (1188/1188 tests), with external review BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0. Stage 11B implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f` passed exact-SHA CI run `38470073111` (1180/1180 tests). v1.2.10 is RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. Stage 8B remains OPTIONAL / NOT STARTED. Current dependent work is v1.2.11 release preparation; final publication remains an Owner gate. Do not invent Stage 11C or start unrelated work.
+Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A, Stage 11B, and the WWM API-driven compatibility UX are REVIEWED / ACCEPTED. v1.2.11 RC #39 / run `38552297818` failed Owner smoke because an authentic v1.2.10 auto-detected Steam legacy cycle lacked persisted GamePath evidence; RC #39 is not accepted. This bounded high-risk persistence/recovery correction is implemented/validated pending external pre-commit Architect review; no new RC, tag or publication is authorized. Stage 8B remains OPTIONAL / NOT STARTED. Do not invent Stage 11C or start unrelated work.
 
 ## Backlog
 

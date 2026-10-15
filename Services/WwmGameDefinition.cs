@@ -135,6 +135,7 @@ public sealed record WwmInstallationBinding(
     string Fingerprint)
 {
     public string? LegacyPersistedRootEvidence { get; init; }
+    public bool IsUniqueAutomaticSteamDetection { get; init; }
     public string[] ManagedRelativePaths => WwmGameDefinition.Default.GetManagedRelativePaths(Layout);
 
     public static WwmInstallationBinding FromDetection(WwmDetectionResult detection)
@@ -144,7 +145,8 @@ public sealed record WwmInstallationBinding(
         return new WwmInstallationBinding(WwmGameDefinition.NormalizeInstallationRoot(detection.GameRoot), detection.Source, detection.TargetLayout,
             detection.BuildId, WwmGameDefinition.ComputeInstallationFingerprint(detection.GameRoot))
         {
-            LegacyPersistedRootEvidence = detection.PersistedGamePath
+            LegacyPersistedRootEvidence = detection.PersistedGamePath,
+            IsUniqueAutomaticSteamDetection = detection.IsUniqueAutomaticSteamDetection
         };
     }
 }

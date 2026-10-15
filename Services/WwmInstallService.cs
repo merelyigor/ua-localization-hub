@@ -30,6 +30,7 @@ public sealed class WwmInstallService
     private readonly WwmStateStore _store;
     private readonly ILogger _logger;
     private readonly WwmGameDefinition _definition;
+    private readonly ConfigStore? _configStore;
     private readonly AsyncLocal<WwmInstallationBinding?> _bindingContext = new();
     internal Action<int>? AfterTargetAppliedForTest { get; set; }
     internal Action? BeforeStateSaveForTest { get; set; }
@@ -38,13 +39,14 @@ public sealed class WwmInstallService
     internal Action<string, string>? BeforeTargetReplaceForTest { get; set; }
 
     public WwmInstallService(HttpClient httpClient, GamePersistencePaths persistencePaths, WwmStateStore store, ILogger logger,
-        WwmGameDefinition? definition = null)
+        WwmGameDefinition? definition = null, ConfigStore? configStore = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _persistencePaths = persistencePaths ?? throw new ArgumentNullException(nameof(persistencePaths));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _definition = definition ?? WwmGameDefinition.Default;
+        _configStore = configStore;
     }
 
     public async Task<WwmMutationResult> RecoverAsync(string gameRoot, string? currentBuildId, CancellationToken token = default,
@@ -869,10 +871,24 @@ public sealed class WwmInstallService
         var hasLegacyState = state?.SchemaVersion == 1;
         var hasLegacySnapshot = snapshot?.SchemaVersion == 1;
         var hasLegacyJournal = journal?.SchemaVersion == 1;
-        if (!hasLegacyState && !hasLegacySnapshot && !hasLegacyJournal) return null;
+        var automaticBindingCanResume = CurrentBinding.IsUniqueAutomaticSteamDetection
+            && CurrentBinding.Source == WwmInstallationSource.Steam
+            && CurrentBinding.Layout == WwmInstallationLayout.Package
+            && string.IsNullOrWhiteSpace(CurrentBinding.LegacyPersistedRootEvidence);
+        if (!hasLegacyState && !hasLegacySnapshot && !hasLegacyJournal)
+        {
+            if (automaticBindingCanResume && state?.SchemaVersion == 2 && snapshot?.SchemaVersion == 2
+                && StateMatchesBinding(state, CurrentBinding) && ValidateSnapshotFiles(snapshot)
+                && (journal == null || JournalMatchesBinding(journal, CurrentBinding))
+                && string.Equals(state.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal)
+                && await MatchesManifestAsync(CurrentBinding.GameRoot, state.Targets, token).ConfigureAwait(false))
+                return await PersistAutomaticallyDetectedRootAsync(token).ConfigureAwait(false);
+            return null;
+        }
+        var automaticLegacyBinding = automaticBindingCanResume;
         if (!HasTrustedLegacyRoot(CurrentBinding))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
-                "Старі дані WWM не прив’язані до підтвердженого збереженого шляху цієї Steam-інсталяції; автоматичну операцію заблоковано.");
+                "Знайдено дані попередньої версії Хабу, але їх не вдалося автоматично прив’язати до цієї інсталяції. Оберіть папку цієї гри вручну, щоб підтвердити шлях.");
 
         if (state != null && state.SchemaVersion == 2 && !StateMatchesBinding(state, CurrentBinding))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан WWM належить іншій інсталяції; legacy binding заблоковано.");
@@ -882,11 +898,60 @@ public sealed class WwmInstallService
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Знімок WWM має некоректну прив’язку або файли; legacy binding заблоковано.");
         if (hasLegacySnapshot && (snapshot == null || !ValidateSnapshotFiles(snapshot)))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Legacy-знімок WWM не пройшов перевірку цілі, циклу або резервних файлів.");
+        if (hasLegacyJournal && (journal == null || snapshot == null
+            || (state != null && !string.Equals(state.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal))
+            || !LegacyJournalProvesSnapshotCycle(snapshot, journal)))
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                "Неможливо довести, що legacy-журнал WWM належить активному циклу початкового знімка.");
         if (hasLegacyState && (snapshot == null || state == null
             || !string.Equals(state.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal)))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Legacy-стан WWM не має знімка того самого довіреного циклу.");
         if (hasLegacySnapshot && !SnapshotCycleIsProven(snapshot!, state, journal))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Неможливо довести належність legacy-знімка активному циклу WWM.");
+
+        Config? configToPersist = null;
+        if (automaticLegacyBinding)
+        {
+            if (!await CanAutoBindLegacyMetadataAsync(state, snapshot, journal, hasLegacyState,
+                    hasLegacyJournal, token).ConfigureAwait(false))
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Знайдено дані попередньої версії Хабу, але їх не вдалося автоматично прив’язати до цієї інсталяції. Оберіть папку цієї гри вручну, щоб підтвердити шлях.");
+
+            if (_configStore == null)
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Не вдалося зберегти підтверджений шлях Where Winds Meet; виберіть папку гри вручну.");
+            var configLoad = _configStore.Load();
+            if (configLoad.Status == FileLoadStatus.Invalid)
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Налаштування шляху Where Winds Meet неможливо безпечно оновити; виберіть папку гри вручну.");
+            var savedConfig = configLoad.Value ?? new Config();
+            if (!string.IsNullOrWhiteSpace(savedConfig.GamePath)
+                && !TrySameFullPath(savedConfig.GamePath, CurrentBinding.GameRoot))
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Збережений шлях Where Winds Meet відрізняється від автоматично знайденої гри; підтвердіть шлях вручну.");
+            if (string.IsNullOrWhiteSpace(savedConfig.GamePath))
+            {
+                configToPersist = savedConfig;
+                configToPersist.GamePath = WwmGameDefinition.NormalizeInstallationRoot(CurrentBinding.GameRoot);
+            }
+        }
+
+        var legacyJournalWasCommitted = false;
+        if (hasLegacyJournal)
+        {
+            try
+            {
+                // Capture the full state + target outcome before any schema migration changes state bytes.
+                legacyJournalWasCommitted = await MatchesExpectedOutcomeAsync(
+                    CurrentBinding.GameRoot, journal!, token).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
+            {
+                if (ex is OperationCanceledException) throw;
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Не вдалося безпечно перевірити завершений результат legacy-транзакції WWM.");
+            }
+        }
 
         if (hasLegacyState)
         {
@@ -894,6 +959,25 @@ public sealed class WwmInstallService
             state.InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(CurrentBinding.GameRoot);
             state.TargetLayout = WwmInstallationLayout.Package.ToString();
             state.InstallationFingerprint = CurrentBinding.Fingerprint;
+            if (legacyJournalWasCommitted && journal!.ExpectedStateSha256 != "absent")
+            {
+                // Persist the new expected hash in the bound journal before replacing the state file.
+                // If the process stops between these writes, the already-validated committed
+                // targets/state transition remains recognizable on the next recovery attempt.
+                journal.SchemaVersion = 2;
+                journal.InstallationRoot = WwmGameDefinition.NormalizeInstallationRoot(CurrentBinding.GameRoot);
+                journal.TargetLayout = WwmInstallationLayout.Package.ToString();
+                journal.InstallationFingerprint = CurrentBinding.Fingerprint;
+                journal.ExpectedStateSha256 = Convert.ToHexString(SHA256.HashData(
+                    Encoding.UTF8.GetBytes(WwmStateStore.SerializeState(state)))).ToLowerInvariant();
+                try { await _store.WriteJournalAsync(journal, token).ConfigureAwait(false); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
+                {
+                    if (ex is OperationCanceledException) throw;
+                    return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                        "Не вдалося безпечно зафіксувати committed-результат legacy-транзакції WWM.");
+                }
+            }
             try { await _store.SaveAsync(state, token).ConfigureAwait(false); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
             {
@@ -930,9 +1014,119 @@ public sealed class WwmInstallService
             }
         }
 
-        _logger.Info("Bound verified legacy WWM Package metadata to the exact persisted Steam installation root.");
+        if (configToPersist != null)
+        {
+            try { await _configStore!.SaveAsync(configToPersist, token).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
+            {
+                if (ex is OperationCanceledException) throw;
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Метадані WWM прив’язано, але шлях гри не вдалося зберегти. Повторіть запуск або виберіть папку вручну.");
+            }
+        }
+
+        _logger.Info(automaticLegacyBinding
+            ? "Bound verified legacy WWM Package metadata to the unique Steam AppID installation after installed-target and snapshot verification."
+            : "Bound verified legacy WWM Package metadata to the exact persisted Steam installation root.");
         return null;
     }
+
+    private async Task<bool> CanAutoBindLegacyMetadataAsync(WwmInstallationState? state, WwmPreHubSnapshot? snapshot,
+        WwmTransactionJournal? journal, bool hasLegacyState, bool hasLegacyJournal,
+        CancellationToken token)
+    {
+        var binding = CurrentBinding;
+        if (!binding.IsUniqueAutomaticSteamDetection || binding.Source != WwmInstallationSource.Steam
+            || binding.Layout != WwmInstallationLayout.Package || snapshot == null
+            || snapshot.SchemaVersion is not (1 or 2)
+            || !BuildEvidenceMatches(state?.GameBuildId, binding.BuildId)
+            || !BuildEvidenceMatches(snapshot.GameBuildId, binding.BuildId)
+            || !BuildEvidenceMatches(journal?.GameBuildId, binding.BuildId)
+            || !BuildEvidenceMatches(state?.GameBuildId, snapshot.GameBuildId)
+            || !BuildEvidenceMatches(journal?.GameBuildId, snapshot.GameBuildId))
+            return false;
+
+        if (hasLegacyState || state?.SchemaVersion == 2)
+        {
+            if (state == null || snapshot == null
+                || !string.Equals(state.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal)
+                || (state.SchemaVersion == 2 && !StateMatchesBinding(state, binding))
+                || !state.Targets.Select(item => item.RelativePath).OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .SequenceEqual(binding.ManagedRelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase)
+                || (!hasLegacyJournal && !await MatchesManifestAsync(binding.GameRoot, state.Targets, token).ConfigureAwait(false)))
+                return false;
+        }
+
+        if (hasLegacyJournal)
+        {
+            if (journal == null || !BuildEvidenceMatches(journal.GameBuildId, binding.BuildId)
+                || !LegacyJournalProvesSnapshotCycle(snapshot, journal)
+                || !await MatchesJournalKnownTargetStatesAsync(binding.GameRoot, journal, token).ConfigureAwait(false))
+                return false;
+        }
+
+        // The active journal must link itself to this snapshot cycle. State linkage,
+        // orphan operation directories and transaction-known bytes do not prove journal ownership.
+        if (hasLegacyJournal)
+            return journal != null && LegacyJournalProvesSnapshotCycle(snapshot, journal);
+
+        // Without an active legacy journal, only a directly linked committed state can own the snapshot.
+        return (hasLegacyState || state?.SchemaVersion == 2) && state != null
+            && string.Equals(state.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal);
+    }
+
+    private static bool LegacyJournalProvesSnapshotCycle(WwmPreHubSnapshot snapshot, WwmTransactionJournal journal)
+    {
+        if (journal.CreatedPreHubSnapshot
+            && string.Equals(journal.OperationId, snapshot.CycleOperationId, StringComparison.Ordinal))
+            return true;
+
+        if (!journal.PreviousStateExisted || string.IsNullOrWhiteSpace(journal.PreviousStateBase64))
+            return false;
+
+        try
+        {
+            var bytes = Convert.FromBase64String(journal.PreviousStateBase64);
+            var json = new System.Text.UTF8Encoding(false, true).GetString(bytes);
+            return WwmStateStore.TryDeserializeState(json, out var previousState, out _)
+                && string.Equals(previousState!.PreHubSnapshotCycleId, snapshot.CycleOperationId, StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is FormatException or System.Text.DecoderFallbackException)
+        {
+            return false;
+        }
+    }
+
+    private async Task<WwmMutationResult?> PersistAutomaticallyDetectedRootAsync(CancellationToken token)
+    {
+        if (_configStore == null)
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                "Не вдалося зберегти підтверджений шлях Where Winds Meet; виберіть папку гри вручну.");
+        var loaded = _configStore.Load();
+        if (loaded.Status == FileLoadStatus.Invalid)
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                "Налаштування шляху Where Winds Meet неможливо безпечно оновити; виберіть папку гри вручну.");
+        var config = loaded.Value ?? new Config();
+        var normalizedRoot = WwmGameDefinition.NormalizeInstallationRoot(CurrentBinding.GameRoot);
+        if (!string.IsNullOrWhiteSpace(config.GamePath))
+            return TrySameFullPath(config.GamePath, normalizedRoot)
+                ? null
+                : WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                    "Збережений шлях Where Winds Meet відрізняється від автоматично знайденої гри; підтвердіть шлях вручну.");
+        config.GamePath = normalizedRoot;
+        try { await _configStore.SaveAsync(config, token).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
+        {
+            if (ex is OperationCanceledException) throw;
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                "Метадані WWM прив’язано, але шлях гри не вдалося зберегти. Повторіть запуск або виберіть папку вручну.");
+        }
+        return null;
+    }
+
+    private static bool BuildEvidenceMatches(string? recordedBuild, string? currentBuild)
+        => recordedBuild == null || currentBuild == null
+            || string.Equals(recordedBuild, currentBuild, StringComparison.Ordinal);
 
     private bool SnapshotCycleIsProven(WwmPreHubSnapshot snapshot, WwmInstallationState? state, WwmTransactionJournal? journal)
     {
@@ -1328,8 +1522,9 @@ public sealed class WwmInstallService
     private static bool HasTrustedLegacyRoot(WwmInstallationBinding binding)
         => binding.Source == WwmInstallationSource.Steam
             && binding.Layout == WwmInstallationLayout.Package
-            && !string.IsNullOrWhiteSpace(binding.LegacyPersistedRootEvidence)
-            && TrySameFullPath(binding.LegacyPersistedRootEvidence, binding.GameRoot);
+            && ((!string.IsNullOrWhiteSpace(binding.LegacyPersistedRootEvidence)
+                    && TrySameFullPath(binding.LegacyPersistedRootEvidence, binding.GameRoot))
+                || binding.IsUniqueAutomaticSteamDetection);
 
     private static bool TrySameFullPath(string? left, string right)
     {

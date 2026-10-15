@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **v1.2.11 Release Candidate preparation only; final publication remains an Owner gate**
-Current phase: Stage 11B — REVIEWED / ACCEPTED; WWM API-driven compatibility UX — REVIEWED / ACCEPTED
-Next action: **v1.2.11 RELEASE PREPARATION**. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
+Implementation authorization: **bounded v1.2.11 RC legacy migration correction only; no commit/push until external pre-commit review, and no new RC/publication authorization**
+Current phase: Stage 11B and WWM API-driven compatibility UX — REVIEWED / ACCEPTED; v1.2.11 RC #39 correction — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
+Next action: **external pre-commit review of the corrective patch**; RC #39 Owner smoke FAILED and is not accepted. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -206,11 +206,13 @@ External Architect implementation review: **APPROVED**, BLOCKER `0`, IMPORTANT `
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2E, Stage 11A and Stage 11B are **REVIEWED / ACCEPTED**. Stage 11B exact implementation SHA is `0ee0d819eb6f3f6fb404eb283095944d955f2a7f`; exact-SHA CI run `38470073111` passed with 1180/1180 tests. The separate executable identity migration was reviewed and released in v1.2.10. Stage 8B remains **OPTIONAL / NOT STARTED**. No real Steam/Epic/Official game files were mutated during Stage 11B development; non-Steam mutation validation used synthetic/temp fixtures. Compatibility UX follow-up commit `e9834bf2cd80fee3137b2349ac547752e7af20e3` passed exact-SHA CI run `38531685694` (1188/1188); external review remains pending. After review, the intended next task is v1.2.11 release preparation, not publication.
+Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2E, Stage 11A, Stage 11B and WWM API-driven compatibility UX are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. v1.2.11 RC #39 / run `38552297818` failed Owner smoke because legacy v1.2.10 auto-detected Steam state lacked persisted root evidence; it is not accepted. The current corrective patch includes same-session manual-root trust only after config save, plus exact active-journal-to-snapshot-cycle ownership checks; it is **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW** (full Release suite 1198/1198). No new RC, tag or publication is authorized. Real game files remain untouched; commit/push: none.
 
 ## Current progress
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. Stage 11B exact implementation SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f` passed CI run `38470073111`; 1180 tests passed. Real game files were not mutated during Stage 11B development; synthetic/temp fixtures provided non-Steam mutation coverage. Stage 10 and its real-game E2E are included in stable v1.2.10. The public executable identity migration was released with canonical and legacy-compatible bundles. The bounded API-driven compatibility UX follow-up commit `e9834bf2cd80fee3137b2349ac547752e7af20e3` passed exact-SHA CI run `38531685694` (1188/1188); external review remains pending. After review, v1.2.11 release preparation is the intended separate task. No Stage 11C or publication is authorized.
+v1.2.11 RC correction v4 preserves the exact pre-migration committed outcome of an active legacy journal (state SHA plus target manifests): committed installs remain cleanup-only after binding, and committed restores retain absent-state semantics. Synthetic committed install/restore regressions pass; Release build has 0 warnings/errors, focused WWM + MainForm tests pass 163/163, and the full Release suite passes 1200/1200. The patch remains pending pre-commit external Architect review; RC #39 remains unaccepted. No real game files, commit, push, tag or release were changed.
+
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B and the compatibility UX are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. v1.2.11 RC #39 failed Owner smoke on migration of an authentic legacy v1.2.10 automatic Steam cycle without saved GamePath; RC #39 is not accepted. The bounded correction is pending pre-commit Architect review. No subsequent RC/publication is authorized here; no Stage 11C is created.
 
 ### v1.2.10 release cycle
 

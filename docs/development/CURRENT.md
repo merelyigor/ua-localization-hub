@@ -1,6 +1,6 @@
 # Current Engineering Context
 
-Оновлено: 2026-10-14
+Оновлено: 2026-10-16
 
 ## Project Purpose / Status
 
@@ -8,11 +8,15 @@
 
 Стабільний реліз: **v1.2.10**. Публічний Release ID `409061408` опубліковано як stable із annotated tag `v1.2.10` на exact RC source SHA `fc7026311f3d79562e7558311441d829283930c9`. Canonical і legacy ZIP assets незалежно перевірені за точними RC hashes. Offline/degraded release-feed implementation завершено та прийнято зовнішнім Architect.
 
-Поточний стан: **Stage 11B — REVIEWED / ACCEPTED**; WWM API-driven compatibility UX — **REVIEWED / ACCEPTED** (BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`). Compatibility UX implementation SHA `e9834bf2cd80fee3137b2349ac547752e7af20e3`; exact-SHA CI run `38531685694` — SUCCESS, **1188 passed / 0 failed / 0 skipped**. Перед кожною WWM install/update confirmation policy використовує свіже `data.current.game_tested`: для валідного installable package `true` пропускає dialog, `false` або відсутнє поле вимагає нейтрального підтвердження; відсутній/некоректний current package блокується раніше на package resolution. Steam build ID не створює compatibility warning і не порівнюється з `game_version`. Реальні game files не змінювалися. Stage 11B реалізацію прийнято на SHA `0ee0d819eb6f3f6fb404eb283095944d955f2a7f`; exact-SHA CI run `38470073111` — SUCCESS, **1180 passed / 0 failed / 0 skipped**. Поточна залежна робота: **v1.2.11 RELEASE PREPARATION**; публікація очікує окремого Owner smoke та рішення. Стабільний реліз залишається **v1.2.10**.
+Поточний стан: **v1.2.11 RC CORRECTION — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW**. Owner smoke для RC #39 / run `38552297818` **FAILED**: штатна v1.2.10 Steam-інсталяція з автоматичним detection не мала persisted `Config.GamePath`, тому legacy schema-v1 state/snapshot не пройшли старе root-evidence правило. Обмежене migration-доказування вимагає точного root, валідного циклу state/snapshot і збігу обох installed targets; активний schema-v1 journal додатково мусить сам довести належність snapshot cycle через `CreatedPreHubSnapshot + OperationId` або валідний `PreviousStateBase64`. Невідповідність cycle між state та snapshot, неоднозначність і відмінність bytes/build залишаються fail-closed. Точний ручний вибір Steam root після успішного збереження шляху дає persisted-root evidence у поточній сесії; помилка збереження або non-Steam вибір її не авторизують. Міграція змінює лише Hub metadata/config, не game files. Перевірка: 1198/1198 тестів; RC #39 не прийнято, новий RC не створювався.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame`: Stages 8D.1, 8D.2, 9, 10, 11A and 11B are **REVIEWED / ACCEPTED**; Stage 8B remains **OPTIONAL / NOT STARTED**. The bounded compatibility UX follow-up is **REVIEWED / ACCEPTED** (BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`); implementation SHA `e9834bf2cd80fee3137b2349ac547752e7af20e3`, exact-SHA CI run `38531685694` SUCCESS (1188/1188). Current dependent work is **v1.2.11 RELEASE PREPARATION**; final publication remains after Owner smoke/decision. No Stage 11C is created. v1.2.10 and its executable identity migration remain **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**.
+Stage 11B та WWM API-driven compatibility UX залишаються **REVIEWED / ACCEPTED** (відповідно CI `38470073111`, 1180/1180, та CI `38531685694`, 1188/1188). Fresh Winds4UA `data.current.game_tested` визначає confirmation; Steam build є лише informational/staleness metadata. Стабільний реліз залишається **v1.2.10**. Поточна дія — external pre-commit review цього RC correction; commit/push не виконувалися.
+
+Owner-approved PRIMARY roadmap `localization-hub-multigame`: Stages 8D.1, 8D.2, 9, 10, 11A and 11B and the WWM API-driven compatibility UX are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. v1.2.11 RC #39 Owner smoke failed on legacy v1.2.10 auto-detected Steam root migration; the bounded correction is pending pre-commit external Architect review. No RC acceptance, final tag or publication is authorized by this correction task. No Stage 11C is created. v1.2.10 remains **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**.
 
 ## Architecture Summary
+
+v1.2.11 RC correction v4 supersedes earlier validation counts: legacy migration now preserves the exact pre-migration committed journal outcome (state SHA plus target manifests), rebinding an already committed install journal before state replacement and retaining absent-state semantics for committed restore. Build: 0 warnings / 0 errors; focused WWM + MainForm tests: 163/163; full Release suite: 1200/1200. RC #39 remains unaccepted; correction awaits external pre-commit Architect review. No commit/push or real game-file mutation.
 
 - `Program.cs` є manual composition root без DI-контейнера.
 - `MainForm` координує UI та application services; довгі HTTP/file operations виконуються async.

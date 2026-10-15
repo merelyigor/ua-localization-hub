@@ -79,19 +79,21 @@ public sealed class WwmSteamDetector
                 _logger.Debug($"WWM Epic manifest installation path was rejected: {ex.Message}");
             }
         }
-        return candidates.Count switch
-        {
-            0 => WwmDetectionResult.NotFound,
-            1 => candidates.Values.Single(),
-            _ => WwmDetectionResult.Ambiguous
-        };
+        if (candidates.Count == 0) return WwmDetectionResult.NotFound;
+        if (candidates.Count > 1) return WwmDetectionResult.Ambiguous;
+        var unique = candidates.Values.Single();
+        return unique with { IsUniqueAutomaticSteamDetection = unique.Source == WwmInstallationSource.Steam };
     }
 
     public WwmDetectionResult Detect(string? savedRoot)
     {
         if (TryDescribeRoot(savedRoot, "saved-config", out var savedDetection))
             return savedDetection with { PersistedGamePath = WwmGameDefinition.NormalizeInstallationRoot(savedRoot!) };
-        return Detect();
+        var automatic = Detect();
+        // A stale configured path must not be silently replaced with automatic legacy ownership evidence.
+        return string.IsNullOrWhiteSpace(savedRoot)
+            ? automatic
+            : automatic with { IsUniqueAutomaticSteamDetection = false };
     }
 
     public WwmDetectionResult DescribeRoot(string gameRoot, string evidenceMarker)
@@ -472,6 +474,7 @@ public sealed record WwmDetectionResult(
 {
     public bool IsAmbiguous { get; init; }
     public string? PersistedGamePath { get; init; }
+    public bool IsUniqueAutomaticSteamDetection { get; init; }
     public static WwmDetectionResult NotFound { get; } = new(null, WwmInstallationSource.UnknownWindows,
         WwmInstallationLayout.Unknown, null, null);
     public static WwmDetectionResult Ambiguous { get; } = new(null, WwmInstallationSource.UnknownWindows,

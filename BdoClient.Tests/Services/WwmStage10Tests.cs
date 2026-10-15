@@ -504,6 +504,401 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
+    public async Task V1210AutoDetectedSteamLegacyCycle_MigratesAndPersistsRootWithoutChangingGameFiles()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var detection = fixture.Session.DetectGame();
+        Assert.Equal(WwmInstallationSource.Steam, detection.Source);
+        Assert.True(detection.IsUniqueAutomaticSteamDetection);
+        Assert.Null(detection.PersistedGamePath);
+        var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(detection);
+        var state = await fixture.Session.InstallService.ResolveStateAsync(detection, fixture.Package);
+        var restoreAvailable = await fixture.Session.InstallService.CheckRestoreAvailabilityAsync(detection);
+
+        Assert.True(recovery.IsSuccess, recovery.Message);
+        Assert.Equal(WwmInstalledStateKind.Current, state.State);
+        Assert.True(restoreAvailable.IsAvailable, restoreAvailable.Message);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), fixture.Session.ConfigStore.Load().Value!.GamePath);
+        var migrated = fixture.Session.StateStore.Load(out var stateError);
+        Assert.Null(stateError);
+        Assert.Equal(2, migrated!.SchemaVersion);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), migrated.InstallationRoot);
+        Assert.Equal(nameof(WwmInstallationLayout.Package), migrated.TargetLayout);
+        Assert.Equal(fixture.Targets, migrated.Targets.Select(item => item.RelativePath).ToArray());
+        var snapshotJson = await File.ReadAllTextAsync(Path.Combine(fixture.Session.StateStore.SnapshotDirectory, "snapshot.json"));
+        var snapshot = System.Text.Json.JsonDocument.Parse(snapshotJson).RootElement;
+        Assert.Equal(2, snapshot.GetProperty("schema_version").GetInt32());
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), snapshot.GetProperty("installation_root").GetString());
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210LegacyCycle_AmbiguousAutoDetectionThenManualSteamSelectionMigratesInSameSession()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync(addSecondSteamRoot: true);
+        var automatic = fixture.Session.DetectGame();
+        Assert.True(automatic.IsAmbiguous);
+        Assert.Null(automatic.GameRoot);
+        Assert.Null(automatic.PersistedGamePath);
+        var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        var manual = await fixture.Session.ResolveAndSaveManualPathAsync(fixture.Root);
+
+        Assert.Equal(ManualResolveStatus.Found, manual.Status);
+        Assert.NotNull(manual.Detection);
+        Assert.Equal(WwmInstallationSource.Steam, manual.Detection!.Source);
+        Assert.False(manual.Detection.IsUniqueAutomaticSteamDetection);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), manual.Detection.PersistedGamePath);
+        Assert.Same(manual.Detection, fixture.Session.CurrentDetection);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), fixture.Session.ConfigStore.Load().Value!.GamePath);
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(fixture.Session.CurrentDetection);
+        var state = await fixture.Session.InstallService.ResolveStateAsync(fixture.Session.CurrentDetection, fixture.Package);
+        var restoreAvailability = await fixture.Session.InstallService.CheckRestoreAvailabilityAsync(fixture.Session.CurrentDetection);
+        var migrated = fixture.Session.StateStore.Load(out var stateError);
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        Assert.True(recovery.IsSuccess, recovery.Message);
+        Assert.Equal(WwmInstalledStateKind.Current, state.State);
+        Assert.True(restoreAvailability.IsAvailable, restoreAvailability.Message);
+        Assert.Null(stateError);
+        Assert.Equal(2, migrated!.SchemaVersion);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), migrated.InstallationRoot);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfter[index]);
+    }
+
+    [Fact]
+    public async Task ManualSteamSelection_ConfigSaveFailureDoesNotGrantPersistedRootEvidence()
+    {
+        using var temp = new TestTemp();
+        var (steamRoot, gameRoot) = CreateSteamRoot(temp.Root, "steam-manual-save-failure", "game");
+        using var client = new HttpClient(new StubHandler());
+        using var session = WwmGameSession.CreateForTests(new AppPaths(Path.Combine(temp.Root, "app")), Logger, client,
+            steamRoots: new[] { steamRoot });
+        var priorDetection = session.CurrentDetection;
+        Directory.CreateDirectory(session.PersistencePaths.ConfigFile);
+
+        await Assert.ThrowsAnyAsync<IOException>(() => session.ResolveAndSaveManualPathAsync(gameRoot));
+
+        Assert.Same(priorDetection, session.CurrentDetection);
+        Assert.Null(session.CurrentDetection.PersistedGamePath);
+        Assert.Null(session.ConfigStore.Load().Value?.GamePath);
+    }
+
+    [Fact]
+    public async Task ManualUnknownWindowsSelection_DoesNotBindLegacySteamCycle()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var unknownRoot = Path.Combine(Path.GetDirectoryName(fixture.Root)!, "user-selected-unknown-root");
+        CreateGameMarkers(unknownRoot);
+        var originalBytes = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        var manual = await fixture.Session.ResolveAndSaveManualPathAsync(unknownRoot);
+        Assert.Equal(ManualResolveStatus.Found, manual.Status);
+        Assert.Equal(WwmInstallationSource.UnknownWindows, manual.Detection!.Source);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(unknownRoot), manual.Detection.PersistedGamePath);
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(fixture.Session.CurrentDetection);
+        var state = fixture.Session.StateStore.Load(out _);
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        Assert.False(recovery.IsSuccess);
+        Assert.Equal(WwmMutationError.RecoveryRequired, recovery.Error);
+        Assert.Equal(1, state!.SchemaVersion);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(unknownRoot), fixture.Session.ConfigStore.Load().Value!.GamePath);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(originalBytes[index], filesAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210AutoDetectedSteamLegacyCycle_WithChangedTarget_FailsClosedWithoutBindingOrMutation()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var detection = fixture.Session.DetectGame();
+        var changed = new byte[] { 201, 202, 203 };
+        await File.WriteAllBytesAsync(Path.Combine(fixture.Root, fixture.Targets[0]), changed);
+        var unchangedSecond = await File.ReadAllBytesAsync(Path.Combine(fixture.Root, fixture.Targets[1]));
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(detection);
+        var state = fixture.Session.StateStore.Load(out _);
+        var snapshotJson = await File.ReadAllTextAsync(Path.Combine(fixture.Session.StateStore.SnapshotDirectory, "snapshot.json"));
+
+        Assert.False(recovery.IsSuccess);
+        Assert.Equal(WwmMutationError.RecoveryRequired, recovery.Error);
+        Assert.Null(fixture.Session.ConfigStore.Load().Value?.GamePath);
+        Assert.Equal(1, state!.SchemaVersion);
+        Assert.Equal(1, System.Text.Json.JsonDocument.Parse(snapshotJson).RootElement.GetProperty("schema_version").GetInt32());
+        Assert.Equal(changed, await File.ReadAllBytesAsync(Path.Combine(fixture.Root, fixture.Targets[0])));
+        Assert.Equal(unchangedSecond, await File.ReadAllBytesAsync(Path.Combine(fixture.Root, fixture.Targets[1])));
+    }
+
+    [Theory]
+    [InlineData("build")]
+    [InlineData("cycle")]
+    public async Task V1210AutoDetectedSteamLegacyCycle_WithConflictingEvidence_FailsClosed(string defect)
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var detection = fixture.Session.DetectGame();
+        var legacy = fixture.Session.StateStore.Load(out _)!;
+        if (defect == "build") legacy.GameBuildId = "different-build";
+        else legacy.PreHubSnapshotCycleId = Guid.NewGuid().ToString("N");
+        await fixture.Session.StateStore.SaveAsync(legacy);
+        var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(detection);
+
+        Assert.False(recovery.IsSuccess);
+        Assert.Equal(WwmMutationError.RecoveryRequired, recovery.Error);
+        Assert.Null(fixture.Session.ConfigStore.Load().Value?.GamePath);
+        Assert.Equal(1, fixture.Session.StateStore.Load(out _)!.SchemaVersion);
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210AutoDetectedLegacyCycle_WithMultipleSteamRoots_RemainsAmbiguousAndUnbound()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync(addSecondSteamRoot: true);
+
+        var detection = fixture.Session.DetectGame();
+
+        Assert.True(detection.IsAmbiguous);
+        Assert.Null(detection.GameRoot);
+        Assert.False(detection.IsMutationSupported);
+        Assert.Null(fixture.Session.ConfigStore.Load().Value?.GamePath);
+        Assert.Equal(1, fixture.Session.StateStore.Load(out _)!.SchemaVersion);
+    }
+
+    [Fact]
+    public async Task V1210AutoDetectedLegacyJournal_BindsOnlyAfterKnownTargetAndCycleValidation()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var detection = fixture.Session.DetectGame();
+        var store = fixture.Session.StateStore;
+        var stateBytes = await File.ReadAllBytesAsync(store.StateFile);
+        var operationId = Guid.NewGuid().ToString("N");
+        var operationDirectory = Path.Combine(store.TransactionDirectory, operationId);
+        Directory.CreateDirectory(operationDirectory);
+        var previousTargets = new List<WwmPreviousTarget>();
+        var expectedTargets = new List<WwmTargetManifestEntry>();
+        for (var index = 0; index < fixture.Targets.Length; index++)
+        {
+            var bytes = fixture.Installed[index];
+            await File.WriteAllBytesAsync(Path.Combine(operationDirectory, index + ".bin"), bytes);
+            previousTargets.Add(new WwmPreviousTarget
+            {
+                RelativePath = fixture.Targets[index], Existed = true, SizeBytes = bytes.Length,
+                Sha256 = Hash(bytes), BackupFile = index + ".bin"
+            });
+            var future = new byte[] { (byte)(150 + index), (byte)(160 + index) };
+            expectedTargets.Add(new WwmTargetManifestEntry
+            {
+                RelativePath = fixture.Targets[index], SizeBytes = future.Length, Sha256 = Hash(future)
+            });
+        }
+        await store.WriteJournalAsync(new WwmTransactionJournal
+        {
+            SchemaVersion = 1, OperationId = operationId, Operation = "install", PreviousTargets = previousTargets,
+            TargetManifest = expectedTargets, ExpectedAbsentTargets = new(), ExpectedStateSha256 = Hash(new byte[] { 99 }),
+            PreviousStateExisted = true, PreviousStateBase64 = Convert.ToBase64String(stateBytes), GameBuildId = detection.BuildId
+        });
+
+        var recovered = await fixture.Session.InstallService.RecoverAsync(detection);
+
+        Assert.True(recovered.IsSuccess, recovered.Message);
+        Assert.Null(store.LoadJournal(out _));
+        Assert.Equal(2, store.Load(out _)!.SchemaVersion);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), fixture.Session.ConfigStore.Load().Value!.GamePath);
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(fixture.Installed[index], filesAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210AutoDetectedCommittedLegacyInstallJournal_MigratesAndCleansWithoutRollback()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var detection = fixture.Session.DetectGame();
+        var store = fixture.Session.StateStore;
+        var committedStateBytes = await File.ReadAllBytesAsync(store.StateFile);
+        var committedState = store.Load(out _)!;
+        var activeCycleId = committedState.PreHubSnapshotCycleId;
+        var previousTargetsBytes = new[] { new byte[] { 51, 52, 53 }, new byte[] { 61, 62, 63 } };
+        var previousState = System.Text.Json.JsonSerializer.Deserialize<WwmInstallationState>(
+            System.Text.Json.JsonSerializer.Serialize(committedState))!;
+        previousState.ReleaseVersion = "v-old";
+        previousState.Targets = previousTargetsBytes.Select((bytes, index) => new WwmTargetManifestEntry
+        {
+            RelativePath = fixture.Targets[index], SizeBytes = bytes.Length, Sha256 = Hash(bytes)
+        }).ToList();
+
+        var operationId = Guid.NewGuid().ToString("N");
+        var operationDirectory = Path.Combine(store.TransactionDirectory, operationId);
+        Directory.CreateDirectory(operationDirectory);
+        var previousTargets = new List<WwmPreviousTarget>();
+        for (var index = 0; index < fixture.Targets.Length; index++)
+        {
+            await File.WriteAllBytesAsync(Path.Combine(operationDirectory, index + ".bin"), previousTargetsBytes[index]);
+            previousTargets.Add(new WwmPreviousTarget
+            {
+                RelativePath = fixture.Targets[index], Existed = true, SizeBytes = previousTargetsBytes[index].Length,
+                Sha256 = Hash(previousTargetsBytes[index]), BackupFile = index + ".bin"
+            });
+        }
+        await store.WriteJournalAsync(new WwmTransactionJournal
+        {
+            SchemaVersion = 1, OperationId = operationId, Operation = "install",
+            PreviousTargets = previousTargets,
+            TargetManifest = fixture.Installed.Select((bytes, index) => new WwmTargetManifestEntry
+            {
+                RelativePath = fixture.Targets[index], SizeBytes = bytes.Length, Sha256 = Hash(bytes)
+            }).ToList(),
+            ExpectedAbsentTargets = new(), ExpectedStateSha256 = Hash(committedStateBytes),
+            PreviousStateExisted = true,
+            PreviousStateBase64 = Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(previousState)),
+            GameBuildId = detection.BuildId
+        });
+
+        var recovered = await fixture.Session.InstallService.RecoverAsync(detection);
+
+        Assert.True(recovered.IsSuccess, recovered.Message);
+        Assert.Null(store.LoadJournal(out _));
+        Assert.False(Directory.Exists(operationDirectory));
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), fixture.Session.ConfigStore.Load().Value!.GamePath);
+        var migratedState = store.Load(out var stateError);
+        Assert.Null(stateError);
+        Assert.Equal(2, migratedState!.SchemaVersion);
+        Assert.Equal(committedState.ReleaseVersion, migratedState.ReleaseVersion);
+        Assert.Equal(activeCycleId, migratedState.PreHubSnapshotCycleId);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), migratedState.InstallationRoot);
+        var snapshot = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(store.SnapshotDirectory, "snapshot.json"))).RootElement;
+        Assert.Equal(2, snapshot.GetProperty("schema_version").GetInt32());
+        Assert.Equal(activeCycleId, snapshot.GetProperty("cycle_operation_id").GetString());
+        var targetsAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(fixture.Installed[index], targetsAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210AutoDetectedCommittedLegacyRestoreJournal_KeepsAbsentStateAndRetiresSnapshot()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var detection = fixture.Session.DetectGame();
+        var store = fixture.Session.StateStore;
+        var previousState = store.Load(out _)!;
+        var previousStateBytes = await File.ReadAllBytesAsync(store.StateFile);
+        var restoredTargets = new[]
+        {
+            await File.ReadAllBytesAsync(Path.Combine(store.SnapshotDirectory, "0.bin")),
+            await File.ReadAllBytesAsync(Path.Combine(store.SnapshotDirectory, "1.bin"))
+        };
+        var cycleId = previousState.PreHubSnapshotCycleId;
+        var operationId = Guid.NewGuid().ToString("N");
+        var operationDirectory = Path.Combine(store.TransactionDirectory, operationId);
+        Directory.CreateDirectory(operationDirectory);
+        var previousTargets = new List<WwmPreviousTarget>();
+        for (var index = 0; index < fixture.Targets.Length; index++)
+        {
+            var bytes = fixture.Installed[index];
+            await File.WriteAllBytesAsync(Path.Combine(operationDirectory, index + ".bin"), bytes);
+            previousTargets.Add(new WwmPreviousTarget
+            {
+                RelativePath = fixture.Targets[index], Existed = true, SizeBytes = bytes.Length,
+                Sha256 = Hash(bytes), BackupFile = index + ".bin"
+            });
+            await File.WriteAllBytesAsync(Path.Combine(fixture.Root, fixture.Targets[index]), restoredTargets[index]);
+        }
+        await store.ClearAsync();
+        await store.WriteJournalAsync(new WwmTransactionJournal
+        {
+            SchemaVersion = 1, OperationId = operationId, Operation = "restore", PreviousTargets = previousTargets,
+            TargetManifest = restoredTargets.Select((bytes, index) => new WwmTargetManifestEntry
+            {
+                RelativePath = fixture.Targets[index], SizeBytes = bytes.Length, Sha256 = Hash(bytes)
+            }).ToList(),
+            ExpectedAbsentTargets = new(), ExpectedStateSha256 = "absent", PreviousStateExisted = true,
+            PreviousStateBase64 = Convert.ToBase64String(previousStateBytes), GameBuildId = detection.BuildId
+        });
+
+        var recovered = await fixture.Session.InstallService.RecoverAsync(detection);
+
+        Assert.True(recovered.IsSuccess, recovered.Message);
+        Assert.Null(store.LoadJournal(out _));
+        Assert.False(File.Exists(store.StateFile));
+        Assert.False(Directory.Exists(store.SnapshotDirectory));
+        Assert.False(Directory.Exists(operationDirectory));
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), fixture.Session.ConfigStore.Load().Value!.GamePath);
+        Assert.Equal(cycleId, previousState.PreHubSnapshotCycleId);
+        var targetsAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(restoredTargets[index], targetsAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210AutoDetectedLegacyJournal_WithUnlinkedPreviousStateAndOrphanCycleDirectory_FailsClosed()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        var detection = fixture.Session.DetectGame();
+        var store = fixture.Session.StateStore;
+        var currentState = store.Load(out _)!;
+        var activeCycleId = currentState.PreHubSnapshotCycleId;
+        var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        // This directory is generic snapshot-cycle evidence, not proof that this journal owns that cycle.
+        Directory.CreateDirectory(Path.Combine(store.TransactionDirectory, activeCycleId));
+        var unrelatedPreviousState = currentState;
+        unrelatedPreviousState.PreHubSnapshotCycleId = Guid.NewGuid().ToString("N");
+        var previousStateBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(unrelatedPreviousState);
+        var operationId = Guid.NewGuid().ToString("N");
+        var operationDirectory = Path.Combine(store.TransactionDirectory, operationId);
+        Directory.CreateDirectory(operationDirectory);
+        var previousTargets = new List<WwmPreviousTarget>();
+        var expectedTargets = new List<WwmTargetManifestEntry>();
+        for (var index = 0; index < fixture.Targets.Length; index++)
+        {
+            var bytes = fixture.Installed[index];
+            await File.WriteAllBytesAsync(Path.Combine(operationDirectory, index + ".bin"), bytes);
+            previousTargets.Add(new WwmPreviousTarget
+            {
+                RelativePath = fixture.Targets[index], Existed = true, SizeBytes = bytes.Length,
+                Sha256 = Hash(bytes), BackupFile = index + ".bin"
+            });
+            var future = new byte[] { (byte)(180 + index), (byte)(190 + index) };
+            expectedTargets.Add(new WwmTargetManifestEntry
+            {
+                RelativePath = fixture.Targets[index], SizeBytes = future.Length, Sha256 = Hash(future)
+            });
+        }
+        await store.WriteJournalAsync(new WwmTransactionJournal
+        {
+            SchemaVersion = 1, OperationId = operationId, Operation = "install", PreviousTargets = previousTargets,
+            TargetManifest = expectedTargets, ExpectedAbsentTargets = new(), ExpectedStateSha256 = new string('a', 64),
+            PreviousStateExisted = true, PreviousStateBase64 = Convert.ToBase64String(previousStateBytes), GameBuildId = detection.BuildId
+        });
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(detection);
+
+        var stillLegacyState = store.Load(out _);
+        var stillLegacyJournal = store.LoadJournal(out _);
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        Assert.False(recovery.IsSuccess);
+        Assert.Equal(WwmMutationError.RecoveryRequired, recovery.Error);
+        Assert.Null(fixture.Session.ConfigStore.Load().Value?.GamePath);
+        Assert.Equal(1, stillLegacyState!.SchemaVersion);
+        Assert.Equal(activeCycleId, stillLegacyState.PreHubSnapshotCycleId);
+        Assert.Equal(1, stillLegacyJournal!.SchemaVersion);
+        Assert.Equal(operationId, stillLegacyJournal.OperationId);
+        for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfter[index]);
+    }
+
+    [Fact]
     public async Task LegacyV1StateAndSnapshot_AreNotAppliedToAnotherSteamRootWithSameBuild()
     {
         using var temp = new TestTemp();
@@ -546,7 +941,7 @@ public sealed class WwmStage10Tests
         var install = await service.InstallAsync(otherDetection, CreatePackageMetadata(CreatePackage()));
 
         Assert.False(availability.IsAvailable);
-        Assert.Contains("збереженого шляху", availability.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("вручну", availability.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(WwmMutationError.RecoveryRequired, restore.Error);
         Assert.Equal(WwmMutationError.RecoveryRequired, install.Error);
         Assert.Equal(1, store.Load(out _)!.SchemaVersion);
@@ -2088,6 +2483,66 @@ public sealed class WwmStage10Tests
         }
         await File.WriteAllTextAsync(Path.Combine(store.SnapshotDirectory, "snapshot.json"),
             System.Text.Json.JsonSerializer.Serialize(snapshot));
+    }
+
+    private static async Task<LegacyAutoFixture> CreateLegacyAutoDetectedFixtureAsync(bool addSecondSteamRoot = false)
+    {
+        var temp = new TestTemp();
+        try
+        {
+            var (steamRoot, root) = CreateSteamRoot(temp.Root, "steam-auto", "arbitrary-v1210-install");
+            var steamRoots = new List<string> { steamRoot };
+            if (addSecondSteamRoot)
+                steamRoots.Add(CreateSteamRoot(temp.Root, "steam-other", "other-valid-install").SteamRoot);
+            var paths = new AppPaths(Path.Combine(temp.Root, "app"));
+            var persistence = paths.GetGamePersistencePaths("where-winds-meet");
+            var client = new HttpClient(new StubHandler());
+            var session = WwmGameSession.CreateForTests(paths, Logger, client, ownsHttpClient: true, steamRoots: steamRoots);
+            var targets = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.Package);
+            var installed = new[] { new byte[] { 10, 11 }, new byte[] { 12, 13 } };
+            var previous = new[] { new byte[] { 90, 91 }, new byte[] { 92, 93, 94 } };
+            for (var index = 0; index < targets.Length; index++)
+                await File.WriteAllBytesAsync(Path.Combine(root, targets[index]), installed[index]);
+            persistence.EnsureDirectories();
+            var store = session.StateStore;
+            var cycleId = Guid.NewGuid().ToString("N");
+            var archive = CreatePackage();
+            var package = CreatePackageMetadata(archive);
+            await store.SaveAsync(new WwmInstallationState
+            {
+                SchemaVersion = 1, ModeSlug = package.Mode.Slug, ModeVariant = package.Mode.Variant,
+                ReleaseVersion = package.Version, ArchiveSizeBytes = package.SizeBytes, ArchiveSha256 = package.Sha256,
+                PreHubSnapshotCycleId = cycleId, GameBuildId = "25281753", InstalledAt = DateTimeOffset.UtcNow,
+                Targets = installed.Select((bytes, index) => new WwmTargetManifestEntry
+                    { RelativePath = targets[index], SizeBytes = bytes.Length, Sha256 = Hash(bytes) }).ToList()
+            });
+            await CreatePreHubSnapshotAsync(store, targets, previous, "25281753", cycleId);
+            return new LegacyAutoFixture(temp, session, root, targets, installed, package);
+        }
+        catch
+        {
+            temp.Dispose();
+            throw;
+        }
+    }
+
+    private static async Task<byte[][]> ReadTargetsAsync(string root, string[] targets)
+    {
+        var bytes = new byte[targets.Length][];
+        for (var index = 0; index < targets.Length; index++)
+            bytes[index] = await File.ReadAllBytesAsync(Path.Combine(root, targets[index]));
+        return bytes;
+    }
+
+    private sealed class LegacyAutoFixture(TestTemp temp, WwmGameSession session, string root, string[] targets,
+        byte[][] installed, WwmApiPackage package) : IDisposable
+    {
+        public WwmGameSession Session { get; } = session;
+        public string Root { get; } = root;
+        public string[] Targets { get; } = targets;
+        public byte[][] Installed { get; } = installed;
+        public WwmApiPackage Package { get; } = package;
+        public void Dispose() { Session.Dispose(); temp.Dispose(); }
     }
 
     private static void AssertNoGameTemps(string root)

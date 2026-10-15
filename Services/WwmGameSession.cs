@@ -31,7 +31,7 @@ public sealed class WwmGameSession : IGameSession
             manualDirectoryEnumerator ?? (path => Directory.EnumerateDirectories(path)),
             maximumManualDirectories, maximumManualDepth, epicManifestDirectory);
         ApiClient = new Winds4UaApiClient(httpClient, logger);
-        InstallService = new WwmInstallService(httpClient, PersistencePaths, StateStore, logger, definition);
+        InstallService = new WwmInstallService(httpClient, PersistencePaths, StateStore, logger, definition, ConfigStore);
         Poller = new WwmReleaseFeedPoller(ApiClient);
     }
 
@@ -82,8 +82,12 @@ public sealed class WwmGameSession : IGameSession
         if (!detection.IsFound) return new WwmManualDetectionResult(ManualResolveStatus.NotFound, null);
         var loaded = ConfigStore.Load();
         var config = loaded.Value ?? new Config();
-        config.GamePath = detection.GameRoot;
+        var persistedRoot = WwmGameDefinition.NormalizeInstallationRoot(detection.GameRoot!);
+        config.GamePath = persistedRoot;
         await ConfigStore.SaveAsync(config, searchToken).ConfigureAwait(false);
+        // A successful explicit selection plus persisted canonical path is trusted
+        // legacy-root evidence for this session. Never grant it before SaveAsync.
+        detection = detection with { PersistedGamePath = persistedRoot };
         CurrentDetection = detection;
         GameRoot = detection.GameRoot;
         SteamBuildId = detection.BuildId;
