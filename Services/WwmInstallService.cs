@@ -133,9 +133,6 @@ public sealed class WwmInstallService
         if (stateError != null) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM пошкоджено; встановлення заблоковано.");
         if (state != null && !StateMatchesBinding(state, binding)) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Збережений стан WWM належить іншій інсталяції або розкладці.");
         if (state != null && IsStateStale(state, binding)) return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
-        if (state != null && !await MatchesManifestAsync(gameRoot, state.Targets, cancellationToken).ConfigureAwait(false))
-            return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles, "Файли локалізації змінені поза Хабом. Операцію заблоковано.");
-
         WwmStagedPackage staged;
         try { staged = await new WwmPackageService(_httpClient, _persistencePaths, _logger).DownloadAndStageAsync(package, cancellationToken).ConfigureAwait(false); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return WwmMutationResult.Failure(WwmMutationError.Cancelled, "Операцію скасовано."); }
@@ -152,8 +149,6 @@ public sealed class WwmInstallService
                 return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM змінився або пошкоджений; встановлення заблоковано.");
             if (state != null && !StateMatchesBinding(state, binding)) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Збережений стан WWM належить іншій інсталяції або розкладці.");
             if (state != null && IsStateStale(state, binding)) return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
-            if (state != null && !await MatchesManifestAsync(gameRoot, state.Targets, cancellationToken).ConfigureAwait(false))
-                return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles, "Файли локалізації змінилися під час підготовки пакета. Операцію заблоковано.");
             var operationId = Guid.NewGuid().ToString("N");
             var snapshotResult = await EnsurePreHubSnapshotAsync(gameRoot, buildId, state != null, operationId, cancellationToken).ConfigureAwait(false);
             if (snapshotResult.Snapshot == null)
@@ -225,7 +220,7 @@ public sealed class WwmInstallService
         if (!StateMatchesBinding(state, binding)) return (false, "Збережений стан або знімок належить іншій інсталяції чи розкладці.");
         if (IsStateStale(state, binding)) return (false, GetSnapshotStaleMessage(binding));
         if (!await MatchesManifestAsync(gameRoot, state.Targets, token).ConfigureAwait(false))
-            return (false, "Керовані файли WWM змінені поза Хабом. Безпечне відновлення заблоковано.");
+            return (false, "Файли гри змінено поза Хабом. Початковий стан можна відновити лише якщо snapshot залишається актуальним.");
 
         var snapshot = LoadPreHubSnapshot(out var snapshotError);
         if (snapshot == null || !string.Equals(snapshot.CycleOperationId, state.PreHubSnapshotCycleId, StringComparison.Ordinal))
@@ -255,7 +250,12 @@ public sealed class WwmInstallService
         if (!StateMatchesBinding(state, binding)) return new(WwmInstalledStateKind.Modified, "Збережений стан належить іншій інсталяції або розкладці.");
         if (IsStateStale(state, binding)) return new(WwmInstalledStateKind.Modified, GetSnapshotStaleMessage(binding));
         if (!await MatchesManifestAsync(gameRoot, state.Targets, token).ConfigureAwait(false))
-            return new(WwmInstalledStateKind.Modified, "Файли локалізації змінено або втрачено.");
+        {
+            var snapshot = LoadPreHubSnapshot(out _);
+            if (snapshot == null || !string.Equals(snapshot.CycleOperationId, state.PreHubSnapshotCycleId, StringComparison.Ordinal))
+                return new(WwmInstalledStateKind.Modified, "Початковий знімок відсутній або не належить довіреному циклу WWM.");
+            return new(WwmInstalledStateKind.NeedsReinstall, "Файли гри змінено — потрібне повторне встановлення.");
+        }
         if (current != null && state.ModeSlug == current.Mode.Slug && state.ModeVariant == current.Mode.Variant
             && state.ReleaseVersion == current.Version && state.ArchiveSizeBytes == current.SizeBytes
             && state.ArchiveSha256 == current.Sha256)
@@ -279,16 +279,11 @@ public sealed class WwmInstallService
                 return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан змінився; новий знімок не вдалося безпечно прибрати.");
             return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM пошкоджено перед транзакцією.");
         }
-        if (currentState != null && !await MatchesManifestAsync(gameRoot, currentState.Targets, token).ConfigureAwait(false))
-        {
-            if (createdPreHubSnapshot && !RetireCreatedSnapshot(operationId))
-                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Файли змінилися; новий знімок не вдалося безпечно прибрати.");
-            return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles, "Керовані файли змінилися перед транзакцією.");
-        }
         var operationDir = Path.Combine(_store.TransactionDirectory, operationId);
         WwmTransactionJournal? journal = null;
         var mutationStarted = false;
         var targetMutationOccurred = false;
+        var capturedBaselineVerified = false;
         var phase = "prepare_transaction";
         string? activeTarget = null;
         try
@@ -351,14 +346,33 @@ public sealed class WwmInstallService
                 if (File.Exists(target))
                 {
                     phase = "replace_target";
-                    mutationStarted = true;
                     BeforeTargetReplaceForTest?.Invoke(item.RelativePath, target);
+                    if (!capturedBaselineVerified)
+                    {
+                        if (!await MatchesPreviousOutcomeAsync(gameRoot, journal, token).ConfigureAwait(false))
+                            throw new InvalidDataException("WWM targets changed after rollback baseline capture.");
+                        capturedBaselineVerified = true;
+                    }
+                    if (!await MatchesPreviousTargetAsync(gameRoot,
+                            previous.Single(record => record.RelativePath == item.RelativePath), token).ConfigureAwait(false))
+                        throw new InvalidDataException("WWM target changed after rollback baseline capture.");
+                    mutationStarted = true;
                     ReplaceManagedTarget(replacement, target, previousAttributes,
                         () => targetMutationOccurred = true, nextPhase => phase = nextPhase);
                 }
                 else
                 {
                     phase = "move_new_target";
+                    BeforeTargetReplaceForTest?.Invoke(item.RelativePath, target);
+                    if (!capturedBaselineVerified)
+                    {
+                        if (!await MatchesPreviousOutcomeAsync(gameRoot, journal, token).ConfigureAwait(false))
+                            throw new InvalidDataException("WWM targets changed after rollback baseline capture.");
+                        capturedBaselineVerified = true;
+                    }
+                    if (!await MatchesPreviousTargetAsync(gameRoot,
+                            previous.Single(record => record.RelativePath == item.RelativePath), token).ConfigureAwait(false))
+                        throw new InvalidDataException("WWM target changed after rollback baseline capture.");
                     mutationStarted = true;
                     File.Move(replacement, target);
                     targetMutationOccurred = true;
@@ -771,8 +785,7 @@ public sealed class WwmInstallService
                 return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
                     "Керований стан WWM не має відповідного знімка активного циклу; встановлення та відновлення заблоковано.");
             if (!await MatchesManifestAsync(root, state.Targets, token).ConfigureAwait(false))
-                return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles,
-                    "Керовані файли WWM змінені поза Хабом. Безпечну операцію заблоковано.");
+                _logger.Warning("Trusted WWM installation targets changed outside the Hub; startup recovery completed without mutating them. A fresh package can be installed with an operation-specific rollback baseline.");
             return WwmMutationResult.Success();
         }
         if (!Directory.Exists(_store.SnapshotDirectory)) return WwmMutationResult.Success();
@@ -1179,20 +1192,49 @@ public sealed class WwmInstallService
             var relative = CurrentTargets[i];
             var target = SafeGameTarget(root, relative);
             if (!File.Exists(target)) { result.Add(new WwmPreviousTarget { RelativePath = relative, Existed = false }); continue; }
+            var beforeInfo = new FileInfo(target);
+            var beforeAttributes = File.GetAttributes(target);
+            if ((beforeAttributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                throw new InvalidDataException($"Unsafe WWM target type: {relative}");
+            var beforeLength = beforeInfo.Length;
+            var beforeWrite = beforeInfo.LastWriteTimeUtc;
             var backupName = i + ".bin";
             var backupPath = Path.Combine(operationDir, backupName);
             await CopyFileAsync(target, backupPath, token).ConfigureAwait(false);
+            var backupSize = new FileInfo(backupPath).Length;
+            var backupHash = await HashHelper.ComputeFileSha256Async(backupPath, token).ConfigureAwait(false);
+            var afterInfo = new FileInfo(target);
+            var afterAttributes = File.GetAttributes(target);
+            if (beforeLength != backupSize || beforeLength != afterInfo.Length
+                || beforeWrite != afterInfo.LastWriteTimeUtc || beforeAttributes != afterAttributes
+                || !string.Equals(backupHash, await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), StringComparison.OrdinalIgnoreCase))
+                throw new IOException($"WWM target changed while its rollback baseline was captured: {relative}");
             result.Add(new WwmPreviousTarget
             {
                 RelativePath = relative,
                 Existed = true,
-                SizeBytes = new FileInfo(backupPath).Length,
-                Sha256 = await HashHelper.ComputeFileSha256Async(backupPath, token).ConfigureAwait(false),
+                SizeBytes = backupSize,
+                Sha256 = backupHash,
                 BackupFile = backupName,
-                Attributes = (int)File.GetAttributes(target)
+                Attributes = (int)beforeAttributes
             });
         }
         return result;
+    }
+
+    private async Task<bool> MatchesPreviousTargetAsync(string root, WwmPreviousTarget previous, CancellationToken token)
+    {
+        var target = SafeGameTarget(root, previous.RelativePath);
+        FileAttributes? attributes = null;
+        try { attributes = File.GetAttributes(target); }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+        if (attributes == null) return !previous.Existed;
+        if (!previous.Existed || (attributes.Value & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0
+            || previous.Attributes is { } expectedAttributes && (int)attributes.Value != expectedAttributes)
+            return false;
+        return new FileInfo(target).Length == previous.SizeBytes
+            && string.Equals(await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), previous.Sha256, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<bool> RollbackAsync(string root, WwmTransactionJournal journal, string operationDir, CancellationToken token)

@@ -168,6 +168,10 @@ internal sealed record WwmModeCardPresentation(
             return new(installedState == WwmInstalledStateKind.Modified ? "Файли змінені" : "Потрібне відновлення",
                 null, false, installedState == WwmInstalledStateKind.Modified ? ModeCardTone.Error : ModeCardTone.Error, false);
 
+        if (installedState == WwmInstalledStateKind.NeedsReinstall)
+            return new("Файли гри змінено — потрібне повторне встановлення", "Встановити",
+                gameDetected && !operationInProgress, ModeCardTone.Warning, false);
+
         if (sameInstalledMode && installedState == WwmInstalledStateKind.Current)
             return new("✓ Встановлено", null, false, ModeCardTone.Success, true);
 

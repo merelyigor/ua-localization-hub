@@ -2456,7 +2456,7 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
-    public async Task ResolveState_DistinguishesCurrentDifferentModeAndModifiedFiles()
+    public async Task ResolveState_DistinguishesCurrentDifferentModeAndExternalChangeCanBeReinstalled()
     {
         using var temp = new TestTemp();
         var root = Path.Combine(temp.Root, "Where Winds Meet");
@@ -2478,8 +2478,97 @@ public sealed class WwmStage10Tests
         };
         Assert.Equal(WwmInstalledStateKind.UpdateAvailable, (await service.ResolveStateAsync(root, otherMode)).State);
         File.AppendAllText(Path.Combine(root, WwmGameDefinition.Default.ManagedRelativePaths[1]), "external");
-        Assert.Equal(WwmInstalledStateKind.Modified, (await service.ResolveStateAsync(root, package)).State);
-        Assert.Equal(WwmMutationError.ModifiedFiles, (await service.InstallAsync(root, "42", package)).Error);
+        Assert.Equal(WwmInstalledStateKind.NeedsReinstall, (await service.ResolveStateAsync(root, package)).State);
+        Assert.True((await service.InstallAsync(root, "42", package)).IsSuccess);
+        Assert.Equal(WwmInstalledStateKind.Current, (await service.ResolveStateAsync(root, package)).State);
+    }
+
+    [Fact]
+    public async Task InstallFailureAfterFirstReplacement_RestoresExactExternalTargetsAndPreviousState()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "Where Winds Meet");
+        CreateGameMarkers(root);
+        var paths = WwmGameDefinition.Default.ManagedRelativePaths;
+        var packageArchive = CreatePackage();
+        var package = CreatePackageMetadata(packageArchive);
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(packageArchive) });
+        var scope = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
+        scope.EnsureDirectories();
+        var store = new WwmStateStore(scope);
+        var service = new WwmInstallService(client, scope, store, Logger);
+        Assert.True((await service.InstallAsync(root, "42", package)).IsSuccess);
+        var external = new[] { new byte[] { 101, 102, 103 }, new byte[] { 111, 112, 113, 114 } };
+        for (var i = 0; i < paths.Length; i++) await File.WriteAllBytesAsync(Path.Combine(root, paths[i]), external[i]);
+        var oldStateBytes = await File.ReadAllBytesAsync(store.StateFile);
+        service.AfterTargetAppliedForTest = count => { if (count == 1) throw new IOException("synthetic second-target failure"); };
+
+        var result = await service.InstallAsync(root, "42", package);
+
+        Assert.Equal(WwmMutationError.Mutation, result.Error);
+        for (var i = 0; i < paths.Length; i++) Assert.Equal(external[i], await File.ReadAllBytesAsync(Path.Combine(root, paths[i])));
+        Assert.Equal(oldStateBytes, await File.ReadAllBytesAsync(store.StateFile));
+        Assert.Null(store.LoadJournal(out _));
+    }
+
+    [Fact]
+    public async Task InstallCancellationAfterFirstReplacement_RestoresExactExternalTargetsAndPreviousState()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "Where Winds Meet");
+        CreateGameMarkers(root);
+        var paths = WwmGameDefinition.Default.ManagedRelativePaths;
+        var archive = CreatePackage();
+        var package = CreatePackageMetadata(archive);
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
+        var scope = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
+        scope.EnsureDirectories();
+        var store = new WwmStateStore(scope);
+        var service = new WwmInstallService(client, scope, store, Logger);
+        Assert.True((await service.InstallAsync(root, "42", package)).IsSuccess);
+        var external = new[] { new byte[] { 121, 122, 123 }, new byte[] { 131, 132, 133 } };
+        for (var i = 0; i < paths.Length; i++) await File.WriteAllBytesAsync(Path.Combine(root, paths[i]), external[i]);
+        var oldStateBytes = await File.ReadAllBytesAsync(store.StateFile);
+        using var cancellation = new CancellationTokenSource();
+        service.AfterTargetAppliedForTest = count => { if (count == 1) cancellation.Cancel(); };
+
+        var result = await service.InstallAsync(root, "42", package, cancellation.Token);
+
+        Assert.Equal(WwmMutationError.Cancelled, result.Error);
+        for (var i = 0; i < paths.Length; i++) Assert.Equal(external[i], await File.ReadAllBytesAsync(Path.Combine(root, paths[i])));
+        Assert.Equal(oldStateBytes, await File.ReadAllBytesAsync(store.StateFile));
+        Assert.Null(store.LoadJournal(out _));
+    }
+
+    [Fact]
+    public async Task Install_TargetChangesAfterRollbackCapture_FailsBeforeFirstReplacement()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "Where Winds Meet");
+        CreateGameMarkers(root);
+        var paths = WwmGameDefinition.Default.ManagedRelativePaths;
+        var archive = CreatePackage();
+        var package = CreatePackageMetadata(archive);
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
+        var scope = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
+        scope.EnsureDirectories();
+        var store = new WwmStateStore(scope);
+        var service = new WwmInstallService(client, scope, store, Logger);
+        var external = new[] { new byte[] { 141, 142, 143 }, new byte[] { 151, 152, 153 } };
+        for (var i = 0; i < paths.Length; i++) await File.WriteAllBytesAsync(Path.Combine(root, paths[i]), external[i]);
+        var changedAfterCapture = new byte[] { 161, 162, 163, 164 };
+        service.BeforeTargetReplaceForTest = (relative, _) =>
+        {
+            if (relative == paths[0]) File.WriteAllBytes(Path.Combine(root, paths[1]), changedAfterCapture);
+        };
+
+        var result = await service.InstallAsync(root, "42", package);
+
+        Assert.Equal(WwmMutationError.Mutation, result.Error);
+        Assert.Equal(external[0], await File.ReadAllBytesAsync(Path.Combine(root, paths[0])));
+        Assert.Equal(changedAfterCapture, await File.ReadAllBytesAsync(Path.Combine(root, paths[1])));
+        Assert.False(File.Exists(store.StateFile));
+        Assert.Null(store.LoadJournal(out _));
     }
 
     [Fact]

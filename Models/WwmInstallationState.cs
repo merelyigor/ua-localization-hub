@@ -36,6 +36,6 @@ public sealed class WwmApiPackage
     public required string Sha256 { get; init; }
 }
 
-public enum WwmInstalledStateKind { Unknown, Current, UpdateAvailable, Modified }
+public enum WwmInstalledStateKind { Unknown, Current, UpdateAvailable, NeedsReinstall, Modified }
 
 public sealed record WwmInstalledStateResult(WwmInstalledStateKind State, string? Message = null);

@@ -63,4 +63,16 @@ public sealed class WwmModeCardPresentationTests
         Assert.Null(presentation.ActionText);
         Assert.False(presentation.ActionEnabled);
     }
+
+    [Fact]
+    public void ExternallyChangedManagedFiles_OfferReinstallWithoutRestoreClaim()
+    {
+        var presentation = WwmModeCardPresentation.Create(true, WwmInstalledStateKind.NeedsReinstall,
+            stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: false);
+
+        Assert.Equal("Файли гри змінено — потрібне повторне встановлення", presentation.StateText);
+        Assert.Equal("Встановити", presentation.ActionText);
+        Assert.True(presentation.ActionEnabled);
+        Assert.False(presentation.IsInstalled);
+    }
 }

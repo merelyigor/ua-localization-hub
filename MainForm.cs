@@ -474,6 +474,8 @@ public partial class MainForm : Form
     internal string WwmGameStatusForTest => gameStatusLabel.Text;
     internal string WwmGamePathForTest => gamePathLabel.Text;
     internal bool WwmInstallActionsEnabledForTest => modesFlowPanel.Controls.OfType<WwmModeCard>().Any(card => card.ActionVisibleForTest && card.ActionEnabledForTest);
+    internal bool WwmModeInstalledForTest(string slug, string variant) => modesFlowPanel.Controls.OfType<WwmModeCard>()
+        .Any(card => card.ModeSlug == slug && card.ModeVariant == variant && card.IsInstalledForTest);
     internal bool WwmRestoreEnabledForTest => restoreOriginalButton.Enabled;
     internal bool WwmManualDetectionInProgressForTest => _wwmManualDetectionInProgress;
     internal bool WwmDetectEnabledForTest => detectGameButton.Enabled;
@@ -498,6 +500,7 @@ public partial class MainForm : Form
     internal string OperationMessageForTest => operationMessageLabel.Text;
     internal Task HandleInstallForTestAsync() => HandleInstallAsync();
     internal Task HandleWwmInstallForTestAsync(string slug, string variant) => HandleWwmInstallAsync(slug, variant);
+    internal Task RefreshWwmStateForTestAsync() => RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
     internal Task<WwmMutationResult> HandleWwmRestoreForTestAsync() => HandleWwmRestoreAsync();
     internal Task<WwmManualDetectionResult?> ResolveWwmManualPathForTestAsync(
         string selectedPath, CancellationToken token = default)

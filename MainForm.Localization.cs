@@ -161,6 +161,12 @@ public partial class MainForm
             SetMessage("Керовані файли WWM змінені поза Хабом. Автоматичні операції заблоковано.");
             SetActionsEnabled(false);
         }
+        else if (stateError == null && installed != null && overallState.State == WwmInstalledStateKind.NeedsReinstall)
+        {
+            SetMessage(overallState.Message ?? "Файли гри змінено — потрібне повторне встановлення.");
+            // Restore availability and package installation are independent: a stale pre-Hub
+            // snapshot may disable restore while a fresh package remains safely installable.
+        }
         if (installed != null && stateError == null) StartWwmFileMonitorIfEligible();
         else DisposeWwmFileMonitor();
         ScheduleContentFit();
@@ -234,6 +240,7 @@ public partial class MainForm
     {
         var session = _wwmSession;
         if (session == null || IsUiWorkBlocked || _gameRoot == null || !session.MutationSupported || _wwmRecoveryBlocked) return;
+        var installSucceeded = false;
         _operationInProgress = true;
         _operationCts = CancellationTokenSource.CreateLinkedTokenSource(_gameSessionCts?.Token ?? CancellationToken.None);
         var token = _operationCts.Token;
@@ -287,6 +294,7 @@ public partial class MainForm
             else
             {
                 SetMessage(result.IsSuccess ? "Локалізацію Winds4UA успішно встановлено." : result.Message ?? "Операцію Winds4UA не виконано.");
+                installSucceeded = result.IsSuccess;
             }
             _wwmFeed = latest.Feed;
         }
@@ -310,7 +318,11 @@ public partial class MainForm
             _operationInProgress = false;
             SetControlsDuringOperation(true);
             if (IsCurrentGameSession(_gameSessionGeneration, session))
+            {
                 await RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
+                if (installSucceeded)
+                    SetMessage("Локалізацію Winds4UA успішно встановлено.");
+            }
             session.Poller.Resume();
         }
     }

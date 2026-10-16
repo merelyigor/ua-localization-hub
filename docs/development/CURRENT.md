@@ -8,7 +8,7 @@
 
 Стабільний реліз: **v1.2.10**. Публічний Release ID `409061408` опубліковано як stable із annotated tag `v1.2.10` на exact RC source SHA `fc7026311f3d79562e7558311441d829283930c9`. Canonical і legacy ZIP assets незалежно перевірені за точними RC hashes. Offline/degraded release-feed implementation завершено та прийнято зовнішнім Architect.
 
-Поточний стан: RC #39/#40/#41 залишаються **OWNER SMOKE FAILED / NOT ACCEPTED / DO NOT REUSE**. RC #41 / run `38844562243` виявив MainForm дефект: після ручного підтвердження Steam-root recovery-блок не повторював `RecoverAsync`. Корекція commit `731837eb21f45f20ab14a3d87c264bccfb1bb6b2` отримала exact-SHA CI #263 / run `38927511513` — **SUCCESS**, 1204/1204; зовнішній Architect review — **REVIEWED / ACCEPTED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. Наступна дія — створити новий v1.2.11 RC; публікація не авторизована.
+Поточний стан: RC #39/#40/#41/#42 залишаються **OWNER SMOKE FAILED / NOT ACCEPTED / DO NOT REUSE**. RC #42 / run `38930894752` показав, що дві зовнішньо змінені managed WWM-цілі після переходу Steam build до `25906190` перетворюють довірений no-journal стан на `ModifiedFiles`, через що UI блокує також встановлення свіжого API package. Read-only перевірка Owner state підтвердила schema-v2 root/layout/cycle, пов’язаний цілісний snapshot старого build `25281753`, відсутній journal та відмінність обох live targets від state manifest. Це високоризикова correction у **PRE-COMMIT REVIEW MODE**: окремий `NeedsReinstall` для валідного no-journal state; install baseline з точних поточних targets у durable journal; snapshot лишається незмінним і stale Restore недоступний. Реальні game files не змінювалися. Commit/push/RC #43 не авторизовані.
 
 Stage 11B та WWM API-driven compatibility UX залишаються **REVIEWED / ACCEPTED**. RC #40 correction зберігає root/cycle/hash/cross-root fail-closed перевірки; Steam build mismatch не є root identity, але stale snapshot блокує Restore. RC #39/#40/#41 не прийняті Owner smoke і не повинні повторно використовуватися. RC41 manual-recovery retry correction **REVIEWED / ACCEPTED**; новий v1.2.11 RC очікує Owner smoke, фінальна публікація не авторизована.
 
@@ -25,6 +25,8 @@ v1.2.11 RC #39 correction v4 preserves exact pre-migration committed journal out
 - `Storage` відповідає за config, installation state, original snapshot і restore points.
 - `Update` містить GitHub Release discovery, schema-2 bundle validation, staging, replacement helper, rollback та startup maintenance.
 - WWM composition is isolated in `WwmGameSession`, `Winds4UaApiClient`, `WwmSteamDetector`, `WwmPackageService`, `WwmInstallService`, `WwmReleaseFeedPoller` and versioned `WwmStateStore`; BDO APIs and state schema remain separate.
+
+Для підтверджено довіреного WWM state без активного journal зовнішня зміна target-файлів є станом повторного встановлення, а не startup recovery failure. Після свіжої API/package перевірки нова транзакція бере поточні exact bytes/existence/attributes обох targets як per-operation rollback baseline. Застарілий pre-Hub snapshot не переписується: Restore лишається окремо заблокованим, але не блокує Install. Невирішений journal і некоректні ownership/binding докази залишаються fail-closed.
 
 ## Tray / Background Contract
 
