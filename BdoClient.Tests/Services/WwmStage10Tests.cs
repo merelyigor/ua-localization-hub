@@ -637,16 +637,13 @@ public sealed class WwmStage10Tests
         Assert.Equal(unchangedSecond, await File.ReadAllBytesAsync(Path.Combine(fixture.Root, fixture.Targets[1])));
     }
 
-    [Theory]
-    [InlineData("build")]
-    [InlineData("cycle")]
-    public async Task V1210AutoDetectedSteamLegacyCycle_WithConflictingEvidence_FailsClosed(string defect)
+    [Fact]
+    public async Task V1210AutoDetectedSteamLegacyCycle_WithConflictingCycle_FailsClosed()
     {
         using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
         var detection = fixture.Session.DetectGame();
         var legacy = fixture.Session.StateStore.Load(out _)!;
-        if (defect == "build") legacy.GameBuildId = "different-build";
-        else legacy.PreHubSnapshotCycleId = Guid.NewGuid().ToString("N");
+        legacy.PreHubSnapshotCycleId = Guid.NewGuid().ToString("N");
         await fixture.Session.StateStore.SaveAsync(legacy);
         var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
 
@@ -658,6 +655,131 @@ public sealed class WwmStage10Tests
         Assert.Equal(1, fixture.Session.StateStore.Load(out _)!.SchemaVersion);
         var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
         for (var index = 0; index < fixture.Targets.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210LegacySteamCycle_AutoDetectedAfterGameUpdateMigratesButRestoreRemainsStale()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync(currentBuildId: "25906190", stateBuildId: "25281754");
+        var detection = fixture.Session.DetectGame();
+        Assert.Equal("25906190", detection.BuildId);
+        Assert.Null(detection.PersistedGamePath);
+        var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(detection);
+
+        Assert.True(recovery.IsSuccess, recovery.Message);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), fixture.Session.ConfigStore.Load().Value!.GamePath);
+        var migratedState = fixture.Session.StateStore.Load(out var stateError);
+        Assert.Null(stateError);
+        Assert.Equal(2, migratedState!.SchemaVersion);
+        Assert.Equal("25281754", migratedState.GameBuildId);
+        var snapshotJson = await File.ReadAllTextAsync(Path.Combine(fixture.Session.StateStore.SnapshotDirectory, "snapshot.json"));
+        using (var snapshotDocument = System.Text.Json.JsonDocument.Parse(snapshotJson))
+        {
+            var snapshot = snapshotDocument.RootElement;
+            Assert.Equal(2, snapshot.GetProperty("schema_version").GetInt32());
+            Assert.Equal("25281753", snapshot.GetProperty("game_build_id").GetString());
+            Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.Root), snapshot.GetProperty("installation_root").GetString());
+        }
+
+        var state = await fixture.Session.InstallService.ResolveStateAsync(detection, fixture.Package);
+        var restoreAvailability = await fixture.Session.InstallService.CheckRestoreAvailabilityAsync(detection);
+        Assert.Equal(WwmInstalledStateKind.Current, state.State);
+        Assert.False(restoreAvailability.IsAvailable);
+        Assert.Contains("Steam build відрізняється", restoreAvailability.Message, StringComparison.Ordinal);
+        var restore = await fixture.Session.InstallService.RestorePreHubAsync(detection);
+        Assert.Equal(WwmMutationError.SnapshotStale, restore.Error);
+        Assert.Contains("Steam build відрізняється", restore.Message, StringComparison.Ordinal);
+        var updatePreparation = await fixture.Session.InstallService.InstallAsync(detection, fixture.Package);
+        Assert.Equal(WwmMutationError.Package, updatePreparation.Error);
+        Assert.DoesNotContain("Steam build відрізняється", updatePreparation.Message, StringComparison.Ordinal);
+        var filesAfterMigration = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < filesBefore.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfterMigration[index]);
+
+        // Model a cold process using persisted config and migrated on-disk metadata.
+        using var restarted = WwmGameSession.CreateForTests(
+            new AppPaths(fixture.Session.PersistencePaths.ApplicationRoot), Logger,
+            new HttpClient(new StubHandler()), ownsHttpClient: true,
+            steamRoots: new[] { Path.GetFullPath(Path.Combine(fixture.Root, "..", "..", "..")) });
+        var restartedDetection = restarted.DetectGame();
+        Assert.Equal("25906190", restartedDetection.BuildId);
+        Assert.Equal(WwmInstallationSource.Steam, restartedDetection.Source);
+        Assert.True((await restarted.InstallService.RecoverAsync(restartedDetection)).IsSuccess);
+        Assert.Equal(WwmInstalledStateKind.Current,
+            (await restarted.InstallService.ResolveStateAsync(restartedDetection, fixture.Package)).State);
+        var restartedRestore = await restarted.InstallService.CheckRestoreAvailabilityAsync(restartedDetection);
+        Assert.False(restartedRestore.IsAvailable);
+        Assert.Contains("Steam build відрізняється", restartedRestore.Message, StringComparison.Ordinal);
+        var filesAfterRestart = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < filesBefore.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfterRestart[index]);
+    }
+
+    [Fact]
+    public async Task V1210LegacySteamCycle_ManualSameSessionMigrationAllowsHistoricalBuildAndKeepsRestoreStale()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync(addSecondSteamRoot: true, currentBuildId: "25906190");
+        var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        var manual = await fixture.Session.ResolveAndSaveManualPathAsync(fixture.Root);
+        var recovery = await fixture.Session.InstallService.RecoverAsync(manual.Detection!);
+        var restoreAvailability = await fixture.Session.InstallService.CheckRestoreAvailabilityAsync(manual.Detection!);
+
+        Assert.True(recovery.IsSuccess, recovery.Message);
+        Assert.Equal(2, fixture.Session.StateStore.Load(out _)!.SchemaVersion);
+        Assert.False(restoreAvailability.IsAvailable);
+        Assert.Contains("Steam build відрізняється", restoreAvailability.Message, StringComparison.Ordinal);
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < filesBefore.Length; index++)
+            Assert.Equal(filesBefore[index], filesAfter[index]);
+    }
+
+    [Fact]
+    public async Task V1210IncompleteLegacyJournal_AfterSteamBuildChangeFailsClosedWithoutRollback()
+    {
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync(currentBuildId: "25906190");
+        var detection = fixture.Session.DetectGame();
+        var store = fixture.Session.StateStore;
+        var stateBytes = await File.ReadAllBytesAsync(store.StateFile);
+        var operationId = Guid.NewGuid().ToString("N");
+        var operationDirectory = Path.Combine(store.TransactionDirectory, operationId);
+        Directory.CreateDirectory(operationDirectory);
+        var previousTargets = new List<WwmPreviousTarget>();
+        var targetManifest = new List<WwmTargetManifestEntry>();
+        for (var index = 0; index < fixture.Targets.Length; index++)
+        {
+            var current = fixture.Installed[index];
+            await File.WriteAllBytesAsync(Path.Combine(operationDirectory, index + ".bin"), current);
+            previousTargets.Add(new WwmPreviousTarget
+            {
+                RelativePath = fixture.Targets[index], Existed = true, SizeBytes = current.Length,
+                Sha256 = Hash(current), BackupFile = index + ".bin"
+            });
+            var expected = new byte[] { (byte)(180 + index), (byte)(190 + index) };
+            targetManifest.Add(new WwmTargetManifestEntry
+            {
+                RelativePath = fixture.Targets[index], SizeBytes = expected.Length, Sha256 = Hash(expected)
+            });
+        }
+        await store.WriteJournalAsync(new WwmTransactionJournal
+        {
+            SchemaVersion = 1, OperationId = operationId, Operation = "install", PreviousTargets = previousTargets,
+            TargetManifest = targetManifest, ExpectedAbsentTargets = new(), ExpectedStateSha256 = Hash(new byte[] { 77 }),
+            PreviousStateExisted = true, PreviousStateBase64 = Convert.ToBase64String(stateBytes), GameBuildId = "25281753"
+        });
+        var filesBefore = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+
+        var recovery = await fixture.Session.InstallService.RecoverAsync(detection);
+
+        Assert.False(recovery.IsSuccess);
+        Assert.Equal(WwmMutationError.SnapshotStale, recovery.Error);
+        Assert.Contains("Steam build відрізняється", recovery.Message, StringComparison.Ordinal);
+        Assert.NotNull(store.LoadJournal(out _));
+        var filesAfter = await ReadTargetsAsync(fixture.Root, fixture.Targets);
+        for (var index = 0; index < filesBefore.Length; index++)
             Assert.Equal(filesBefore[index], filesAfter[index]);
     }
 
@@ -723,7 +845,7 @@ public sealed class WwmStage10Tests
     [Fact]
     public async Task V1210AutoDetectedCommittedLegacyInstallJournal_MigratesAndCleansWithoutRollback()
     {
-        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync(currentBuildId: "25906190");
         var detection = fixture.Session.DetectGame();
         var store = fixture.Session.StateStore;
         var committedStateBytes = await File.ReadAllBytesAsync(store.StateFile);
@@ -762,7 +884,7 @@ public sealed class WwmStage10Tests
             ExpectedAbsentTargets = new(), ExpectedStateSha256 = Hash(committedStateBytes),
             PreviousStateExisted = true,
             PreviousStateBase64 = Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(previousState)),
-            GameBuildId = detection.BuildId
+            GameBuildId = "25281753"
         });
 
         var recovered = await fixture.Session.InstallService.RecoverAsync(detection);
@@ -788,7 +910,7 @@ public sealed class WwmStage10Tests
     [Fact]
     public async Task V1210AutoDetectedCommittedLegacyRestoreJournal_KeepsAbsentStateAndRetiresSnapshot()
     {
-        using var fixture = await CreateLegacyAutoDetectedFixtureAsync();
+        using var fixture = await CreateLegacyAutoDetectedFixtureAsync(currentBuildId: "25906190");
         var detection = fixture.Session.DetectGame();
         var store = fixture.Session.StateStore;
         var previousState = store.Load(out _)!;
@@ -823,7 +945,7 @@ public sealed class WwmStage10Tests
                 RelativePath = fixture.Targets[index], SizeBytes = bytes.Length, Sha256 = Hash(bytes)
             }).ToList(),
             ExpectedAbsentTargets = new(), ExpectedStateSha256 = "absent", PreviousStateExisted = true,
-            PreviousStateBase64 = Convert.ToBase64String(previousStateBytes), GameBuildId = detection.BuildId
+            PreviousStateBase64 = Convert.ToBase64String(previousStateBytes), GameBuildId = "25281753"
         });
 
         var recovered = await fixture.Session.InstallService.RecoverAsync(detection);
@@ -2485,12 +2607,13 @@ public sealed class WwmStage10Tests
             System.Text.Json.JsonSerializer.Serialize(snapshot));
     }
 
-    private static async Task<LegacyAutoFixture> CreateLegacyAutoDetectedFixtureAsync(bool addSecondSteamRoot = false)
+    private static async Task<LegacyAutoFixture> CreateLegacyAutoDetectedFixtureAsync(
+        bool addSecondSteamRoot = false, string currentBuildId = "25281753", string stateBuildId = "25281753")
     {
         var temp = new TestTemp();
         try
         {
-            var (steamRoot, root) = CreateSteamRoot(temp.Root, "steam-auto", "arbitrary-v1210-install");
+            var (steamRoot, root) = CreateSteamRoot(temp.Root, "steam-auto", "arbitrary-v1210-install", currentBuildId);
             var steamRoots = new List<string> { steamRoot };
             if (addSecondSteamRoot)
                 steamRoots.Add(CreateSteamRoot(temp.Root, "steam-other", "other-valid-install").SteamRoot);
@@ -2512,7 +2635,7 @@ public sealed class WwmStage10Tests
             {
                 SchemaVersion = 1, ModeSlug = package.Mode.Slug, ModeVariant = package.Mode.Variant,
                 ReleaseVersion = package.Version, ArchiveSizeBytes = package.SizeBytes, ArchiveSha256 = package.Sha256,
-                PreHubSnapshotCycleId = cycleId, GameBuildId = "25281753", InstalledAt = DateTimeOffset.UtcNow,
+                PreHubSnapshotCycleId = cycleId, GameBuildId = stateBuildId, InstalledAt = DateTimeOffset.UtcNow,
                 Targets = installed.Select((bytes, index) => new WwmTargetManifestEntry
                     { RelativePath = targets[index], SizeBytes = bytes.Length, Sha256 = Hash(bytes) }).ToList()
             });
@@ -2658,7 +2781,8 @@ public sealed class WwmStage10Tests
     private static void CreateGameMarkers(string root)
         => CreateGameMarkers(root, localDataPatch: false);
 
-    private static (string SteamRoot, string GameRoot) CreateSteamRoot(string parent, string steamDirectory, string installDirectory)
+    private static (string SteamRoot, string GameRoot) CreateSteamRoot(string parent, string steamDirectory, string installDirectory,
+        string buildId = "25281753")
     {
         var steamRoot = Path.Combine(parent, steamDirectory);
         var gameRoot = Path.Combine(steamRoot, "steamapps", "common", installDirectory);
@@ -2666,7 +2790,7 @@ public sealed class WwmStage10Tests
         var manifestPath = Path.Combine(steamRoot, "steamapps", "appmanifest_3564740.acf");
         Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
         File.WriteAllText(manifestPath,
-            $"\"appid\" \"3564740\" \"installdir\" \"{installDirectory}\" \"buildid\" \"25281753\"");
+            $"\"appid\" \"3564740\" \"installdir\" \"{installDirectory}\" \"buildid\" \"{buildId}\"");
         return (steamRoot, gameRoot);
     }
 

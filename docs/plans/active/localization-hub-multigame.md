@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **new v1.2.11 Release Candidate preparation only; no final tag or publication**
-Current phase: Stage 11B, WWM API-driven compatibility UX, and v1.2.11 RC #39 migration correction — REVIEWED / ACCEPTED
-Next action: **prepare a new v1.2.11 Release Candidate from accepted main**; RC #39 Owner smoke FAILED / NOT ACCEPTED / DO NOT REUSE. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
+Implementation authorization: **bounded RC #40 corrective implementation/validation only; no commit, push, new RC, final tag or publication**
+Current phase: v1.2.11 RC #40 historical Steam-build staleness correction — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
+Next action: **external Architect review of this correction**; RC #39 / #40 Owner smoke FAILED / NOT ACCEPTED / DO NOT REUSE. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -210,9 +210,15 @@ Stage 9 analysis, Stage 10 implementation and authorized real install/restore E2
 
 ## Current progress
 
-v1.2.11 RC correction v4 preserves the exact pre-migration committed outcome of an active legacy journal (state SHA plus target manifests): committed installs remain cleanup-only after binding, and committed restores retain absent-state semantics. Synthetic committed install/restore regressions pass; Release build has 0 warnings/errors, focused WWM + MainForm tests pass 163/163, and the full Release suite passes 1200/1200. External Architect accepted the correction with zero findings. RC #39 remains unaccepted; next action is a new RC from accepted main.
+v1.2.11 RC correction v4 preserves the exact pre-migration committed outcome of an active legacy journal (state SHA plus target manifests): committed installs remain cleanup-only after binding, and committed restores retain absent-state semantics. That correction was accepted externally and passed exact-SHA CI; RC #39 nevertheless remains unaccepted.
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and the v1.2.11 legacy migration correction are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39 failed Owner smoke and must not be reused. The next authorized action is a new v1.2.11 Release Candidate; final publication remains an Owner gate. No Stage 11C.
+### RC #40 Owner-smoke failure and bounded correction
+
+Owner smoke of RC #40 / run `38825506167` **FAILED / NOT ACCEPTED / DO NOT REUSE**. The smoke encountered current Steam build `25906190` with a valid v1.2.10 pre-Hub snapshot recorded on build `25281753`; legacy migration incorrectly treated historical build mismatch as invalid binding and blocked managed state/Restore.
+
+The correction separates root ownership from Restore staleness. Migration relies on unique manifest-proven Steam root, Package layout, cycle linkage, backup/hash integrity, exact managed-target or journal-known state, and no conflicting schema-v2 binding—not equality of historical build IDs. The recorded IDs are preserved. A stale linked snapshot still disables Restore Original; an incomplete journal with changed Steam build remains blocked before rollback, while a fully committed journal keeps cleanup-only handling. Managed-target mismatch, ambiguous/cross-root detection, corrupt snapshots and orphan snapshots remain fail-closed. This work is limited to synthetic/temp fixtures and metadata; real game files are not changed. The correction is **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW**; commit/push/new RC: none.
+
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and the v1.2.11 RC #39 legacy migration correction are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39 and #40 failed Owner smoke and must not be reused. The bounded RC #40 correction awaits pre-commit Architect review; no new v1.2.11 RC or publication is authorized yet. No Stage 11C.
 
 ### v1.2.10 release cycle
 

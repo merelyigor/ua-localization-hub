@@ -764,12 +764,16 @@ public sealed class WwmInstallService
             if (IsStateStale(state, CurrentBinding))
                 return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(CurrentBinding));
             var activeSnapshot = LoadPreHubSnapshot(out _);
-            if (activeSnapshot != null && IsSnapshotStale(activeSnapshot, CurrentBinding))
+            if (activeSnapshot != null && CurrentBinding.Source != WwmInstallationSource.Steam
+                && IsSnapshotStale(activeSnapshot, CurrentBinding))
                 return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(CurrentBinding));
-            return activeSnapshot != null && string.Equals(activeSnapshot.CycleOperationId, state.PreHubSnapshotCycleId, StringComparison.Ordinal)
-                ? WwmMutationResult.Success()
-                : WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+            if (activeSnapshot == null || !string.Equals(activeSnapshot.CycleOperationId, state.PreHubSnapshotCycleId, StringComparison.Ordinal))
+                return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
                     "Керований стан WWM не має відповідного знімка активного циклу; встановлення та відновлення заблоковано.");
+            if (!await MatchesManifestAsync(root, state.Targets, token).ConfigureAwait(false))
+                return WwmMutationResult.Failure(WwmMutationError.ModifiedFiles,
+                    "Керовані файли WWM змінені поза Хабом. Безпечну операцію заблоковано.");
+            return WwmMutationResult.Success();
         }
         if (!Directory.Exists(_store.SnapshotDirectory)) return WwmMutationResult.Success();
 
@@ -1038,12 +1042,7 @@ public sealed class WwmInstallService
         var binding = CurrentBinding;
         if (!binding.IsUniqueAutomaticSteamDetection || binding.Source != WwmInstallationSource.Steam
             || binding.Layout != WwmInstallationLayout.Package || snapshot == null
-            || snapshot.SchemaVersion is not (1 or 2)
-            || !BuildEvidenceMatches(state?.GameBuildId, binding.BuildId)
-            || !BuildEvidenceMatches(snapshot.GameBuildId, binding.BuildId)
-            || !BuildEvidenceMatches(journal?.GameBuildId, binding.BuildId)
-            || !BuildEvidenceMatches(state?.GameBuildId, snapshot.GameBuildId)
-            || !BuildEvidenceMatches(journal?.GameBuildId, snapshot.GameBuildId))
+            || snapshot.SchemaVersion is not (1 or 2))
             return false;
 
         if (hasLegacyState || state?.SchemaVersion == 2)
@@ -1059,7 +1058,7 @@ public sealed class WwmInstallService
 
         if (hasLegacyJournal)
         {
-            if (journal == null || !BuildEvidenceMatches(journal.GameBuildId, binding.BuildId)
+            if (journal == null
                 || !LegacyJournalProvesSnapshotCycle(snapshot, journal)
                 || !await MatchesJournalKnownTargetStatesAsync(binding.GameRoot, journal, token).ConfigureAwait(false))
                 return false;
@@ -1123,10 +1122,6 @@ public sealed class WwmInstallService
         }
         return null;
     }
-
-    private static bool BuildEvidenceMatches(string? recordedBuild, string? currentBuild)
-        => recordedBuild == null || currentBuild == null
-            || string.Equals(recordedBuild, currentBuild, StringComparison.Ordinal);
 
     private bool SnapshotCycleIsProven(WwmPreHubSnapshot snapshot, WwmInstallationState? state, WwmTransactionJournal? journal)
     {
@@ -1475,8 +1470,6 @@ public sealed class WwmInstallService
     {
         if (state.SchemaVersion == 1)
             return HasTrustedLegacyRoot(binding) && binding.Source == WwmInstallationSource.Steam && binding.Layout == WwmInstallationLayout.Package
-                && (state.GameBuildId == null || binding.BuildId == null
-                    || string.Equals(state.GameBuildId, binding.BuildId, StringComparison.Ordinal))
                 && state.Targets.Select(item => item.RelativePath).OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .SequenceEqual(binding.ManagedRelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
         if (!WwmStateStore.IsValidBinding(state.InstallationRoot, state.TargetLayout, state.InstallationFingerprint,
@@ -1491,7 +1484,6 @@ public sealed class WwmInstallService
     {
         if (snapshot.SchemaVersion == 1)
             return HasTrustedLegacyRoot(binding) && binding.Source == WwmInstallationSource.Steam && binding.Layout == WwmInstallationLayout.Package
-                && (snapshot.GameBuildId == null || string.Equals(snapshot.GameBuildId, binding.BuildId, StringComparison.Ordinal))
                 && snapshot.Targets.Select(item => item.RelativePath).OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .SequenceEqual(binding.ManagedRelativePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
         if (!WwmStateStore.IsValidBinding(snapshot.InstallationRoot, snapshot.TargetLayout, snapshot.InstallationFingerprint,
