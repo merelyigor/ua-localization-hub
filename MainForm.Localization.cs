@@ -791,7 +791,11 @@ public partial class MainForm
                 return null;
 
             if (resolution.Status == ManualResolveStatus.Found && resolution.Detection != null)
+            {
                 SetWwmGamePresentation(resolution.Detection);
+                await RetryBlockedWwmRecoveryAfterManualSelectionAsync(
+                    session, resolution.Detection, sessionGeneration, cancellationToken);
+            }
             else
                 finalMessage = GetWwmManualResolutionMessage(resolution.Status);
         }
@@ -826,6 +830,46 @@ public partial class MainForm
         }
 
         return resolution;
+    }
+
+    private async Task RetryBlockedWwmRecoveryAfterManualSelectionAsync(
+        WwmGameSession session, WwmDetectionResult detection, long sessionGeneration, CancellationToken cancellationToken)
+    {
+        if (!_wwmRecoveryBlocked || detection.GameRoot == null
+            || string.IsNullOrWhiteSpace(detection.PersistedGamePath)
+            || !string.Equals(WwmGameDefinition.NormalizeInstallationRoot(detection.GameRoot),
+                WwmGameDefinition.NormalizeInstallationRoot(detection.PersistedGamePath), StringComparison.OrdinalIgnoreCase)
+            || !IsCurrentGameSession(sessionGeneration, session))
+            return;
+
+        WwmMutationResult recovery;
+        try
+        {
+            recovery = await session.InstallService.RecoverAsync(detection, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested
+            || !IsCurrentGameSession(sessionGeneration, session))
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (!IsCurrentGameSession(sessionGeneration, session)) return;
+            _logger.Error($"WWM recovery retry after manual root confirmation failed: {ex.GetType().Name}: {ex.Message}");
+            EnterWwmRecoveryBlockedState("Не вдалося повторити безпечне відновлення WWM. Дані збережено для подальшої перевірки.");
+            return;
+        }
+
+        if (!IsCurrentGameSession(sessionGeneration, session)) return;
+        if (recovery.IsSuccess)
+        {
+            _wwmRecoveryBlocked = false;
+            _wwmRecoveryMessage = null;
+            return;
+        }
+
+        _logger.Error($"WWM recovery retry after manual root confirmation blocked: {recovery.Error}: {recovery.Message}");
+        EnterWwmRecoveryBlockedState(recovery.Message);
     }
 
     internal static string GetWwmManualResolutionMessage(ManualResolveStatus status) => status switch

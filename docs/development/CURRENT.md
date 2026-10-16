@@ -8,11 +8,11 @@
 
 Стабільний реліз: **v1.2.10**. Публічний Release ID `409061408` опубліковано як stable із annotated tag `v1.2.10` на exact RC source SHA `fc7026311f3d79562e7558311441d829283930c9`. Canonical і legacy ZIP assets незалежно перевірені за точними RC hashes. Offline/degraded release-feed implementation завершено та прийнято зовнішнім Architect.
 
-Поточний стан: RC #40 Steam-build staleness correction **REVIEWED / ACCEPTED** (commit `1935678a992774a96a3e0ef9f6e531915fcf64f0`, parent `a421fa3ab35ab1bd7cc1fe0380d015be504428b7`; exact-SHA CI #261 / run `38843181893` — SUCCESS, 1202/1202). RC #39 / run `38552297818` і RC #40 / run `38825506167` залишаються **OWNER SMOKE FAILED / NOT ACCEPTED / DO NOT REUSE**. Наступна дія — створити **новий v1.2.11 Release Candidate**; фінальний tag і публікація не авторизовані.
+Поточний стан: RC #39/#40 corrections залишаються **REVIEWED / ACCEPTED**, але RC #39, #40 і #41 — **OWNER SMOKE FAILED / NOT ACCEPTED / DO NOT REUSE**. RC #41 / run `38844562243` виявив MainForm дефект: після ручного підтвердження Steam-root recovery-блок не повторював `RecoverAsync`. Корекція **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW**; commit/push і RC #42 не авторизовані.
 
-Stage 11B та WWM API-driven compatibility UX залишаються **REVIEWED / ACCEPTED** (відповідно CI `38470073111`, 1180/1180, та CI `38531685694`, 1188/1188). Fresh Winds4UA `data.current.game_tested` визначає confirmation; Steam build є лише informational/staleness metadata, не root-identity evidence. Прийнята RC #40 correction зберігає root/cycle/hash/cross-root fail-closed перевірки: stale linked snapshot не блокує normal managed install/update, але Restore Original залишається заблокованим; incomplete journal не може rollback у новіший Steam build, а committed-journal cleanup збережений. Стабільний реліз залишається **v1.2.10**. RC #39 і #40 не прийняті Owner smoke та не повинні повторно використовуватися; новий RC дозволений як наступний крок.
+Stage 11B та WWM API-driven compatibility UX залишаються **REVIEWED / ACCEPTED**. RC #40 correction зберігає root/cycle/hash/cross-root fail-closed перевірки; Steam build mismatch не є root identity, але stale snapshot блокує Restore. RC #39/#40/#41 не прийняті Owner smoke і не повинні повторно використовуватися. Після Architect review RC #41 correction необхідний новий RC; фінальна публікація не авторизована.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame`: Stages 8D.1, 8D.2, 9, 10, 11A and 11B, WWM API-driven compatibility UX, and v1.2.11 RC #39/#40 corrections are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39 and #40 remain failed Owner smoke and must not be reused. The RC #40 correction is commit `1935678a992774a96a3e0ef9f6e531915fcf64f0` (parent `a421fa3ab35ab1bd7cc1fe0380d015be504428b7`), exact-SHA CI #261 / run `38843181893` SUCCESS, 1202/1202; external verdict BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0. Next action: create a new v1.2.11 Release Candidate. No final tag/publication is authorized. No Stage 11C. v1.2.10 remains **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. RC #39/#40/#41 remain failed Owner smoke and must not be reused. RC #41 recovery-retry correction awaits external pre-commit review; no RC #42 or publication is authorized. No Stage 11C. v1.2.10 remains **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**.
 
 ## Architecture Summary
 
@@ -125,6 +125,10 @@ v1.2.11 RC #39 correction v4 preserves exact pre-migration committed journal out
 - [`docs/plans/archive/code-quality-ux-improvements.md`](../plans/archive/code-quality-ux-improvements.md) — completed archived roadmap
 - [`docs/releases/v1.2.9.md`](../releases/v1.2.9.md) — current stable release archive
 - [`history/2026-10.md`](history/2026-10.md) — current engineering journal
+
+## v1.2.11 RC #41 — ручне підтвердження кореня та повтор recovery
+
+Owner smoke RC #41 / run `38844562243` **FAILED / NOT ACCEPTED / DO NOT REUSE**: після успішного збереження вручну вибраного точного Steam-root MainForm зберігав startup `_wwmRecoveryBlocked`, через що `RefreshWwmStateAsync` не запускався і новий довірений detection не передавався на повторний `RecoverAsync`. Корекція виконує retry одразу після підтвердженого manual selection; recovery-блок очищується лише при успіху, а при новій помилці повідомлення оновлюється та блокування лишається. Сервісні trust rules не змінюються. Застосовано синтетичні/тимчасові fixtures; game targets не змінювалися. Стан: **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW**; commit/push/RC #42 — NONE.
 
 ## Current Task Handoff
 

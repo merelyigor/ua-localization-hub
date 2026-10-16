@@ -2,6 +2,7 @@ using System.Net;
 using System.Drawing;
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Windows.Forms;
 using BdoClient.Api;
@@ -762,6 +763,86 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.SelectGameAsync("black-desert-online");
         await fixture.WaitForSwitchCompletionAsync();
         await fixture.WaitForAsync(form => form.SelectedGame.Id == "black-desert-online" && !form.IsSwitchInProgress);
+    }
+
+    [Fact]
+    public async Task WwmManualTrustedRoot_RetriesBlockedLegacyRecoveryAndRefreshesWithoutRestart()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmInvalidConfigInitially: true,
+            seedLegacyWwmState: true,
+            wwmSteamBuildId: "25906190");
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.WwmRecoveryBlockedForTest
+            && FindWwmModeCards(form).Count == 1);
+
+        Assert.Contains("Налаштування шляху Where Winds Meet неможливо безпечно оновити", fixture.Form.OperationMessageForTest, StringComparison.Ordinal);
+
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        var targets = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.Package);
+        var before = await Task.WhenAll(targets.Select(path => File.ReadAllBytesAsync(Path.Combine(fixture.WwmGameRoot, path))));
+        var selected = await fixture.BeginWwmManualPathSearchAsync(fixture.WwmGameRoot);
+        var result = await selected.WaitAsync(MainFormTestFixture.Timeout);
+
+        Assert.NotNull(result);
+        Assert.Equal(ManualResolveStatus.Found, result!.Status);
+        Assert.False(fixture.Form.WwmRecoveryBlockedForTest);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.WwmGameRoot),
+            session.CurrentDetection.PersistedGamePath);
+        Assert.Equal(WwmGameDefinition.NormalizeInstallationRoot(fixture.WwmGameRoot),
+            session.ConfigStore.Load().Value!.GamePath);
+        Assert.Equal(2, session.StateStore.Load(out _)!.SchemaVersion);
+        await fixture.WaitForAsync(form => FindWwmModeCards(form).Any(card => card.ActionEnabledForTest));
+        var installedCard = Assert.Single(FindWwmModeCards(fixture.Form));
+        Assert.NotEqual("Потрібне відновлення", installedCard.StateTextForTest);
+        Assert.True(installedCard.ActionTextForTest is "Встановити" or "Оновити");
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest); // The synthetic snapshot is stale by design.
+        for (var index = 0; index < targets.Length; index++)
+            Assert.Equal(before[index], await File.ReadAllBytesAsync(Path.Combine(fixture.WwmGameRoot, targets[index])));
+    }
+
+    [Fact]
+    public async Task WwmManualTrustedRoot_RecoveryRetryFailureKeepsBlockedPresentation()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(CreateTinyWwmArchive()),
+            wwmInvalidConfigInitially: true,
+            seedLegacyWwmState: true,
+            wwmSteamBuildId: "25906190");
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.WwmRecoveryBlockedForTest);
+
+        var targets = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.Package);
+        var before = await Task.WhenAll(targets.Select(path => File.ReadAllBytesAsync(Path.Combine(fixture.WwmGameRoot, path))));
+        var snapshotPath = Path.Combine(fixture.AppPaths.GetGamePersistencePaths("where-winds-meet").BackupsDir,
+            "pre-hub", "snapshot.json");
+        await File.WriteAllTextAsync(snapshotPath, "{ malformed snapshot");
+        var resultTask = await fixture.BeginWwmManualPathSearchAsync(fixture.WwmGameRoot);
+        var result = await resultTask.WaitAsync(MainFormTestFixture.Timeout);
+
+        Assert.Equal(ManualResolveStatus.Found, result!.Status);
+        Assert.True(fixture.Form.WwmRecoveryBlockedForTest);
+        Assert.Contains("Знімок WWM неможливо безпечно прочитати", fixture.Form.OperationMessageForTest, StringComparison.Ordinal);
+        Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+        Assert.All(FindWwmModeCards(fixture.Form), card =>
+        {
+            Assert.Equal("Потрібне відновлення", card.StateTextForTest);
+            Assert.False(card.ActionVisibleForTest);
+            Assert.False(card.ActionEnabledForTest);
+        });
+        Assert.Equal(1, Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest).StateStore.Load(out _)!.SchemaVersion);
+        for (var index = 0; index < targets.Length; index++)
+            Assert.Equal(before[index], await File.ReadAllBytesAsync(Path.Combine(fixture.WwmGameRoot, targets[index])));
     }
 
     private static List<WwmModeCard> FindWwmModeCards(Control root)
@@ -1653,6 +1734,10 @@ internal sealed class MainFormTestFixture : IDisposable
     private readonly bool _wwmAlsoHasLocalDataPatchLayout;
     private readonly bool _wwmGameMarkersPresent;
     private readonly Func<string, IEnumerable<string>>? _wwmManualDirectoryEnumerator;
+    private readonly bool _wwmConfigWithoutGamePath;
+    private readonly bool _seedLegacyWwmState;
+    private readonly string _wwmSteamBuildId;
+    private readonly bool _wwmInvalidConfigInitially;
     private readonly TaskCompletionSource<MainForm> _formReady =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<object?> _hostCompleted =
@@ -1683,7 +1768,11 @@ internal sealed class MainFormTestFixture : IDisposable
         bool wwmGameMarkersPresent,
         Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator,
         bool wwmHasEpicManifest,
-        bool wwmAlsoHasLocalDataPatchLayout)
+        bool wwmAlsoHasLocalDataPatchLayout,
+        bool wwmConfigWithoutGamePath,
+        bool seedLegacyWwmState,
+        string wwmSteamBuildId,
+        bool wwmInvalidConfigInitially)
     {
         _bdoHandler = bdoHandler;
         _includeSyntheticSecondGame = includeSyntheticSecondGame;
@@ -1696,6 +1785,10 @@ internal sealed class MainFormTestFixture : IDisposable
         _wwmAlsoHasLocalDataPatchLayout = wwmAlsoHasLocalDataPatchLayout;
         _wwmGameMarkersPresent = wwmGameMarkersPresent;
         _wwmManualDirectoryEnumerator = wwmManualDirectoryEnumerator;
+        _wwmConfigWithoutGamePath = wwmConfigWithoutGamePath;
+        _seedLegacyWwmState = seedLegacyWwmState;
+        _wwmSteamBuildId = wwmSteamBuildId;
+        _wwmInvalidConfigInitially = wwmInvalidConfigInitially;
         if (includeWwm && wwmHandlerFactory == null)
             throw new ArgumentException("A WWM API handler factory is required when WWM is included.", nameof(wwmHandlerFactory));
         _githubHandler = CreateSuccessfulGitHubHandler();
@@ -1752,7 +1845,7 @@ internal sealed class MainFormTestFixture : IDisposable
                 {
                     Directory.CreateDirectory(Path.Combine(_wwmSteamRoot, "steamapps"));
                     File.WriteAllText(Path.Combine(_wwmSteamRoot, "steamapps", $"appmanifest_{definition.SteamAppId}.acf"),
-                        $"\"AppState\" {{ \"appid\" \"{definition.SteamAppId}\" \"installdir\" \"fake-wwm-game\" \"buildid\" \"25281753\" }}");
+                        $"\"AppState\" {{ \"appid\" \"{definition.SteamAppId}\" \"installdir\" \"fake-wwm-game\" \"buildid\" \"{_wwmSteamBuildId}\" }}");
                 }
             }
             var wwmPaths = _appPaths.GetGamePersistencePaths(definition.Id);
@@ -1765,8 +1858,12 @@ internal sealed class MainFormTestFixture : IDisposable
                     JsonSerializer.Serialize(new { AppName = "WhereWindsMeet", DisplayName = "Where Winds Meet", InstallLocation = WwmGameRoot }));
             }
             var wwmConfig = wwmConfigJson == null ? new Config() : JsonSerializer.Deserialize<Config>(wwmConfigJson) ?? new Config();
-            wwmConfig.GamePath ??= WwmGameRoot;
-            File.WriteAllText(wwmPaths.ConfigFile, JsonSerializer.Serialize(wwmConfig));
+            if (!_wwmConfigWithoutGamePath) wwmConfig.GamePath ??= WwmGameRoot;
+            File.WriteAllText(wwmPaths.ConfigFile, _wwmInvalidConfigInitially
+                ? "{ invalid configuration"
+                : JsonSerializer.Serialize(wwmConfig));
+            if (_seedLegacyWwmState)
+                SeedLegacyWwmState(wwmPaths, definition, WwmGameRoot);
             if (_seedMalformedWwmJournal)
             {
                 var journal = Path.Combine(wwmPaths.StateDir, "wwm-transaction", "journal.json");
@@ -1788,6 +1885,44 @@ internal sealed class MainFormTestFixture : IDisposable
             Name = "BdoClient.MainFormLifecycleTest"
         };
         _uiThread.SetApartmentState(ApartmentState.STA);
+    }
+
+    private static void SeedLegacyWwmState(GamePersistencePaths paths, WwmGameDefinition definition, string gameRoot)
+    {
+        var targets = definition.GetManagedRelativePaths(WwmInstallationLayout.Package);
+        var installed = new[] { new byte[] { 10, 11, 12 }, new byte[] { 13, 14, 15, 16 } };
+        var baseline = new[] { new byte[] { 90, 91 }, new byte[] { 92, 93, 94 } };
+        for (var index = 0; index < targets.Length; index++)
+            File.WriteAllBytes(Path.Combine(gameRoot, targets[index]), installed[index]);
+
+        var cycleId = Guid.NewGuid().ToString("N");
+        var state = new WwmInstallationState
+        {
+            SchemaVersion = 1, ModeSlug = "ukrainian", ModeVariant = "default", ReleaseVersion = "v2.6.3",
+            ArchiveSizeBytes = 1, ArchiveSha256 = Convert.ToHexString(SHA256.HashData(new byte[] { 1 })).ToLowerInvariant(),
+            PreHubSnapshotCycleId = cycleId, GameBuildId = "25281753", InstalledAt = DateTimeOffset.UtcNow,
+            Targets = installed.Select((bytes, index) => new WwmTargetManifestEntry
+            {
+                RelativePath = targets[index], SizeBytes = bytes.Length,
+                Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()
+            }).ToList()
+        };
+        var store = new WwmStateStore(paths);
+        store.SaveAsync(state).GetAwaiter().GetResult();
+        Directory.CreateDirectory(store.SnapshotDirectory);
+        var snapshotTargets = new List<WwmPreviousTarget>();
+        for (var index = 0; index < targets.Length; index++)
+        {
+            var backupName = $"{index}.bin";
+            File.WriteAllBytes(Path.Combine(store.SnapshotDirectory, backupName), baseline[index]);
+            snapshotTargets.Add(new WwmPreviousTarget
+            {
+                RelativePath = targets[index], Existed = true, SizeBytes = baseline[index].Length,
+                Sha256 = Convert.ToHexString(SHA256.HashData(baseline[index])).ToLowerInvariant(), BackupFile = backupName
+            });
+        }
+        File.WriteAllText(Path.Combine(store.SnapshotDirectory, "snapshot.json"), JsonSerializer.Serialize(
+            new WwmPreHubSnapshot { CycleOperationId = cycleId, GameBuildId = "25281753", Targets = snapshotTargets }));
     }
 
     internal string GameRoot { get; }
@@ -2017,13 +2152,18 @@ internal sealed class MainFormTestFixture : IDisposable
         bool wwmGameMarkersPresent = true,
         Func<string, IEnumerable<string>>? wwmManualDirectoryEnumerator = null,
         bool wwmHasEpicManifest = false,
-        bool wwmAlsoHasLocalDataPatchLayout = false)
+        bool wwmAlsoHasLocalDataPatchLayout = false,
+        bool wwmConfigWithoutGamePath = false,
+        bool wwmInvalidConfigInitially = false,
+        bool seedLegacyWwmState = false,
+        string wwmSteamBuildId = "25281753")
     {
         var fixture = new MainFormTestFixture(
             bdoHandler, startInBackground, exitWhenShown, seedReleaseFeedCache, gamePatch, applicationConfigJson,
             includeSyntheticSecondGame, includeWwm, wwmHandlerFactory, seedMalformedWwmJournal, wwmConfigJson,
             wwmHasSteamManifest, wwmUsesLocalDataPatchLayout, wwmGameMarkersPresent, wwmManualDirectoryEnumerator,
-            wwmHasEpicManifest, wwmAlsoHasLocalDataPatchLayout);
+            wwmHasEpicManifest, wwmAlsoHasLocalDataPatchLayout, wwmConfigWithoutGamePath, seedLegacyWwmState,
+            wwmSteamBuildId, wwmInvalidConfigInitially);
         fixture._uiThread.Start();
 
         try
