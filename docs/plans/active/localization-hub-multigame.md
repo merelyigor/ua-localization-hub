@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **RC #41 bounded correction only; pre-commit external review required; no commit, push or RC #42**
-Current phase: RC #41 manual-root recovery retry — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
-Next action: **external pre-commit review**; RC #39 / #40 / #41 Owner smoke FAILED / NOT ACCEPTED / DO NOT REUSE. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
+Implementation authorization: **No new implementation authorized; prepare a new v1.2.11 Release Candidate only. Final publication remains an Owner gate.**
+Current phase: RC #41 manual-root recovery retry — REVIEWED / ACCEPTED
+Next action: **create a completely new v1.2.11 Release Candidate**; RC #39 / #40 / #41 Owner smoke FAILED / NOT ACCEPTED / DO NOT REUSE. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -206,7 +206,7 @@ External Architect implementation review: **APPROVED**, BLOCKER `0`, IMPORTANT `
 
 High-risk/pre-commit review is required for the runtime architecture boundary, updater/repository identity bridge, physical EXE/autostart migration, any persistence-root migration, and materially different WWM file mutation. Selector shell, visible rebrand and scoped cache isolation after the boundary may use normal Combined mode, with Owner visual smoke for UI. Repository rename is always an Owner operational gate.
 
-Stage 9 analysis, Stage 10 implementation/real E2E, Stage 11A, Stage 11B, compatibility UX, and RC #39/#40 corrections remain **REVIEWED / ACCEPTED**. RC #39 / #40 / #41 remain **FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE**. RC #40 correction commit `1935678a992774a96a3e0ef9f6e531915fcf64f0` passed exact-SHA CI #261 / run `38843181893`, 1202/1202; historical Steam builds are not root identity, stale snapshots block Restore, and incomplete journals cannot rollback into a newer build.
+Stage 9 analysis, Stage 10 implementation/real E2E, Stage 11A, Stage 11B, compatibility UX, and RC #39/#40/#41 corrections remain **REVIEWED / ACCEPTED**. RC #39 / #40 / #41 remain **FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE**. RC #40 correction commit `1935678a992774a96a3e0ef9f6e531915fcf64f0` passed exact-SHA CI #261 / run `38843181893`, 1202/1202; historical Steam builds are not root identity, stale snapshots block Restore, and incomplete journals cannot rollback into a newer build. RC #41 correction is also REVIEWED / ACCEPTED at `731837eb21f45f20ab14a3d87c264bccfb1bb6b2`, exact-SHA CI #263 / run `38927511513` SUCCESS (1204/1204). Its manual-root recovery retry clears the recovery latch only after successful `RecoverAsync`; failed retry remains blocked and reports the new error.
 
 ## Current progress
 
@@ -220,9 +220,9 @@ The correction separates root ownership from Restore staleness. Migration relies
 
 ### RC #41 — manual-root recovery retry correction
 
-Owner smoke RC #41 / run `38844562243` **FAILED / NOT ACCEPTED / DO NOT REUSE**. MainForm retained the startup recovery-block latch after the exact Steam root was manually selected and persisted, so no recovery retry used the newly trusted detection. This bounded UI correction retries `RecoverAsync` immediately after successful path persistence, clears the block only on recovery success, and retains/updates the blocked presentation on failure. Service trust policy is unchanged; synthetic/temp fixtures only, no real game mutation. Current correction is **IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW**; commit/push/RC #42: none.
+Owner smoke RC #41 / run `38844562243` **FAILED / NOT ACCEPTED / DO NOT REUSE**. MainForm retained the startup recovery-block latch after the exact Steam root was manually selected and persisted, so no recovery retry used the newly trusted detection. The accepted correction retries `RecoverAsync` immediately after successful path persistence, clears the block only on recovery success, and retains/updates the blocked presentation on failure. Service trust policy is unchanged; synthetic/temp fixtures only, no real game mutation. External Architect review: **REVIEWED / ACCEPTED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; commit `731837eb21f45f20ab14a3d87c264bccfb1bb6b2`, parent `cc7574e7a6c1827416e8136107a9b1f0962229b8`; exact-SHA CI #263 / run `38927511513` — SUCCESS, 1204 passed / 0 failed / 0 skipped. Next action: create a completely new v1.2.11 RC; RC #39/#40/#41 artifacts must not be reused.
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and RC #39/#40 corrections are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39/#40/#41 failed Owner smoke and must not be reused. RC #41 recovery-retry correction awaits external pre-commit review; no new RC or publication is authorized. No Stage 11C.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and RC #39/#40/#41 corrections are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39/#40/#41 failed Owner smoke and must not be reused. Next action is a completely new v1.2.11 RC; no final tag/publication is authorized. No Stage 11C.
 
 ### v1.2.10 release cycle
 

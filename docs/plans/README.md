@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** RC #41 manual-root recovery retry — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
-**Next:** External pre-commit review; RC #39/#40/#41 remain FAILED / NOT ACCEPTED / DO NOT REUSE
-**Implementation authorization:** No commit, push, RC #42 or publication authorized in this correction
+**Current phase:** RC #41 manual-root recovery retry — REVIEWED / ACCEPTED
+**Next:** Create a completely new v1.2.11 Release Candidate; RC #39/#40/#41 remain FAILED / NOT ACCEPTED / DO NOT REUSE
+**Implementation authorization:** No new implementation; RC preparation only. Final tag/publication remains an Owner gate.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | RC #41 recovery correction — pending external pre-commit review | Review correction; do not reuse RC #39/#40/#41 |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | RC #41 recovery correction — REVIEWED / ACCEPTED | Prepare a new v1.2.11 RC; do not reuse RC #39/#40/#41 |
 
 Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. RC #39 / #40 / #41 are FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #41 / run `38844562243` failed because MainForm did not retry recovery after successful manual root confirmation. The bounded UI correction keeps the service trust rules unchanged, retries with the newly persisted detection, and clears the block only on successful recovery. It is awaiting external pre-commit review; no commit/push/RC #42 or publication is authorized. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. RC #39 / #40 / #41 are FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #41 / run `38844562243` failed because MainForm did not retry recovery after successful manual root confirmation. The bounded UI correction keeps the service trust rules unchanged, retries with the newly persisted detection, and clears the block only on successful recovery; failure preserves the block and updates its message. Correction commit `731837eb21f45f20ab14a3d87c264bccfb1bb6b2` is REVIEWED / ACCEPTED; exact-SHA CI #263 / run `38927511513` succeeded (1204/1204). Next action: prepare a completely new v1.2.11 RC. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C or final publication authorization.
 
 ## Backlog
 
