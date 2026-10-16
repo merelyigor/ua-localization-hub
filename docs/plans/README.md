@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.11 RC #40 legacy Steam-build staleness correction — IMPLEMENTED / VALIDATED / PENDING PRE-COMMIT EXTERNAL ARCHITECT REVIEW
-**Next:** External Architect review of the RC #40 correction; RC #39 and #40 remain FAILED / NOT ACCEPTED / DO NOT REUSE
-**Implementation authorization:** Pre-commit corrective validation only; no commit/push, new RC, final tag, GitHub Release, asset publication, or NEXT reset
+**Current phase:** RC #40 Steam-build staleness correction — REVIEWED / ACCEPTED
+**Next:** Create a new v1.2.11 Release Candidate; RC #39 and #40 remain FAILED / NOT ACCEPTED / DO NOT REUSE
+**Implementation authorization:** Release Candidate preparation only; no final tag, GitHub Release, asset publication, or NEXT reset
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.11 RC #40 correction — PENDING PRE-COMMIT EXTERNAL REVIEW | Architect review; do not reuse RC #39/#40 |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.11 — new Release Candidate preparation | Create a fresh RC; do not reuse RC #39/#40 |
 
 Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A, Stage 11B, WWM API-driven compatibility UX, and the v1.2.11 RC #39 migration correction are REVIEWED / ACCEPTED. RC #39 / run `38552297818` and RC #40 / run `38825506167` both remain FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #40 exposed that historical Steam build IDs were incorrectly used as legacy root-binding evidence. Its bounded correction is implemented/validated and awaits pre-commit external Architect review. No commit, push or new RC is authorized. Stage 8B remains OPTIONAL / NOT STARTED. Do not invent Stage 11C or start unrelated work.
+Stage 9 analysis, Stage 10 WWM implementation/real E2E, Stage 11A, Stage 11B, WWM API-driven compatibility UX, and the v1.2.11 RC #39/#40 corrections are REVIEWED / ACCEPTED. RC #39 / run `38552297818` and RC #40 / run `38825506167` both remain FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #40 correction commit `1935678a992774a96a3e0ef9f6e531915fcf64f0` (parent `a421fa3ab35ab1bd7cc1fe0380d015be504428b7`) passed exact-SHA CI #261 / run `38843181893`, 1202/1202; external verdict BLOCKER 0 / IMPORTANT 0 / OPTIONAL 0. Historical Steam builds are not root identity; stale linked snapshots block Restore Original but not normal managed install/update, and incomplete journals cannot rollback into a newer build. Stage 8B remains OPTIONAL / NOT STARTED. Next action is a new v1.2.11 Release Candidate; no final tag or publication is authorized. Do not invent Stage 11C or start unrelated work.
 
 ## Backlog
 
