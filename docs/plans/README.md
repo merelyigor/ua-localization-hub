@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** RC #42 external-target reinstall correction — PRE-COMMIT REVIEW
-**Next:** Complete bounded correction, automated validation and external pre-commit review; RC #39/#40/#41/#42 remain FAILED / NOT ACCEPTED / DO NOT REUSE
-**Implementation authorization:** Only the explicitly requested RC #42 correction; no commit/push/new RC. Publication remains an Owner gate.
+**Current phase:** v1.2.11 — NEW RELEASE CANDIDATE PREPARATION
+**Next:** Generate and validate a new RC from accepted main, then Owner end-to-end install smoke; RC #39/#40/#41/#42 remain FAILED / NOT ACCEPTED / DO NOT REUSE
+**Implementation authorization:** Lifecycle documentation sync and mechanical RC preparation only. No final tag or publication; Owner smoke remains required.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | RC #42 external-target reinstall correction — PRE-COMMIT REVIEW | Validate and export patch for external review; do not commit/push or create RC #43 |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.11 — NEW RELEASE CANDIDATE PREPARATION | Create a new RC and deliver exact canonical artifact for Owner end-to-end install smoke |
 
 Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. RC #39/#40/#41/#42 are FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #42 / run `38930894752` failed because externally changed WWM targets with a trusted bound state and no active journal were treated as recovery failure, blocking fresh API Install as well as stale Restore. The current bounded pre-commit correction separates `NeedsReinstall` from unsafe/corrupt `Modified`, captures exact current targets for the next operation's durable rollback baseline, and keeps the historical pre-Hub snapshot unchanged with Restore disabled when stale. Read-only Owner-state diagnosis only; no real game files mutated. This correction remains PRE-COMMIT REVIEW; commit/push/RC #43 are not authorized. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. RC #39/#40/#41/#42 are FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #42 / run `38930894752` failed because externally changed WWM targets with a trusted bound state and no active journal were treated as recovery failure, blocking fresh API Install. Accepted correction `e87e2688e2c7fb144ced1adde84745abf3369684` (CI #265 / run `38957407339`, SUCCESS, 1209/1209) separates `NeedsReinstall` from unsafe states and captures exact current targets as the next install transaction's rollback baseline; a stale historical snapshot can disable Restore without blocking fresh API Install. New v1.2.11 RC preparation is authorized; Owner end-to-end install smoke remains required. No final tag/publication. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
 
 ## Backlog
 

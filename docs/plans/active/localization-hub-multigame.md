@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **Only the explicitly requested RC #42 external-target reinstall correction in pre-commit review mode. No commit/push/RC #43. Final publication remains an Owner gate.**
-Current phase: RC #42 external-target reinstall correction — PRE-COMMIT REVIEW
-Next action: **complete validation and export the full patch for external review**; RC #39/#40/#41/#42 Owner smoke FAILED / NOT ACCEPTED / DO NOT REUSE. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
+Implementation authorization: **Lifecycle documentation sync and mechanical preparation of a new v1.2.11 Release Candidate. Owner end-to-end install smoke is required; final publication remains an Owner gate.**
+Current phase: v1.2.11 — NEW RELEASE CANDIDATE PREPARATION
+Next action: **generate and validate a new RC, then provide its exact canonical artifact for Owner end-to-end install smoke**; RC #39/#40/#41/#42 Owner smoke FAILED / NOT ACCEPTED / DO NOT REUSE. No Stage 11C; Stage 8B remains OPTIONAL / NOT STARTED.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -222,7 +222,7 @@ The correction separates root ownership from Restore staleness. Migration relies
 
 Owner smoke RC #41 / run `38844562243` **FAILED / NOT ACCEPTED / DO NOT REUSE**. MainForm retained the startup recovery-block latch after the exact Steam root was manually selected and persisted, so no recovery retry used the newly trusted detection. The accepted correction retries `RecoverAsync` immediately after successful path persistence, clears the block only on recovery success, and retains/updates the blocked presentation on failure. Service trust policy is unchanged; synthetic/temp fixtures only, no real game mutation. External Architect review: **REVIEWED / ACCEPTED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; commit `731837eb21f45f20ab14a3d87c264bccfb1bb6b2`, parent `cc7574e7a6c1827416e8136107a9b1f0962229b8`; exact-SHA CI #263 / run `38927511513` — SUCCESS, 1204 passed / 0 failed / 0 skipped. Next action: create a completely new v1.2.11 RC; RC #39/#40/#41 artifacts must not be reused.
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and RC #39/#40/#41 corrections are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39/#40/#41/#42 failed Owner smoke and must not be reused. RC #42 correction is in pre-commit review; no commit/push or new RC is authorized. No Stage 11C.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and RC #39/#40/#41/#42 corrections are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39/#40/#41/#42 failed Owner smoke and must not be reused. The accepted RC #42 correction (`e87e2688e2c7fb144ced1adde84745abf3369684`, CI #265 / run `38957407339` SUCCESS, 1209/1209) treats trusted no-journal external target changes as `NeedsReinstall`; fresh API Install uses exact current targets as its rollback baseline, while stale Restore remains unavailable. Current action: prepare a new v1.2.11 RC and await Owner end-to-end install smoke. No final tag/publication; no Stage 11C.
 
 ### v1.2.10 release cycle
 
@@ -236,4 +236,4 @@ Roadmap approved by Owner and activated after v1.2.7 external release acceptance
 
 RC #42 / run `38930894752` Owner smoke **FAILED / NOT ACCEPTED / DO NOT REUSE**. Read-only diagnosis found trusted schema-v2 root/layout/cycle state, an integrity-valid linked snapshot from historical Steam build `25281753`, no active journal, current build `25906190`, and both live targets differing from the previous installed hashes. The bug treated this expected external/game-update change as recovery failure and disabled the fresh API Install action.
 
-The current pre-commit correction uses a distinct `NeedsReinstall` presentation only for structurally valid trusted state with no active journal; fresh API install remains available, while Restore can remain disabled for the stale snapshot. The new transaction captures both exact current targets as its operation rollback baseline and journals them before replacement. The historical pre-Hub snapshot remains unchanged. Tests and API validation use synthetic/temp roots. Real WWM files were inspected read-only and not mutated. No commit/push/RC #43; external pre-commit review pending.
+The accepted correction commit `e87e2688e2c7fb144ced1adde84745abf3369684` (parent `aab84800fb49025f43e5ef9b4fdd2eb6c80088e7`) uses a distinct `NeedsReinstall` presentation only for structurally valid trusted state with no active journal; fresh API install remains available, while Restore can remain disabled for a stale snapshot. The transaction captures both exact current targets as its rollback baseline and journals them before replacement. The historical pre-Hub snapshot remains unchanged. Synthetic startup/install/new-session regression passed; real WWM files were not mutated during correction. External Architect: **REVIEWED / ACCEPTED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; exact-SHA CI #265 / run `38957407339` — SUCCESS, 1209/1209. RC #42 remains failed and must not be reused. Next: new v1.2.11 RC and Owner end-to-end install smoke; no final tag/publication.
