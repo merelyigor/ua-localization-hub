@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.11 — NEW RELEASE CANDIDATE PREPARATION
-**Next:** Generate and validate a new RC from accepted main, then Owner end-to-end install smoke; RC #39/#40/#41/#42 remain FAILED / NOT ACCEPTED / DO NOT REUSE
-**Implementation authorization:** Lifecycle documentation sync and mechanical RC preparation only. No final tag or publication; Owner smoke remains required.
+**Current phase:** v1.2.11 — RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW
+**Next:** Owner-authorized v1.2.12 authoritative localization freshness and WWM release-version presentation
+**Implementation authorization:** Bounded v1.2.12 task as specified by Owner; high-risk BDO release-selection changes remain pre-commit review. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.11 — NEW RELEASE CANDIDATE PREPARATION | Create a new RC and deliver exact canonical artifact for Owner end-to-end install smoke |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.12 — AUTHORITATIVE LOCALIZATION FRESHNESS | Complete read-only diagnosis, then implement under pre-commit review; WWM API version label included |
 
-Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.10 exact RC assets, public tag, release body and downloads were verified.
+Release cycles: `v1.2.9` and `v1.2.10` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.11 — RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW; exact RC assets, annotated tag, release body and public downloads were verified and archived in [`../releases/v1.2.11.md`](../releases/v1.2.11.md).
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. RC #39/#40/#41/#42 are FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #42 / run `38930894752` failed because externally changed WWM targets with a trusted bound state and no active journal were treated as recovery failure, blocking fresh API Install. Accepted correction `e87e2688e2c7fb144ced1adde84745abf3369684` (CI #265 / run `38957407339`, SUCCESS, 1209/1209) separates `NeedsReinstall` from unsafe states and captures exact current targets as the next install transaction's rollback baseline; a stale historical snapshot can disable Restore without blocking fresh API Install. New v1.2.11 RC preparation is authorized; Owner end-to-end install smoke remains required. No final tag/publication. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. RC #39/#40/#41/#42 are FAILED OWNER SMOKE / NOT ACCEPTED / DO NOT REUSE. RC #42 correction `e87e2688e2c7fb144ced1adde84745abf3369684` passed Architect review, CI #265 / run `38957407339` (1209/1209); RC #43 then passed Owner WWM end-to-end installation smoke and v1.2.11 was published stable as Release ID `416033195`, tag peeling to `758755058e3a197a59ec41452fb6a95938b54d7a`. Lifecycle: RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW. Current authorized follow-up is bounded v1.2.12 authoritative latest localization consistency and WWM release-version display. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
 
 ## Backlog
 
