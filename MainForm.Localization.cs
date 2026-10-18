@@ -140,8 +140,8 @@ public partial class MainForm
             : await session.InstallService.CheckRestoreAvailabilityAsync(session.CurrentDetection, cancellationToken).ConfigureAwait(true);
         if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
         SetActionsEnabled(restoreAvailability.IsAvailable && !IsUiWorkBlocked);
-        if (!restoreAvailability.IsAvailable && !string.IsNullOrWhiteSpace(restoreAvailability.Message))
-            SetMessage(restoreAvailability.Message);
+        logsToolTip.SetToolTip(restoreOriginalButton,
+            restoreAvailability.IsAvailable ? string.Empty : restoreAvailability.Message ?? string.Empty);
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
         {
             var hasPackage = WwmPackageResolver.TryResolve(_wwmFeed, card.ModeSlug, card.ModeVariant, out var package, out _);
@@ -248,6 +248,7 @@ public partial class MainForm
         session.Poller.Pause();
         SetControlsDuringOperation(false);
         SetOperationState(OperationState.LoadingApi);
+        SetWwmCardBusy(slug, variant, "Перевіряємо актуальний реліз…");
         try
         {
             var latest = await session.ApiClient.GetLatestAsync(token);
@@ -270,6 +271,9 @@ public partial class MainForm
             token.ThrowIfCancellationRequested();
             if (!IsCurrentGameSession(_gameSessionGeneration, session)) return;
             SetOperationState(OperationState.Downloading);
+            progressBar.Style = ProgressBarStyle.Marquee;
+            progressBar.MarqueeAnimationSpeed = 30;
+            SetWwmCardBusy(slug, variant, "Завантажуємо та встановлюємо реліз…");
             cancelButton.Visible = true;
             cancelButton.Enabled = true;
             var result = WwmInstallResultForTest != null
@@ -323,6 +327,16 @@ public partial class MainForm
         var version = _wwmFeed?.Data?.Current?.Version;
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
             card.SetReleaseVersion(version);
+    }
+
+    private void SetWwmCardBusy(string slug, string variant, string message)
+    {
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+        {
+            if (string.Equals(card.ModeSlug, slug, StringComparison.Ordinal)
+                && string.Equals(card.ModeVariant, variant, StringComparison.Ordinal))
+                card.PresentBusy(message);
+        }
     }
 
     private async Task<WwmMutationResult> HandleWwmRestoreAsync()

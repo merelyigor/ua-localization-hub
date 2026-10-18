@@ -451,6 +451,7 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.True(beforeInstallCard.ActionVisibleForTest);
         Assert.True(beforeInstallCard.ActionEnabledForTest);
         Assert.False(fixture.Form.WwmRestoreEnabledForTest);
+        Assert.DoesNotContain("Steam build відрізняється", fixture.Form.OperationMessageForTest, StringComparison.Ordinal);
         for (var index = 0; index < targets.Length; index++)
             Assert.Equal(externalCurrentBytes[index], await File.ReadAllBytesAsync(Path.Combine(fixture.WwmGameRoot, targets[index])));
 

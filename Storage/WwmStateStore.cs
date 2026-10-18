@@ -204,7 +204,7 @@ public sealed class WwmStateStore
     private static string? GetJournalValidationError(WwmTransactionJournal? journal)
     {
         if (journal == null) return "WWM transaction journal is empty.";
-        if (journal.SchemaVersion is not (1 or 2)) return "WWM transaction journal schema is unsupported.";
+        if (journal.SchemaVersion is not (1 or 2 or 3)) return "WWM transaction journal schema is unsupported.";
         if (!Guid.TryParseExact(journal.OperationId, "N", out _)) return "WWM transaction journal operation id is invalid.";
         if (journal.Operation is not ("install" or "restore")) return "WWM transaction journal operation is invalid.";
         if (journal.PreviousTargets == null || journal.TargetManifest == null || journal.ExpectedAbsentTargets == null)
@@ -218,6 +218,21 @@ public sealed class WwmStateStore
             return "WWM transaction journal previous target manifest is invalid.";
         if (journal.PreviousTargets.Select(item => item.RelativePath).Distinct(StringComparer.Ordinal).Count() != 2)
             return "WWM transaction journal previous targets are duplicated.";
+        if (journal.AttributeOnlyTargets == null) return "WWM journal attribute-target collection is missing.";
+        if (journal.SchemaVersion < 3 && journal.AttributeOnlyTargets.Count != 0)
+            return "Legacy WWM journal unexpectedly contains attribute-only targets.";
+        if ((journal.SchemaVersion == 3 && journal.AttributeOnlyTargets.Count != 2)
+            || (journal.AttributeOnlyTargets.Count != 0
+            && (journal.AttributeOnlyTargets.Count != 2
+                || journal.TargetLayout != nameof(WwmInstallationLayout.Package)
+                || !journal.AttributeOnlyTargets.Select((item, index) => (item, index)).All(pair => pair.item != null
+                    && pair.item.RelativePath == WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch)[pair.index]
+                    && (pair.item.Existed
+                        ? pair.item.SizeBytes > 0 && IsSha256(pair.item.Sha256) && IsSafeAttributes(pair.item.Attributes)
+                            && pair.item.BackupFile == null
+                        : pair.item.SizeBytes == null && pair.item.Sha256 == null && pair.item.BackupFile == null && pair.item.Attributes == null)))
+            || journal.AttributeOnlyTargets.Select(item => item.RelativePath).Distinct(StringComparer.OrdinalIgnoreCase).Count() != journal.AttributeOnlyTargets.Count))
+            return "WWM journal attribute-only target manifest is invalid.";
         if (journal.PreviousStateBase64 is null) return "WWM transaction journal previous state field is missing.";
         if (!ValidateJournalOutcome(journal)) return "WWM transaction journal expected outcome is invalid.";
         var allPaths = journal.PreviousTargets.Select(item => item.RelativePath)
@@ -252,6 +267,7 @@ public sealed class WwmTransactionJournal
     [JsonPropertyName("previous_state_existed")] public bool PreviousStateExisted { get; set; }
     [JsonPropertyName("created_pre_hub_snapshot")] public bool CreatedPreHubSnapshot { get; set; }
     [JsonPropertyName("previous_targets")] public List<WwmPreviousTarget> PreviousTargets { get; set; } = new();
+    [JsonPropertyName("attribute_only_targets")] public List<WwmPreviousTarget> AttributeOnlyTargets { get; set; } = new();
     [JsonPropertyName("target_manifest")] public List<WwmTargetManifestEntry> TargetManifest { get; set; } = new();
     [JsonPropertyName("expected_absent_targets")] public List<string> ExpectedAbsentTargets { get; set; } = new();
     [JsonPropertyName("expected_state_sha256")] public string? ExpectedStateSha256 { get; set; }

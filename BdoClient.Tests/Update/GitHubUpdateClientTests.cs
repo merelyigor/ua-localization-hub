@@ -362,10 +362,32 @@ public class GitHubUpdateClientTests
     }
 
     [Fact]
-    public async Task DownloadAssetAsync_Http404_NoRetry()
+    public async Task DownloadAssetAsync_Http404ThenAvailable_RetriesAndSucceeds()
     {
         var handler = new QueuedHandler();
         handler.Enqueue(new HttpResponseMessage(HttpStatusCode.NotFound));
+        handler.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(Encoding.UTF8.GetBytes("ok"))
+        });
+        var client = CreateClientWithHandler(handler);
+        var dest = Path.Combine(Path.GetTempPath(), $"bdo-test-{Guid.NewGuid():N}.bin");
+        try
+        {
+            var result = await client.DownloadAssetAsync("https://github.com/test/BDO-UA-Client.exe", dest, 2, null);
+            Assert.True(result.IsSuccess);
+            Assert.Equal(2, handler.RequestCount);
+            Assert.Equal("ok", await File.ReadAllTextAsync(dest));
+        }
+        finally { if (File.Exists(dest)) File.Delete(dest); }
+    }
+
+    [Fact]
+    public async Task DownloadAssetAsync_Http404_RemainsFailureAfterRetryBudget()
+    {
+        var handler = new QueuedHandler();
+        for (var attempt = 0; attempt <= GitHubUpdateClient.MaxRetries; attempt++)
+            handler.Enqueue(new HttpResponseMessage(HttpStatusCode.NotFound));
         var client = CreateClientWithHandler(handler);
         var dest = Path.Combine(Path.GetTempPath(), $"bdo-test-{Guid.NewGuid():N}.bin");
         try
@@ -373,6 +395,8 @@ public class GitHubUpdateClientTests
             var result = await client.DownloadAssetAsync("https://github.com/test/BDO-UA-Client.exe", dest, 100, null);
             Assert.False(result.IsSuccess);
             Assert.Contains("404", result.ErrorMessage!);
+            Assert.Equal(GitHubUpdateClient.MaxRetries + 1, handler.RequestCount);
+            Assert.False(File.Exists(dest));
         }
         finally { if (File.Exists(dest)) File.Delete(dest); }
     }
@@ -498,6 +522,8 @@ public class GitHubUpdateClientTests
         private readonly Queue<HttpResponseMessage> _responses = new();
         private long? _contentLengthOverride;
 
+        public int RequestCount { get; private set; }
+
         public QueuedHandler(params object[] responses)
         {
             foreach (var r in responses)
@@ -523,6 +549,7 @@ public class GitHubUpdateClientTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount++;
             if (_responses.Count == 0)
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
 

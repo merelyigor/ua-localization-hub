@@ -333,7 +333,7 @@ public partial class MainForm
         foreach (var card in modesFlowPanel.Controls.OfType<LocalizationModeCard>())
             card.Enabled = enabled;
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
-            card.Enabled = enabled;
+            card.SetInteractionEnabled(enabled);
         if (_apiLoadedSuccessfully && _wwmSession == null)
             ApplyModeCardPresentations(_lastResolvedState, _lastInstalledModeSlug, _lastInstalledPublicId);
         RefreshUpdateButtonPresentation();

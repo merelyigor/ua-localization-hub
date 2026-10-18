@@ -1,4 +1,3 @@
-using System.Drawing.Drawing2D;
 using BdoClient.Models;
 using BdoClient.Services;
 
@@ -108,32 +107,15 @@ internal sealed class LocalizationModeCard : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        var bounds = ClientRectangle; bounds.Width--; bounds.Height--;
-        if (bounds.Width <= 1 || bounds.Height <= 1) return;
-        var surface = !Enabled ? UiTheme.DisabledSurface : _hovered ? UiTheme.SurfaceHover : UiTheme.Surface;
-        var borderColor = !Enabled ? UiTheme.DisabledBorder : _hovered ? UiTheme.BorderHover : UiTheme.Border;
-        if (_presentation.Tone == ModeCardTone.Success) borderColor = UiTheme.Success;
-        if (_presentation.Tone == ModeCardTone.Warning) borderColor = UiTheme.Accent;
-        if (_presentation.Tone == ModeCardTone.Error) borderColor = UiTheme.Error;
-        using var path = Rounded(bounds, UiTheme.Scale(this, 16));
-        using var fill = new SolidBrush(surface);
-        using var border = new Pen(borderColor);
-        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        e.Graphics.FillPath(fill, path); e.Graphics.DrawPath(border, path);
+        ModeCardChrome.DrawSurface(e.Graphics, this, _presentation.Tone, _selected, _hovered, Enabled, Focused);
 
         var padding = UiTheme.Scale(this, 18);
         var parsed = LocalizationFlagParser.Parse(DynamicModePolicy.GetDisplayName(Mode));
         DrawFlags(e.Graphics, parsed.CountryCodes, new Point(padding, padding), DeviceDpi / 96f);
         if (!string.IsNullOrWhiteSpace(_presentation.StateText))
         {
-            using var badgeFont = new Font(Font.FontFamily, 8.5F, FontStyle.Bold);
-            var badgeSize = TextRenderer.MeasureText(_presentation.StateText, badgeFont);
-            var badgeRect = new Rectangle(Width - padding - badgeSize.Width - UiTheme.Scale(this, 14), padding - UiTheme.Scale(this, 3), badgeSize.Width + UiTheme.Scale(this, 14), UiTheme.Scale(this, 24));
-            using var badgeFill = new SolidBrush(ToneSurface(_presentation.Tone));
-            using var badgeBorder = new Pen(borderColor);
-            using var badgePath = Rounded(badgeRect, UiTheme.Scale(this, 12));
-            e.Graphics.FillPath(badgeFill, badgePath); e.Graphics.DrawPath(badgeBorder, badgePath);
-            TextRenderer.DrawText(e.Graphics, _presentation.StateText, badgeFont, badgeRect, ToneText(_presentation.Tone), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            ModeCardChrome.DrawTopRightBadge(e.Graphics, this, _presentation.StateText, _presentation.Tone,
+                inset: 18, top: 15);
         }
 
         var top = padding + UiTheme.Scale(this, 30);
@@ -149,18 +131,9 @@ internal sealed class LocalizationModeCard : Control
             y += Measure(description, bodyFont, textWidth).Height + UiTheme.Scale(this, 6);
         }
         TextRenderer.DrawText(e.Graphics, DynamicModePolicy.FormatReleaseLine(Mode), bodyFont, new Rectangle(padding, y, textWidth, Height - y), UiTheme.SecondaryText, TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
-        if (Focused)
-        {
-            var focus = Rectangle.Inflate(bounds, -UiTheme.Scale(this, 5), -UiTheme.Scale(this, 5));
-            using var focusPen = new Pen(UiTheme.SecondaryText, 1) { DashStyle = DashStyle.Dot };
-            using var focusPath = Rounded(focus, UiTheme.Scale(this, 11)); e.Graphics.DrawPath(focusPen, focusPath);
-        }
     }
 
     private static Size Measure(string text, Font font, int width) => TextRenderer.MeasureText(text, font, new Size(Math.Max(1, width), 0), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
-    private static Color ToneSurface(ModeCardTone tone) => tone switch { ModeCardTone.Success => UiTheme.SuccessSurface, ModeCardTone.Warning => UiTheme.GoldSubtleSurface, ModeCardTone.Error => UiTheme.ErrorSurface, ModeCardTone.Busy => UiTheme.SurfaceHover, _ => UiTheme.SurfaceElevated };
-    private static Color ToneText(ModeCardTone tone) => tone switch { ModeCardTone.Success => UiTheme.Success, ModeCardTone.Warning => UiTheme.Accent, ModeCardTone.Error => UiTheme.Error, _ => UiTheme.SecondaryText };
-    private static GraphicsPath Rounded(Rectangle r, int radius) { var d = Math.Max(1, radius * 2); var path = new GraphicsPath(); path.AddArc(r.Left,r.Top,d,d,180,90); path.AddArc(r.Right-d,r.Top,d,d,270,90); path.AddArc(r.Right-d,r.Bottom-d,d,d,0,90); path.AddArc(r.Left,r.Bottom-d,d,d,90,90); path.CloseFigure(); return path; }
     private static void DrawFlags(Graphics graphics, IReadOnlyList<string> codes, Point start, float scale)
     {
         var width=(int)Math.Round(30*scale); var height=(int)Math.Round(18*scale); var gap=(int)Math.Round(5*scale); var x=start.X;

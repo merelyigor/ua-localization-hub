@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **NONE; next implementation work requires OWNER DECISION.**
-Current phase: v1.2.13 — RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW
-Next action: **OWNER DECISION REQUIRED.** v1.2.13 Release ID `416446964` is published from `4ca4199e2fd540459cf8e37857c9d0e6d361e623`; CI #270 / run `39127970968`, RC #45 / run `39128159096`, and public asset verification passed. Archive: [`../../releases/v1.2.13.md`](../../releases/v1.2.13.md). v1.2.12 remains archived at [`../../releases/v1.2.12.md`](../../releases/v1.2.12.md). Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C or new work is authorized by this plan.
+Implementation authorization: **Owner-authorized v1.2.15 release preparation only.**
+Current phase: v1.2.15 — RELEASE PREPARATION
+Next action: **exact-SHA CI → Release Candidate → verify bundles → publish.** Stable v1.2.14 (Release ID `416460308`, source `2156d36f08cd1fa7ac72c70b48fd94bf468fd2d3`) is archived at [`../../releases/v1.2.14.md`](../../releases/v1.2.14.md). Owner waived external Architect review for v1.2.15; no acceptance by the Implementation Agent is claimed. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal
@@ -222,7 +222,7 @@ The correction separates root ownership from Restore staleness. Migration relies
 
 Owner smoke RC #41 / run `38844562243` **FAILED / NOT ACCEPTED / DO NOT REUSE**. MainForm retained the startup recovery-block latch after the exact Steam root was manually selected and persisted, so no recovery retry used the newly trusted detection. The accepted correction retries `RecoverAsync` immediately after successful path persistence, clears the block only on recovery success, and retains/updates the blocked presentation on failure. Service trust policy is unchanged; synthetic/temp fixtures only, no real game mutation. External Architect review: **REVIEWED / ACCEPTED**, BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`; commit `731837eb21f45f20ab14a3d87c264bccfb1bb6b2`, parent `cc7574e7a6c1827416e8136107a9b1f0962229b8`; exact-SHA CI #263 / run `38927511513` — SUCCESS, 1204 passed / 0 failed / 0 skipped. RC #43 subsequently passed Owner WWM install smoke and was published as v1.2.11; RC #39/#40/#41 artifacts were not reused.
 
-Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and RC #39/#40/#41/#42 corrections are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39/#40/#41/#42 failed Owner smoke and were not reused. v1.2.11 remains RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.12 (Release ID `416416383`) is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**; tag `v1.2.12` peels to `f35a9457fbd7294c02ff86de781fc46952a0e887`. The implementation and release cycle are complete. Next implementation authorization: **OWNER DECISION REQUIRED**. No Stage 11C.
+Roadmap approved by Owner and activated after v1.2.7 external release acceptance. Stage 0 is complete. Stages 1–8A, 8C, 8D.1, 8D.2, 9, 10, 11A and 11B, compatibility UX, and RC #39/#40/#41/#42 corrections are **REVIEWED / ACCEPTED**. Stage 8B remains **OPTIONAL / NOT STARTED**. RC #39/#40/#41/#42 failed Owner smoke and were not reused. v1.2.11 remains RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.12 and v1.2.13 remain archived; v1.2.14 (Release ID `416460308`) is the current stable release. The Owner has authorized the bounded v1.2.15 release preparation described above and waived external Architect review for this release. No Stage 11C.
 
 ### v1.2.10 release cycle
 

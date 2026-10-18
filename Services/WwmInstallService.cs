@@ -291,6 +291,9 @@ public sealed class WwmInstallService
             Directory.CreateDirectory(operationDir);
             var previousState = File.Exists(_store.StateFile) ? await File.ReadAllBytesAsync(_store.StateFile, token).ConfigureAwait(false) : null;
             var previous = await CaptureTargetsAsync(gameRoot, operationDir, token).ConfigureAwait(false);
+            var attributeOnlyTargets = CurrentBinding.Layout == WwmInstallationLayout.Package
+                ? await CaptureLocalDataOverrideAttributesAsync(gameRoot, token).ConfigureAwait(false)
+                : new List<WwmPreviousTarget>();
             var newState = new WwmInstallationState
             {
                 SchemaVersion = 2,
@@ -310,13 +313,14 @@ public sealed class WwmInstallService
             var stateJson = WwmStateStore.SerializeState(newState);
             journal = new WwmTransactionJournal
             {
-                SchemaVersion = 2,
+                SchemaVersion = attributeOnlyTargets.Count == 0 ? 2 : 3,
                 OperationId = operationId,
                 Operation = "install",
                 CreatedPreHubSnapshot = createdPreHubSnapshot,
                 PreviousStateExisted = previousState != null,
                 PreviousStateBase64 = previousState == null ? "" : Convert.ToBase64String(previousState),
                 PreviousTargets = previous,
+                AttributeOnlyTargets = attributeOnlyTargets,
                 TargetManifest = staged.Targets.ToList(),
                 ExpectedStateSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stateJson))).ToLowerInvariant(),
                 GameBuildId = buildId,
@@ -326,6 +330,25 @@ public sealed class WwmInstallService
             };
             phase = "write_journal";
             await _store.WriteJournalAsync(journal, token).ConfigureAwait(false);
+
+            if (attributeOnlyTargets.Any(item => item.Existed
+                && item.Attributes is { } attributes && (((FileAttributes)attributes) & FileAttributes.ReadOnly) != 0))
+            {
+                if (!await MatchesPreviousOutcomeAsync(gameRoot, journal, token).ConfigureAwait(false))
+                    throw new InvalidDataException("WWM targets changed after rollback baseline capture.");
+                capturedBaselineVerified = true;
+                foreach (var item in attributeOnlyTargets.Where(item => item.Existed
+                    && item.Attributes is { } attributes && (((FileAttributes)attributes) & FileAttributes.ReadOnly) != 0))
+                {
+                    token.ThrowIfCancellationRequested();
+                    var target = SafeManagedTarget(gameRoot, item.RelativePath, WwmInstallationLayout.LocalDataPatch);
+                    if (!await MatchesPreviousTargetAsync(gameRoot, item, token, WwmInstallationLayout.LocalDataPatch).ConfigureAwait(false))
+                        throw new InvalidDataException("WWM LocalData override changed after rollback baseline capture.");
+                    mutationStarted = true;
+                    targetMutationOccurred = true;
+                    ClearReadOnlyAttribute(target);
+                }
+            }
 
             var appliedTargets = 0;
             foreach (var item in staged.Targets)
@@ -377,6 +400,8 @@ public sealed class WwmInstallService
                     File.Move(replacement, target);
                     targetMutationOccurred = true;
                 }
+                if (CurrentBinding.Layout == WwmInstallationLayout.LocalDataPatch)
+                    ClearReadOnlyAttribute(target);
                 phase = "verify_target";
                 await VerifyFileAsync(target, item, token).ConfigureAwait(false);
                 phase = "post_replace_hook";
@@ -909,7 +934,7 @@ public sealed class WwmInstallService
 
         if (state != null && state.SchemaVersion == 2 && !StateMatchesBinding(state, CurrentBinding))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан WWM належить іншій інсталяції; legacy binding заблоковано.");
-        if (journal != null && journal.SchemaVersion == 2 && !JournalMatchesBinding(journal, CurrentBinding))
+        if (journal != null && journal.SchemaVersion >= 2 && !JournalMatchesBinding(journal, CurrentBinding))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Журнал WWM належить іншій інсталяції; legacy binding заблоковано.");
         if (snapshot?.SchemaVersion == 2 && !ValidateSnapshotFiles(snapshot))
             return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Знімок WWM має некоректну прив’язку або файли; legacy binding заблоковано.");
@@ -1222,9 +1247,45 @@ public sealed class WwmInstallService
         return result;
     }
 
-    private async Task<bool> MatchesPreviousTargetAsync(string root, WwmPreviousTarget previous, CancellationToken token)
+    private async Task<List<WwmPreviousTarget>> CaptureLocalDataOverrideAttributesAsync(string root, CancellationToken token)
     {
-        var target = SafeGameTarget(root, previous.RelativePath);
+        var paths = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch);
+        var result = new List<WwmPreviousTarget>(paths.Length);
+        for (var index = 0; index < paths.Length; index++)
+        {
+            token.ThrowIfCancellationRequested();
+            var relative = paths[index];
+            var target = SafeManagedTarget(root, relative, WwmInstallationLayout.LocalDataPatch);
+            if (!File.Exists(target))
+            {
+                result.Add(new WwmPreviousTarget { RelativePath = relative, Existed = false });
+                continue;
+            }
+
+            var before = new FileInfo(target);
+            var attributes = File.GetAttributes(target);
+            if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                throw new InvalidDataException($"Unsafe WWM LocalData override type: {relative}");
+            var beforeHash = await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false);
+            var after = new FileInfo(target);
+            if (before.Length != after.Length || before.LastWriteTimeUtc != after.LastWriteTimeUtc
+                || attributes != File.GetAttributes(target)
+                || !string.Equals(beforeHash, await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), StringComparison.OrdinalIgnoreCase))
+                throw new IOException($"WWM LocalData override changed while its attribute rollback baseline was captured: {relative}");
+
+            result.Add(new WwmPreviousTarget
+            {
+                RelativePath = relative, Existed = true, SizeBytes = before.Length, Sha256 = beforeHash,
+                Attributes = (int)attributes
+            });
+        }
+        return result;
+    }
+
+    private async Task<bool> MatchesPreviousTargetAsync(string root, WwmPreviousTarget previous, CancellationToken token,
+        WwmInstallationLayout? targetLayout = null)
+    {
+        var target = SafeManagedTarget(root, previous.RelativePath, targetLayout ?? CurrentBinding.Layout);
         FileAttributes? attributes = null;
         try { attributes = File.GetAttributes(target); }
         catch (FileNotFoundException) { }
@@ -1247,7 +1308,8 @@ public sealed class WwmInstallService
             {
                 token.ThrowIfCancellationRequested();
                 activeTarget = item.RelativePath;
-                var target = SafeGameTarget(root, item.RelativePath);
+                var targetLayout = WwmStateStore.GetLayoutForPath(item.RelativePath);
+                var target = SafeManagedTarget(root, item.RelativePath, targetLayout);
                 if (!item.Existed)
                 {
                     phase = "delete_created_target";
@@ -1263,7 +1325,7 @@ public sealed class WwmInstallService
                     return false;
                 }
                 phase = "prepare_rollback_temp";
-                var temp = PrepareGameTemp(root, item.RelativePath, journal.OperationId, ".rollback-");
+                var temp = PrepareGameTemp(root, item.RelativePath, journal.OperationId, ".rollback-", targetLayout);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                 phase = "write_rollback_temp";
                 await CopyFileAsync(backup, temp, token).ConfigureAwait(false);
@@ -1286,6 +1348,29 @@ public sealed class WwmInstallService
                     return false;
                 }
             }
+            foreach (var item in journal.AttributeOnlyTargets)
+            {
+                token.ThrowIfCancellationRequested();
+                activeTarget = item.RelativePath;
+                var target = SafeManagedTarget(root, item.RelativePath, WwmInstallationLayout.LocalDataPatch);
+                FileAttributes? attributes = null;
+                try { attributes = File.GetAttributes(target); }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+                if (!item.Existed)
+                {
+                    if (attributes != null) return false;
+                    continue;
+                }
+                if (attributes == null || (attributes.Value & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0
+                    || new FileInfo(target).Length != item.SizeBytes
+                    || !string.Equals(await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), item.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.Error($"WWM rollback refused to rewrite changed LocalData override bytes: {item.RelativePath}");
+                    return false;
+                }
+                File.SetAttributes(target, (FileAttributes)item.Attributes!.Value);
+            }
             activeTarget = null;
             phase = "restore_previous_state";
             var oldState = journal.PreviousStateExisted ? Convert.FromBase64String(journal.PreviousStateBase64) : null;
@@ -1301,13 +1386,14 @@ public sealed class WwmInstallService
         }
     }
 
-    private string PrepareGameTemp(string root, string relativePath, string operationId, string kind)
+    private string PrepareGameTemp(string root, string relativePath, string operationId, string kind,
+        WwmInstallationLayout? targetLayout = null)
     {
         if (!Guid.TryParseExact(operationId, "N", out _)
             || kind is not (".hub-" or ".rollback-"))
             throw new InvalidDataException("Invalid WWM game-temp ownership metadata.");
 
-        var target = SafeGameTarget(root, relativePath);
+        var target = SafeManagedTarget(root, relativePath, targetLayout ?? CurrentBinding.Layout);
         var targetDirectory = Path.GetDirectoryName(target)!;
         var tempPath = Path.GetFullPath(target + kind + operationId + ".tmp");
         if (!string.Equals(Path.GetDirectoryName(tempPath), Path.GetFullPath(targetDirectory), StringComparison.OrdinalIgnoreCase))
@@ -1320,13 +1406,16 @@ public sealed class WwmInstallService
     private bool CleanupGameTemps(string root, string operationId)
     {
         if (!Guid.TryParseExact(operationId, "N", out _)) return false;
-        foreach (var relativePath in CurrentTargets)
+        var cleanupTargets = CurrentTargets
+            .Concat(WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var relativePath in cleanupTargets)
         {
             foreach (var kind in new[] { ".hub-", ".rollback-" })
             {
                 try
                 {
-                    var target = SafeGameTarget(root, relativePath);
+                    var target = SafeManagedTarget(root, relativePath, WwmStateStore.GetLayoutForPath(relativePath));
                     var temp = Path.GetFullPath(target + kind + operationId + ".tmp");
                     if (!string.Equals(Path.GetDirectoryName(temp), Path.GetFullPath(Path.GetDirectoryName(target)!), StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("WWM game-temp path escaped the managed target directory.");
@@ -1372,6 +1461,15 @@ public sealed class WwmInstallService
         }
         setPhase?.Invoke("restore_target_attributes");
         File.SetAttributes(target, finalAttributes);
+    }
+
+    private static void ClearReadOnlyAttribute(string target)
+    {
+        var attributes = File.GetAttributes(target);
+        if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+            throw new InvalidDataException("Refusing to change attributes on an unsafe WWM target.");
+        if ((attributes & FileAttributes.ReadOnly) != 0)
+            File.SetAttributes(target, attributes & ~FileAttributes.ReadOnly);
     }
 
     private static void DeleteManagedTarget(string target, Action<string>? setPhase = null)
@@ -1617,6 +1715,24 @@ public sealed class WwmInstallService
             catch (FileNotFoundException) { }
             catch (DirectoryNotFoundException) { }
         }
+        foreach (var previous in journal.AttributeOnlyTargets)
+        {
+            var path = SafeManagedTarget(root, previous.RelativePath, WwmInstallationLayout.LocalDataPatch);
+            FileAttributes? attributes = null;
+            try { attributes = File.GetAttributes(path); }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+            if (attributes == null)
+            {
+                if (previous.Existed) return false;
+                continue;
+            }
+            var expectedAttributes = (FileAttributes)previous.Attributes!.Value & ~FileAttributes.ReadOnly;
+            if (!previous.Existed || (attributes.Value & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0
+                || attributes.Value != expectedAttributes || new FileInfo(path).Length != previous.SizeBytes
+                || !string.Equals(await HashHelper.ComputeFileSha256Async(path, token).ConfigureAwait(false), previous.Sha256, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
         return true;
     }
 
@@ -1675,6 +1791,8 @@ public sealed class WwmInstallService
                     return false;
                 }
             }
+            if (!await MatchesExactCapturedTargetsAsync(root, journal.AttributeOnlyTargets, token).ConfigureAwait(false))
+                return false;
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or FormatException)
@@ -1686,6 +1804,30 @@ public sealed class WwmInstallService
 
     private void LogPreviousOutcomeMismatch(WwmTransactionJournal journal, string target, string reason)
         => _logger.Error($"WWM transaction stopped operation_id={journal.OperationId} operation={journal.Operation} target={target} phase=compare_previous_outcome reason={reason}");
+
+    private async Task<bool> MatchesExactCapturedTargetsAsync(string root, IReadOnlyList<WwmPreviousTarget> targets, CancellationToken token)
+    {
+        foreach (var previous in targets)
+        {
+            token.ThrowIfCancellationRequested();
+            var target = SafeManagedTarget(root, previous.RelativePath, WwmInstallationLayout.LocalDataPatch);
+            FileAttributes? attributes = null;
+            try { attributes = File.GetAttributes(target); }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+            if (attributes == null)
+            {
+                if (previous.Existed) return false;
+                continue;
+            }
+            if (!previous.Existed || (attributes.Value & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0
+                || previous.Attributes is { } expectedAttributes && (int)attributes.Value != expectedAttributes
+                || new FileInfo(target).Length != previous.SizeBytes
+                || !string.Equals(await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), previous.Sha256, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return true;
+    }
 
     private async Task<bool> MatchesJournalKnownTargetStatesAsync(string root, WwmTransactionJournal journal, CancellationToken token)
     {
@@ -1739,6 +1881,28 @@ public sealed class WwmInstallService
             }
         }
 
+        foreach (var previous in journal.AttributeOnlyTargets)
+        {
+            token.ThrowIfCancellationRequested();
+            var target = SafeManagedTarget(root, previous.RelativePath, WwmInstallationLayout.LocalDataPatch);
+            FileAttributes? attributes = null;
+            try { attributes = File.GetAttributes(target); }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+            if (attributes == null)
+            {
+                if (previous.Existed) return false;
+                continue;
+            }
+            if (!previous.Existed || (attributes.Value & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                return false;
+            var priorAttributes = (FileAttributes)previous.Attributes!.Value;
+            if ((attributes.Value != priorAttributes && (attributes.Value | FileAttributes.ReadOnly) != priorAttributes)
+                || new FileInfo(target).Length != previous.SizeBytes
+                || !string.Equals(await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), previous.Sha256, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
         return true;
     }
 
@@ -1786,15 +1950,21 @@ public sealed class WwmInstallService
 
     private string SafeGameTarget(string root, string relative)
     {
-        if (!WwmStateStore.IsAllowedPath(relative)) throw new InvalidDataException("WWM target is not allowlisted.");
         if (WwmStateStore.GetLayoutForPath(relative) != CurrentBinding.Layout)
             throw new InvalidDataException("WWM target does not belong to the selected installation layout.");
+        return SafeManagedTarget(root, relative, CurrentBinding.Layout);
+    }
+
+    private static string SafeManagedTarget(string root, string relative, WwmInstallationLayout layout)
+    {
+        if (!WwmStateStore.IsAllowedPath(relative) || WwmStateStore.GetLayoutForPath(relative) != layout)
+            throw new InvalidDataException("WWM target is not allowlisted for the requested layout.");
         var normalizedRoot = WwmGameDefinition.NormalizeInstallationRoot(root);
         var fullRoot = Path.EndsInDirectorySeparator(normalizedRoot) ? normalizedRoot : normalizedRoot + Path.DirectorySeparatorChar;
         RejectReparsePoint(normalizedRoot);
         var target = Path.GetFullPath(Path.Combine(normalizedRoot, relative));
         if (!target.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("WWM target escaped game root.");
-        var localeRelative = CurrentBinding.Layout == WwmInstallationLayout.Package
+        var localeRelative = layout == WwmInstallationLayout.Package
             ? WwmGameDefinition.Default.LocaleRelativePath : WwmGameDefinition.Default.LocalDataPatchLocaleRelativePath;
         var normalizedLocale = WwmGameDefinition.NormalizeInstallationRoot(Path.Combine(normalizedRoot, localeRelative));
         var locale = Path.EndsInDirectorySeparator(normalizedLocale) ? normalizedLocale : normalizedLocale + Path.DirectorySeparatorChar;

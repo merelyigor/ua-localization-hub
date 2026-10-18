@@ -380,7 +380,12 @@ public sealed class GitHubUpdateClient
 
     private static bool IsRetryable(HttpRequestException ex)
     {
-        if (ex.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.GatewayTimeout)
+        // GitHub's download edge may temporarily return 404 for a newly
+        // published release asset. Retry a bounded 404 so a transient
+        // propagation window does not require the user to restart staging
+        // manually; a genuinely missing asset still fails closed after the
+        // normal retry budget.
+        if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.RequestTimeout or HttpStatusCode.GatewayTimeout)
             return true;
         if (ex.StatusCode is >= HttpStatusCode.InternalServerError)
             return true;

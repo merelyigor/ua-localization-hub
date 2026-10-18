@@ -1,11 +1,76 @@
 using BdoClient;
 using BdoClient.Models;
 using BdoClient.Services;
+using System.Threading;
 
 namespace BdoClient.Tests;
 
 public sealed class WwmModeCardPresentationTests
 {
+    [Fact]
+    public void ActionButtonClick_RequestsActionOnceWithoutTriggeringSelection()
+    {
+        var selectionCount = 0;
+        var actionCount = 0;
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var card = new WwmModeCard(new WwmMode
+                {
+                    Slug = "ukrainian",
+                    Variant = "default",
+                    Label = "Українська",
+                    Available = true
+                });
+                card.Present(WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
+                    stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: false));
+                card.SelectionRequested += (_, _) => selectionCount++;
+                card.ActionRequested += (_, _) => actionCount++;
+                card.ActionButtonForTest.PerformClick();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Card interaction test did not finish.");
+
+        Assert.Null(error);
+        Assert.Equal(0, selectionCount);
+        Assert.Equal(1, actionCount);
+    }
+
+    [Fact]
+    public void BusyInteractionGate_DisablesActionAndRestoresLatestPresentation()
+    {
+        using var card = new WwmModeCard(new WwmMode
+        {
+            Slug = "ukrainian",
+            Variant = "default",
+            Label = "Українська",
+            Available = true
+        });
+        var available = WwmModeCardPresentation.Create(false, WwmInstalledStateKind.Unknown,
+            stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: false);
+        card.Present(available);
+
+        card.SetInteractionEnabled(false);
+        Assert.False(card.ActionEnabledForTest);
+        card.PresentBusy("Завантажуємо та встановлюємо реліз…");
+        Assert.False(card.ActionEnabledForTest);
+
+        card.Present(available);
+        Assert.False(card.ActionEnabledForTest);
+        card.SetInteractionEnabled(true);
+
+        Assert.True(card.ActionEnabledForTest);
+        Assert.Equal("Встановити", card.ActionTextForTest);
+    }
+
     [Fact]
     public void ExactCurrentPackage_ShowsInstalledWithoutAction()
     {
