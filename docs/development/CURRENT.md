@@ -2,15 +2,13 @@
 
 Оновлено: 2026-10-18
 
-## v1.2.17 release lifecycle — application update notification retry
+## v1.2.18 release lifecycle — notification delivery test
 
-Owner authorized and waived external Architect review for this focused fix: an application update first detected while the window is visible remains pending for a tray notification after the app is hidden. Implementation `2d48f6652cc36620ea7e7dac1f6320837efb3b0c` (parent `556758ea759f5288064fe3259580f3588f6d32ea`) passed exact-SHA normal CI #277 / run `39156890397` and Release Candidate #49 / run `39157150228`; 1232/1232 tests passed. Stable Release ID `416645461` was published at `2026-10-18T19:11:56Z`; annotated tag `v1.2.17` peels to the implementation SHA. Both public assets were independently downloaded and match their RC SHA-256. Facts are archived in [`docs/releases/v1.2.17.md`](../releases/v1.2.17.md). `NEXT.json` is reset to canonical empty schema-v1. No external Architect acceptance is claimed and no game files were changed. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**.
+Owner explicitly authorized a public stable release to test update notification delivery to an already-running v1.2.17 client. RC #50 / run `39158551643` succeeded from source `76c590c3170c18775142e33daa5c96fcd03e065a`; Release ID `416655440` was published at `2026-10-18T19:29:58Z`, and annotated tag `v1.2.18` peels to that source. The running hidden v1.2.17 process logged candidate selection and `Update available: v1.2.18` at `22:34:36` local time. This confirms the release-check/tray-notification code path was reached; no screenshot/native UI capture was available to independently attest the visible balloon. Public assets were independently downloaded and hash-verified. Facts are archived in [`docs/releases/v1.2.18.md`](../releases/v1.2.18.md). `NEXT.json` remains canonical empty schema-v1. Owner waived external Architect review; no external acceptance is claimed. No game files were changed. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**.
 
-## v1.2.17 publication facts
-
-- Canonical public asset ID `654257696`, 68,006,525 bytes, SHA-256 `3cd245f30b7125611ceca545a68b6a54457e0a07ed37da06c2e945c4147810af`.
-- Legacy public asset ID `654257695`, 68,006,501 bytes, SHA-256 `aa74be2b5171e066d20b614af8a29d1b73f12e3329773d00f5819fad2bf9d9b5`.
-- Internal EXE SHA-256 `e1aa353ebbaae58eb957ceec7deb1388a7d1178772caea766dcfb8d64e234cde`; FileVersion `1.2.17.0`; ProductVersion `1.2.17`.
+- Canonical public asset ID `654292788`, 68,006,515 bytes, SHA-256 `4caf09e9494b6748c6f71f9e64baab88a4c09aa1407ba7f4c6dab4aebd089616`.
+- Legacy public asset ID `654292790`, 68,006,490 bytes, SHA-256 `69b0140cce5df587538bdadbb266c39c632916bf5df0497272d9f75a0144e7ce`.
+- Internal EXE SHA-256 `c48d7d85c47a07cebbe2eea95fd7a6ad815624b9b02325fd6e10aa2345096a9d`; FileVersion `1.2.18.0`; ProductVersion `1.2.18`.
 
 ## v1.2.16 release lifecycle
 
@@ -36,13 +34,13 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.17** (Release ID `416645461`), source SHA `2d48f6652cc36620ea7e7dac1f6320837efb3b0c`; live latest — v1.2.17. Точні asset facts записані у [`docs/releases/v1.2.17.md`](../releases/v1.2.17.md).
+Останній стабільний реліз: **v1.2.18** (Release ID `416655440`), source SHA `76c590c3170c18775142e33daa5c96fcd03e065a`; live latest — v1.2.18. Точні asset facts записані у [`docs/releases/v1.2.18.md`](../releases/v1.2.18.md).
 
 v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install; їхній вміст не змінюється. У цьому циклі реальні файли гри не змінювалися. Owner waived external Architect review; acceptance не заявляється.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.17 is **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.18 is **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
 
 ## Architecture Summary
 

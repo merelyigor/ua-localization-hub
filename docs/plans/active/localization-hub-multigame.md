@@ -4,8 +4,8 @@ Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
 Implementation authorization: **NONE.**
-Current phase: v1.2.17 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
-Next action: **OWNER DECISION REQUIRED.** Stable v1.2.17 (Release ID `416645461`, source `2d48f6652cc36620ea7e7dac1f6320837efb3b0c`) is archived at [`../../releases/v1.2.17.md`](../../releases/v1.2.17.md). Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
+Current phase: v1.2.18 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
+Next action: **OWNER DECISION REQUIRED.** Stable v1.2.18 (Release ID `416655440`, source `76c590c3170c18775142e33daa5c96fcd03e065a`) is archived at [`../../releases/v1.2.18.md`](../../releases/v1.2.18.md). Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal

@@ -3,7 +3,7 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.17 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
+**Current phase:** v1.2.18 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
 **Next:** OWNER DECISION REQUIRED.
 **Implementation authorization:** NONE. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
@@ -11,11 +11,11 @@
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.17 — released | OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.18 — released | OWNER DECISION REQUIRED |
 
-Release cycles through `v1.2.17` are published and archived. Owner explicitly waived Architect review for v1.2.15, v1.2.16 and v1.2.17; no external acceptance is claimed for these waivers.
+Release cycles through `v1.2.18` are published and archived. Owner explicitly waived Architect review for v1.2.15, v1.2.16, v1.2.17 and v1.2.18; no external acceptance is claimed for these waivers.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.17 is published stable as Release ID `416645461`, tag peeling to `2d48f6652cc36620ea7e7dac1f6320837efb3b0c`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. No implementation work is authorized; no Stage 11C is introduced.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.18 is published stable as Release ID `416655440`, tag peeling to `76c590c3170c18775142e33daa5c96fcd03e065a`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. No implementation work is authorized; no Stage 11C is introduced.
 
 ## Backlog
 
