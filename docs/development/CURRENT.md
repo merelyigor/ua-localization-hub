@@ -1,6 +1,10 @@
 # Current Engineering Context
 
-Оновлено: 2026-10-18
+Оновлено: 2026-10-19
+
+## v1.2.20 — RELEASED / PUBLIC VERIFIED
+
+Owner-authorized stable test release for verifying application-update tray delivery to an already-running v1.2.19 client. No production code changed from v1.2.19. Normal CI #282 / run `39165996840` passed; RC #52 / run `39173763003` passed 1237/1237 tests and produced exact source-bound bundles. Release ID `416758893` was published at `2026-10-18T22:55:20Z`; tag `v1.2.20` peels to `507fc8031c74578af3d144341e1f1bee827c7c74`. At `2026-10-19 01:59:14` local time, the running v1.2.19 tray process selected v1.2.20 and the journal recorded `Tray notification shown event received`; Windows closed it at `01:59:20`. WWM remained current at v2.6.7, so no localization-update notification was expected. Release facts are archived in [`docs/releases/v1.2.20.md`](../releases/v1.2.20.md). `NEXT.json` was already the canonical empty schema-v1 state. No real game files were changed; no external Architect acceptance is claimed.
 
 ## v1.2.19 — RELEASED / PUBLIC VERIFIED
 
@@ -38,13 +42,13 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.18** (Release ID `416655440`), source SHA `76c590c3170c18775142e33daa5c96fcd03e065a`; live latest — v1.2.18. Точні asset facts записані у [`docs/releases/v1.2.18.md`](../releases/v1.2.18.md).
+Останній стабільний реліз: **v1.2.20** (Release ID `416758893`), source SHA `507fc8031c74578af3d144341e1f1bee827c7c74`; live latest — v1.2.20. Точні asset facts записані у [`docs/releases/v1.2.20.md`](../releases/v1.2.20.md).
 
 v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install; їхній вміст не змінюється. У цьому циклі реальні файли гри не змінювалися. Owner waived external Architect review; acceptance не заявляється.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.18 is **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.20 is **RELEASED / PUBLIC VERIFIED** as an Owner-authorized notification test; external Architect acceptance is not claimed. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
 
 ## Architecture Summary
 
