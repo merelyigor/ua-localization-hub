@@ -267,18 +267,6 @@ public partial class MainForm
                 BuildWwmModes();
                 return;
             }
-            if (latest.Feed.Data?.Current?.GameTested != true
-                && !(WwmCompatibilityConfirmationForTest?.Invoke(
-                    "Сумісність релізу з поточною версією гри не підтверджена",
-                    "Winds4UA API не позначає цей реліз як протестований із поточною версією гри. Ви можете продовжити встановлення або повернутися назад.")
-                    ?? GameTestConfirmationDialog.ShowNeutralConfirmation(this,
-                        "Сумісність релізу з поточною версією гри не підтверджена",
-                        "Winds4UA API не позначає цей реліз як протестований із поточною версією гри. Ви можете продовжити встановлення або повернутися назад.")))
-            {
-                SetOperationState(OperationState.Cancelled);
-                SetMessage("Встановлення скасовано.");
-                return;
-            }
             token.ThrowIfCancellationRequested();
             if (!IsCurrentGameSession(_gameSessionGeneration, session)) return;
             SetOperationState(OperationState.Downloading);

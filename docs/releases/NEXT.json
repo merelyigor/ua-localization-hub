@@ -2,7 +2,9 @@
   "schema_version": 1,
   "summary": "",
   "new": [],
-  "fixed": [],
+  "fixed": [
+    "Встановлення Winds4UA більше не переривається окремим вікном підтвердження сумісності."
+  ],
   "reliability": [],
   "performance": [],
   "changes": [],

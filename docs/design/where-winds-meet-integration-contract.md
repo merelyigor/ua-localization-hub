@@ -187,16 +187,16 @@ The persisted Stage 11B installation binding records normalized root, selected l
 
 Automated mutation/recovery evidence is from isolated synthetic/temp roots for Steam Package, Epic Package, Official-like Standard/Lite LocalDataPatch, and UnknownWindows single/dual-layout cases. Real Steam files were read-only; real Epic/Official native E2E was not performed. External Architect implementation review accepted Stage 11B with BLOCKER `0`, IMPORTANT `0`, OPTIONAL `0`. The bounded compatibility UX follow-up below is separate from that accepted Stage 11B implementation and awaits its own exact-SHA CI and external review.
 
-## Current compatibility UX handoff — API-driven confirmation
+## Current compatibility UX handoff — no confirmation dialog
 
-This Owner-authorized follow-up supersedes the earlier interim policy above that unconditionally requested confirmation because compatibility with a specific Steam build was not mapped. Before each WWM install/update, the Hub uses the fresh response returned by `GET https://winds4ua.com.ua/api/public/v1/releases/latest` for package resolution and confirmation policy; it does not use a previously displayed/cached feed for this decision.
+This Owner-authorized change supersedes both the earlier unconditional interim prompt and the later API-driven confirmation policy. Before each WWM install/update, the Hub still fetches `GET https://winds4ua.com.ua/api/public/v1/releases/latest` and uses that fresh response to resolve and validate the exact package; it does not use a previously displayed/cached feed for this decision.
 
-- `data.current.game_tested == true`: proceed without a compatibility confirmation.
-- `game_tested == false` or omitted/defaulted false on an otherwise valid installable current package: show neutral confirmation stating that Winds4UA API does not mark the release as tested with the current game version. Declining cancels before package download or game mutation. If the current release/package itself is absent or invalid, package resolution blocks before confirmation.
+- Once a valid, installable current package has been resolved, the Hub proceeds without showing a compatibility-confirmation dialog, regardless of `data.current.game_tested` being true, false, or missing.
+- API failure, absent current release/package, unavailable mode, or invalid artifact still blocks download/mutation through the existing validation path.
 - The Steam build ID remains informational and a snapshot-staleness safeguard. It does not itself cause a compatibility warning. `data.current.game_version` is not compared with Steam `buildid`; no authoritative mapping is defined.
-- Steam, Epic Games and UnknownWindows use this same API-driven policy. The confirmation does not claim a launcher-specific build mismatch.
+- This behavior is the same for Steam, Epic Games, and UnknownWindows; it does not claim launcher-specific compatibility.
 
-The historical Stage 9 observations and decisions remain as recorded; this section is the current implementation handoff for confirmation behavior.
+Historical Stage 9 observations and prior confirmation-policy decisions remain as recorded; this section describes the current implementation.
 
 ### Legacy journal committed-outcome preservation
 
