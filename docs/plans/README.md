@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.15 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
-**Next:** OWNER DECISION REQUIRED.
-**Implementation authorization:** NONE. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
+**Current phase:** Owner-authorized v1.2.16 — LOCALIZATION UPDATE NOTIFICATION PARITY
+**Next:** external review of the committed implementation.
+**Implementation authorization:** bounded BDO/WWM tray notification parity only. No release publication authorized. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.15 — RELEASED / PUBLIC VERIFIED | OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.16 — localization update notification parity | exact-SHA CI / external review |
 
 Release cycles through `v1.2.15` are published and archived. Owner explicitly waived Architect review for v1.2.15; no self-acceptance is claimed.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.15 is published stable as Release ID `416608010`, tag peeling to `4cc97d616577786725a3878af4a1da46546dbf0f`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. Next implementation authorization: OWNER DECISION REQUIRED; no Stage 11C.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.15 is published stable as Release ID `416608010`, tag peeling to `4cc97d616577786725a3878af4a1da46546dbf0f`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. The only currently authorized work is tray localization-notification parity for BDO/WWM; no Stage 11C or release publication is authorized.
 
 ## Backlog
 

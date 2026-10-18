@@ -102,7 +102,13 @@ public partial class MainForm
         StartLocalFileMonitorIfEligible();
     }
 
-    private void ObserveLocalizationNotification(LocalizationState state)
+    private void ObserveLocalizationNotification(
+        string gameId,
+        string modeKey,
+        string modeName,
+        string releaseIdentity,
+        string releaseVersion,
+        bool updateAvailable)
     {
         var canNotify = !Visible
             && _notifyIcon.Visible
@@ -111,15 +117,28 @@ public partial class MainForm
             && !IsDisposed
             && !Disposing;
 
-        if (!_localizationNotificationTracker.Observe(state, canNotify))
+        if (!_localizationNotificationTracker.Observe(
+                gameId,
+                modeKey,
+                releaseIdentity,
+                updateAvailable,
+                canNotify))
             return;
+
+        var versionText = string.IsNullOrWhiteSpace(releaseVersion) ? string.Empty : $" до {releaseVersion}";
+        var message = $"Для «{modeName}» у {_selectedGame.DisplayName} доступне оновлення{versionText}. Відкрийте Хаб, щоб оновити.";
+        if (LocalizationNotificationForTest is { } notificationObserver)
+        {
+            notificationObserver(message);
+            return;
+        }
 
         try
         {
             _notifyIcon.ShowBalloonTip(
                 5000,
                 ApplicationBrand.DisplayName,
-                $"Доступне оновлення української локалізації для {_selectedGame.DisplayName}.",
+                message,
                 ToolTipIcon.Info);
         }
         catch (Exception ex)

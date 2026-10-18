@@ -142,6 +142,10 @@ public partial class MainForm
         SetActionsEnabled(restoreAvailability.IsAvailable && !IsUiWorkBlocked);
         logsToolTip.SetToolTip(restoreOriginalButton,
             restoreAvailability.IsAvailable ? string.Empty : restoreAvailability.Message ?? string.Empty);
+        string? installedModeKeyForNotification = null;
+        string? installedModeNameForNotification = null;
+        string? releaseIdentityForNotification = null;
+        string? releaseVersionForNotification = null;
         foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
         {
             var hasPackage = WwmPackageResolver.TryResolve(_wwmFeed, card.ModeSlug, card.ModeVariant, out var package, out _);
@@ -153,6 +157,15 @@ public partial class MainForm
             var presentation = WwmModeCardPresentation.Create(sameMode, state.State,
                 stateTrusted: stateError == null, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: true, operationInProgress: IsUiWorkBlocked);
             card.Present(presentation);
+            if (sameMode && state.State == WwmInstalledStateKind.UpdateAvailable && package != null)
+            {
+                installedModeKeyForNotification = $"{card.ModeSlug}/{card.ModeVariant}";
+                installedModeNameForNotification = string.IsNullOrWhiteSpace(card.Mode.Label)
+                    ? card.ModeSlug
+                    : card.Mode.Label;
+                releaseIdentityForNotification = package.Sha256;
+                releaseVersionForNotification = package.Version;
+            }
         }
         var overallState = installed == null
             ? new WwmInstalledStateResult(WwmInstalledStateKind.Unknown)
@@ -167,6 +180,16 @@ public partial class MainForm
             SetMessage(overallState.Message ?? "Файли гри змінено — потрібне повторне встановлення.");
             // Restore availability and package installation are independent: a stale pre-Hub
             // snapshot may disable restore while a fresh package remains safely installable.
+        }
+        if (installedModeKeyForNotification != null)
+        {
+            ObserveLocalizationNotification(
+                gameId: "wwm",
+                modeKey: installedModeKeyForNotification,
+                modeName: installedModeNameForNotification ?? installedModeKeyForNotification,
+                releaseIdentity: releaseIdentityForNotification ?? string.Empty,
+                releaseVersion: releaseVersionForNotification ?? string.Empty,
+                updateAvailable: true);
         }
         if (installed != null && stateError == null) StartWwmFileMonitorIfEligible();
         else DisposeWwmFileMonitor();
@@ -1298,7 +1321,22 @@ public partial class MainForm
         }
 
         StartLocalFileMonitorIfEligible();
-        ObserveLocalizationNotification(stateResult.State);
+        var installedApiModeForNotification = installedModeSlug == null
+            ? null
+            : _apiResponse?.Data?.Modes?.FirstOrDefault(mode =>
+                string.Equals(mode.Slug, installedModeSlug, StringComparison.Ordinal));
+        var latestInstalledModeRelease = installedModeSlug == null
+            ? null
+            : ResolveCurrentRelease(installedModeSlug, installedApiModeForNotification?.Current);
+        ObserveLocalizationNotification(
+            gameId: "bdo",
+            modeKey: installedModeSlug ?? string.Empty,
+            modeName: string.IsNullOrWhiteSpace(installedApiModeForNotification?.PublicName)
+                ? installedModeSlug ?? string.Empty
+                : installedApiModeForNotification.PublicName,
+            releaseIdentity: latestInstalledModeRelease?.PublicId ?? string.Empty,
+            releaseVersion: latestInstalledModeRelease?.Version.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            updateAvailable: stateResult.State == LocalizationState.UpdateAvailable);
     }
 
     private string BuildCachedFeedMessage()

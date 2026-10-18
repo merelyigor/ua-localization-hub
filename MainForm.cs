@@ -283,7 +283,6 @@ public partial class MainForm : Form
             previousCts?.Cancel();
             DetachSessionHandlers();
             DisposeLocalFileMonitor();
-            _localizationNotificationTracker.Reset();
             ClearTransientGameState();
 
             await previous.StopAsync();
@@ -389,7 +388,6 @@ public partial class MainForm : Form
         _lastInstalledModeSlug = null;
         _lastInstalledPublicId = null;
         _localFileCheckInProgress = false;
-        _localizationNotificationTracker.Reset();
         ClearModeControls();
         SetGameSearching();
         ShowModeLoadingPlaceholder();
@@ -495,6 +493,7 @@ public partial class MainForm : Form
     internal int InitialClientHeightForTest => _initialClientHeight;
     internal int ModeSectionHeightForTest => modeGroupBox.Height;
     internal Func<CurrentRelease, bool>? GameTestConfirmationForTest { get; set; }
+    internal Action<string>? LocalizationNotificationForTest { get; set; }
     internal Func<string, string, bool>? WwmCompatibilityConfirmationForTest { get; set; }
     internal Func<CancellationToken, Task<WwmMutationResult>>? WwmInstallResultForTest { get; set; }
     internal string? SelectedModeCardStateTextForTest => modesFlowPanel.Controls

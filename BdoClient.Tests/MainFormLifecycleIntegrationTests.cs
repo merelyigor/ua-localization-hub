@@ -209,6 +209,44 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task HiddenWwmSession_NotifiesOnceForNewInstalledModeRelease()
+    {
+        var archive = CreateTinyWwmArchive();
+        string? currentVersion = "v2.6.3";
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            startInBackground: true,
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(
+                archive, currentVersion: () => currentVersion));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => !form.Visible);
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Any(card => card.ModeSlug == "ukrainian" && card.ActionEnabledForTest));
+
+        await fixture.RunWwmInstallAsync("ukrainian", "default");
+        await fixture.WaitForAsync(form => form.WwmModeInstalledForTest("ukrainian", "default"));
+
+        var notification = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await fixture.SetLocalizationNotificationObserverAsync(message => notification.TrySetResult(message));
+        currentVersion = "v2.6.4";
+
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        await session.Poller.RequestImmediatePollAsync();
+
+        var message = await notification.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Contains("Українська", message, StringComparison.Ordinal);
+        Assert.Contains("Where Winds Meet", message, StringComparison.Ordinal);
+        Assert.Contains("v2.6.4", message, StringComparison.Ordinal);
+        Assert.Contains("Відкрийте Хаб, щоб оновити", message, StringComparison.Ordinal);
+        Assert.Contains(FindWwmModeCards(fixture.Form), card => card.ModeSlug == "ukrainian"
+            && card.StateTextForTest == "Доступне оновлення");
+    }
+
+    [Fact]
     public async Task WwmRecognizedUnknownWindowsRoot_IsNotPresentedAsSteamAndUsesUnambiguousLayout()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
@@ -2854,6 +2892,17 @@ internal sealed class MainFormTestFixture : IDisposable
                 completion.TrySetResult(null);
             }
             catch (Exception ex) { completion.TrySetException(ex); }
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task SetLocalizationNotificationObserverAsync(Action<string> observer)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(() =>
+        {
+            Form.LocalizationNotificationForTest = observer;
+            completion.TrySetResult(null);
         });
         await completion.Task.WaitAsync(Timeout);
     }

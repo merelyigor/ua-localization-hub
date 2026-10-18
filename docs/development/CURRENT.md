@@ -6,6 +6,10 @@
 
 Stable v1.2.15 (Release ID `416608010`) was published at `2026-10-18T17:56:20Z` from source `4cc97d616577786725a3878af4a1da46546dbf0f`; annotated tag `v1.2.15` peels to that exact commit. Normal CI #273 / run `39150722823` and RC #47 / run `39150949238` succeeded; the RC passed 1228/1228 tests. Both exact RC artifacts were published without repacking, then independently downloaded from the public release and hash-verified. Facts are archived in [`docs/releases/v1.2.15.md`](../releases/v1.2.15.md). Owner waived external Architect review; no external acceptance is claimed. `NEXT.json` is reset to canonical empty schema-v1. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**.
 
+## Current follow-up — localization update notifications
+
+Owner authorized a bounded follow-up to make tray notifications consistent for BDO and WWM. Hidden-tray notifications are keyed by game, installed mode and release identity; they include the mode and available release version, do not repeat for the same release, and never install automatically. In-window updates remain represented by the mode cards. Implementation and Release validation passed locally; external review is pending.
+
 ## v1.2.14 release lifecycle
 
 Stable v1.2.14 (Release ID `416460308`) was published at `2026-10-18T13:15:50Z` from source `2156d36f08cd1fa7ac72c70b48fd94bf468fd2d3`; annotated tag `v1.2.14` peels to that exact commit. Normal CI #272 / run `39130202262` and RC #46 / run `39130386049` succeeded. Public canonical and legacy assets and exact release body are archived in [`docs/releases/v1.2.14.md`](../releases/v1.2.14.md). Lifecycle: **RELEASED / PUBLIC VERIFIED**.
@@ -49,7 +53,7 @@ The v1.2.11 RC #39–#42 corrections preserved legacy journal outcomes, exact ro
 - Звичайне X ховає MainForm у Windows tray і не завершує процес; `Відкрити` та подвійний клік відновлюють те саме вікно; `Вихід` є фактичним завершенням.
 - Нормальний і background запуск використовують single-instance activation; повторний запуск активує існуючий клієнт.
 - Видимий API polling працює приблизно кожні 15 секунд, прихований — приблизно кожні 5 хвилин; локальний файл локалізації у background перевіряється дешевим metadata fingerprint.
-- Localization update notification і application version update notification — окремі інформаційні канали з RAM-only dedup; application notification показується один раз для кожного tag у hidden tray. Click-to-open не є контрактом.
+- Localization and application version notifications are separate informational channels with RAM-only dedup. For BDO and WWM, hidden-tray localization notifications are keyed by game + installed mode + release identity and include the available release version; no balloon is shown while the main window is visible, and no automatic installation occurs. Application notifications are deduplicated once per tag in hidden tray. Click-to-open is not a contract.
 - Application-update discovery виконується одразу під час startup і приблизно кожні 5 хвилин, а restore та `Перевірити зараз` запитують свіжу перевірку. Download/install application update не є автоматичними.
 - Приховування вікна не перериває активну операцію; explicit Exit зберігає безпечну семантику завершення.
 

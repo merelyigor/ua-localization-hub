@@ -257,7 +257,6 @@ public partial class MainForm
             previousCts?.Cancel();
             DetachSessionHandlers();
             DisposeLocalFileMonitor();
-            _localizationNotificationTracker.Reset();
             ClearTransientGameState();
 
             _sessionHost.CommitCandidate(candidate);

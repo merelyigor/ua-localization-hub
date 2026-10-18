@@ -9,7 +9,7 @@ public sealed class LocalizationNotificationTrackerTests
     {
         var tracker = new LocalizationNotificationTracker();
 
-        Assert.False(tracker.Observe(LocalizationState.UpToDate, canNotify: true));
+        Assert.False(tracker.Observe("bdo", "full", "release-a", updateAvailable: false, canNotify: true));
     }
 
     [Fact]
@@ -17,7 +17,7 @@ public sealed class LocalizationNotificationTrackerTests
     {
         var tracker = new LocalizationNotificationTracker();
 
-        Assert.True(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
@@ -25,8 +25,8 @@ public sealed class LocalizationNotificationTrackerTests
     {
         var tracker = new LocalizationNotificationTracker();
 
-        Assert.False(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: false));
-        Assert.False(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: false));
+        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
@@ -34,8 +34,8 @@ public sealed class LocalizationNotificationTrackerTests
     {
         var tracker = new LocalizationNotificationTracker();
 
-        Assert.True(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
-        Assert.False(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
+        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
@@ -43,69 +43,88 @@ public sealed class LocalizationNotificationTrackerTests
     {
         var tracker = new LocalizationNotificationTracker();
 
-        tracker.Observe(LocalizationState.UpdateAvailable, canNotify: false);
+        tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: false);
 
-        Assert.False(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
-    public void UpdateAvailableThenUpToDate_Resets()
+    public void NonUpdateObservationDoesNotConsumeOrResetReleaseIdentity()
     {
         var tracker = new LocalizationNotificationTracker();
 
-        tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true);
+        tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true);
+        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: false, canNotify: true));
 
-        Assert.False(tracker.Observe(LocalizationState.UpToDate, canNotify: true));
+        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
-    public void AfterReset_NewHiddenUpdateAvailable_NotifiesAgain()
+    public void DifferentReleaseForSameMode_NotifiesAgain()
     {
         var tracker = new LocalizationNotificationTracker();
 
-        tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true);
-        tracker.Observe(LocalizationState.UpToDate, canNotify: true);
+        tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true);
 
-        Assert.True(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-c", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
-    public void WaitingForReleaseThenHiddenUpdateAvailable_Notifies()
+    public void PreviouslyUnavailableMode_NewReleaseNotifies()
     {
         var tracker = new LocalizationNotificationTracker();
 
-        tracker.Observe(LocalizationState.WaitingForRelease, canNotify: true);
+        tracker.Observe("bdo", "full", "release-a", updateAvailable: false, canNotify: true);
 
-        Assert.True(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
-    public void NotInstalledThenHiddenUpdateAvailable_Notifies()
+    public void NewModeReleaseIsEligibleForNotification()
     {
         var tracker = new LocalizationNotificationTracker();
 
-        tracker.Observe(LocalizationState.NotInstalled, canNotify: true);
+        tracker.Observe("bdo", "full", "release-b", updateAvailable: false, canNotify: true);
 
-        Assert.True(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
-    public void UpdateAvailableThenWaitingForRelease_Resets()
+    public void LaterReleaseNotifiesEvenWhileEarlierReleaseRemainsUnresolved()
     {
         var tracker = new LocalizationNotificationTracker();
 
-        tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true);
-        tracker.Observe(LocalizationState.WaitingForRelease, canNotify: true);
+        tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true);
 
-        Assert.True(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-c", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
-    public void RepeatedState_DoesNotDependOnPublicIdOrMode()
+    public void SameReleaseIsDeduplicatedPerGameAndMode()
     {
         var tracker = new LocalizationNotificationTracker();
 
-        Assert.True(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
-        Assert.False(tracker.Observe(LocalizationState.UpdateAvailable, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
+        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "items", "release-b", updateAvailable: true, canNotify: true));
+        Assert.True(tracker.Observe("wwm", "ukrainian/default", "release-b", updateAvailable: true, canNotify: true));
+    }
+
+    [Fact]
+    public void NewReleaseForSameInstalledModeNotifiesAgain()
+    {
+        var tracker = new LocalizationNotificationTracker();
+
+        Assert.True(tracker.Observe("wwm", "ukrainian/default", "sha-a", updateAvailable: true, canNotify: true));
+        Assert.True(tracker.Observe("wwm", "ukrainian/default", "sha-b", updateAvailable: true, canNotify: true));
+    }
+
+    [Fact]
+    public void MissingIdentityDoesNotNotifyOrConsumeAnotherRelease()
+    {
+        var tracker = new LocalizationNotificationTracker();
+
+        Assert.False(tracker.Observe("wwm", "ukrainian/default", "", updateAvailable: true, canNotify: true));
+        Assert.True(tracker.Observe("wwm", "ukrainian/default", "sha-a", updateAvailable: true, canNotify: true));
     }
 }

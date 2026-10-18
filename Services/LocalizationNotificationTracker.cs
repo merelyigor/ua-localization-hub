@@ -2,22 +2,26 @@ namespace BdoClient.Services;
 
 internal sealed class LocalizationNotificationTracker
 {
-    private bool _actionableEpisodeActive;
+    private readonly HashSet<NotificationKey> _observedReleaseKeys = new();
 
-    public void Reset() => _actionableEpisodeActive = false;
-
-    public bool Observe(LocalizationState state, bool canNotify)
+    public bool Observe(
+        string gameId,
+        string modeKey,
+        string releaseIdentity,
+        bool updateAvailable,
+        bool canNotify)
     {
-        if (state != LocalizationState.UpdateAvailable)
+        if (!updateAvailable
+            || string.IsNullOrWhiteSpace(gameId)
+            || string.IsNullOrWhiteSpace(modeKey)
+            || string.IsNullOrWhiteSpace(releaseIdentity))
         {
-            _actionableEpisodeActive = false;
             return false;
         }
 
-        if (_actionableEpisodeActive)
-            return false;
-
-        _actionableEpisodeActive = true;
-        return canNotify;
+        var isFirstObservation = _observedReleaseKeys.Add(new NotificationKey(gameId, modeKey, releaseIdentity));
+        return isFirstObservation && canNotify;
     }
+
+    private readonly record struct NotificationKey(string GameId, string ModeKey, string ReleaseIdentity);
 }
