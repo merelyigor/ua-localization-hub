@@ -39,28 +39,40 @@ public static class WwmPackageResolver
             return false;
         }
 
-        var files = feed.Data.Current.Files?.Where(item => item.Slug == slug && item.Variant == variant).Take(2).ToArray();
-        var file = files is { Length: 1 } ? files[0] : null;
-        if (file == null || !Uri.TryCreate(file.DownloadUrl, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttps || file.SizeBytes is null or <= 0 or > 1_000_000_000
-            || !IsSha256(file.Sha256)
-            || mode.DownloadUrl != file.DownloadUrl || mode.SizeBytes != file.SizeBytes
-            || !string.Equals(mode.Sha256, file.Sha256, StringComparison.OrdinalIgnoreCase)
-            || string.IsNullOrWhiteSpace(feed.Data.Current.Version))
+        var files = feed.Data.Current.Files?.Where(item => item.Slug == slug && item.Variant == variant).Take(2).ToArray()
+            ?? Array.Empty<WwmReleaseFile>();
+        if (files.Length > 1)
+        {
+            error = "The selected WWM mode has ambiguous current package metadata.";
+            return false;
+        }
+
+        // The current API publishes per-mode package metadata on `modes[]`.
+        // `current.files[]` is an optional corroborating list and may omit a
+        // currently available mode, so it must not hide that mode from users.
+        // If it does include the mode, however, both representations must agree.
+        var file = files.Length == 1 ? files[0] : null;
+        var downloadUrl = file is null ? mode.DownloadUrl : file.DownloadUrl;
+        var sizeBytes = file is null ? mode.SizeBytes : file.SizeBytes;
+        var sha256 = file is null ? mode.Sha256 : file.Sha256;
+        if (string.IsNullOrWhiteSpace(feed.Data.Current.Version)
+            || !Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps || sizeBytes is null or <= 0 or > 1_000_000_000
+            || !IsSha256(sha256)
+            || (file != null && (mode.DownloadUrl != file.DownloadUrl || mode.SizeBytes != file.SizeBytes
+                || !string.Equals(mode.Sha256, file.Sha256, StringComparison.OrdinalIgnoreCase))))
         {
             error = "The selected WWM mode has invalid or inconsistent current package metadata.";
             return false;
         }
 
-        var sizeBytes = file.SizeBytes.GetValueOrDefault();
-        var sha256 = file.Sha256!;
         package = new WwmApiPackage
         {
             Mode = mode,
             Version = feed.Data.Current.Version,
             DownloadUrl = uri.AbsoluteUri,
-            SizeBytes = sizeBytes,
-            Sha256 = sha256.ToLowerInvariant()
+            SizeBytes = sizeBytes.Value,
+            Sha256 = sha256!.ToLowerInvariant()
         };
         return true;
     }

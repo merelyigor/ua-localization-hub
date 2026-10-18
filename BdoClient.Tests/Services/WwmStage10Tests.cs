@@ -73,6 +73,36 @@ public sealed class WwmStage10Tests
         Assert.Equal("https://winds4ua.com.ua/package.zip", package.DownloadUrl);
     }
 
+    [Fact]
+    public void Resolver_IncludesAvailableModeWithValidInlineArtifactWhenCurrentFilesOmitsIt()
+    {
+        var feed = Feed(available: true);
+        feed.Data!.Modes!.Add(new WwmMode
+        {
+            Slug = "english-terms",
+            Variant = "english_terms",
+            Available = true,
+            DownloadUrl = "https://winds4ua.com.ua/releases/english-terms.zip",
+            SizeBytes = 42,
+            Sha256 = new string('b', 64)
+        });
+
+        Assert.True(WwmPackageResolver.TryResolve(feed, "english-terms", "english_terms", out var package, out var error), error);
+        Assert.Equal("v-test", package!.Version);
+        Assert.Equal("https://winds4ua.com.ua/releases/english-terms.zip", package.DownloadUrl);
+        Assert.Equal(42, package.SizeBytes);
+        Assert.Equal(new string('b', 64), package.Sha256);
+    }
+
+    [Fact]
+    public void Resolver_RejectsConflictingInlineAndCurrentFileMetadata()
+    {
+        var feed = Feed(available: true);
+        feed.Data!.Modes![0].DownloadUrl = "https://winds4ua.com.ua/other.zip";
+
+        Assert.False(WwmPackageResolver.TryResolve(feed, "ukrainian", "default", out _, out _));
+    }
+
     [Theory]
     [InlineData(false, "https://winds4ua.com.ua/package.zip", 2, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     [InlineData(true, "http://winds4ua.com.ua/package.zip", 2, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
@@ -91,10 +121,13 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
-    public void Resolver_RejectsModeWithoutCorrespondingCurrentArtifact()
+    public void Resolver_RejectsAvailableModeWithoutInlineOrCurrentArtifactMetadata()
     {
         var feed = Feed(available: true);
         feed.Data!.Current!.Files!.Clear();
+        feed.Data.Modes![0].DownloadUrl = null;
+        feed.Data.Modes[0].SizeBytes = null;
+        feed.Data.Modes[0].Sha256 = null;
         Assert.False(WwmPackageResolver.TryResolve(feed, "ukrainian", "default", out _, out _));
     }
 

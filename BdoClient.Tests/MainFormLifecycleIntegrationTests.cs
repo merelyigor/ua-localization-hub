@@ -156,6 +156,25 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task WwmModes_RenderAllAvailableModesWhenCurrentFilesOnlyListsDefaultArtifact()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(
+                CreateTinyWwmArchive(), includeEnglishTerms: true));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
+            && FindWwmModeCards(form).Count == 2);
+
+        Assert.Contains(FindWwmModeCards(fixture.Form), card => card.ModeSlug == "ukrainian" && card.ModeVariant == "default");
+        Assert.Contains(FindWwmModeCards(fixture.Form), card => card.ModeSlug == "english-terms" && card.ModeVariant == "english_terms");
+    }
+
+    [Fact]
     public async Task WwmModeCardsShowCurrentApiReleaseVersionAndRefreshInPlace()
     {
         string? version = "v2.6.3";
@@ -707,7 +726,7 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
-    public async Task WwmAvailableModeWithoutMatchingArtifact_IsNotRendered()
+    public async Task WwmAvailableModeWithInlineArtifactButNoCurrentFiles_IsRendered()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
             MainFormTestFixture.CreateSuccessfulApiHandler(),
@@ -719,10 +738,10 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.SelectGameAsync("where-winds-meet");
         await fixture.WaitForSwitchCompletionAsync();
         await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
-            && FindWwmModeCards(form).Count == 0
+            && FindWwmModeCards(form).Count == 1
             && form.OperationStateForTest == OperationState.Idle);
 
-        Assert.Contains("Наразі немає доступних режимів", fixture.Form.ModePlaceholderTextForTest, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("ukrainian", Assert.Single(FindWwmModeCards(fixture.Form)).ModeSlug);
     }
 
     [Fact]
@@ -2660,7 +2679,7 @@ internal sealed class MainFormTestFixture : IDisposable
 
     internal static Func<HttpMessageHandler> CreateWwmApiHandlerFactory(byte[]? package = null, List<string>? requests = null,
         Func<bool>? modeAvailable = null, HttpStatusCode latestStatus = HttpStatusCode.OK, bool omitCurrentArtifact = false,
-        Func<bool?>? gameTested = null, Func<string?>? currentVersion = null)
+        Func<bool?>? gameTested = null, Func<string?>? currentVersion = null, bool includeEnglishTerms = false)
         => () => new MainFormTestHttpHandler((request, _) =>
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -2671,16 +2690,16 @@ internal sealed class MainFormTestFixture : IDisposable
                     Content = new StringContent(latestStatus == HttpStatusCode.OK
                         ? CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null, omitCurrentArtifact,
                             gameTested == null ? true : gameTested.Invoke(),
-                            currentVersion == null ? "v-test" : currentVersion.Invoke())
+                            currentVersion == null ? "v-test" : currentVersion.Invoke(), includeEnglishTerms)
                         : "{\"success\":false,\"error\":\"temporary_failure\"}", Encoding.UTF8, "application/json")
                 });
-            if (path == "/releases/test.zip" && package != null)
+            if (path is "/releases/test.zip" or "/releases/english-terms-test.zip" && package != null)
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(package) });
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         });
 
     private static string CreateWwmLatestJson(byte[]? package, bool modeAvailable, bool omitCurrentArtifact, bool? gameTested,
-        string? currentVersion = "v-test")
+        string? currentVersion = "v-test", bool includeEnglishTerms = false)
     {
         var bytes = package ?? Array.Empty<byte>();
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
@@ -2705,8 +2724,8 @@ internal sealed class MainFormTestFixture : IDisposable
                         download_url = modeAvailable ? "https://winds4ua.com.ua/releases/test.zip" : "", size_bytes = modeAvailable ? bytes.Length : (long?)null, sha256 = modeAvailable ? hash : null },
                     new { variant = "english_items", slug = "english-items", label = "Предмети англійською", description = "", audience = "", available = false,
                         download_url = "", size_bytes = (long?)null, sha256 = (string?)null },
-                    new { variant = "english_terms", slug = "english-terms", label = "Терміни англійською", description = "", audience = "", available = false,
-                        download_url = "", size_bytes = (long?)null, sha256 = (string?)null }
+                    new { variant = "english_terms", slug = "english-terms", label = "Терміни англійською", description = "", audience = "", available = includeEnglishTerms,
+                        download_url = includeEnglishTerms ? "https://winds4ua.com.ua/releases/english-terms-test.zip" : "", size_bytes = includeEnglishTerms ? bytes.Length : (long?)null, sha256 = includeEnglishTerms ? hash : null }
                 }
             }
         }, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });

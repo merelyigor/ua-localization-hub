@@ -1,7 +1,9 @@
 {
   "schema_version": 1,
   "summary": "",
-  "new": [],
+  "new": [
+    "Лаунчер WWM показує всі режими, позначені API як доступні."
+  ],
   "fixed": [],
   "reliability": [],
   "performance": [],
