@@ -16,6 +16,8 @@ public partial class MainForm
         if (_operationInProgress) return;
 
         string? finalMessage = null;
+        string? installedAttemptSlug = null;
+        var installSucceeded = false;
 
         try
         {
@@ -49,32 +51,51 @@ public partial class MainForm
             }
 
             SetOperationState(OperationState.LoadingApi);
-            var latest = await _apiClient.GetLatestReleaseAsync(mode.Slug, cancellationToken);
+            var latestVerified = await EnsureAuthoritativeLatestAsync(
+                mode.Slug,
+                forceRefresh: true,
+                cancellationToken: cancellationToken);
             if (_exitAfterOperation || _closing || cancellationToken.IsCancellationRequested)
                 throw new OperationCanceledException(cancellationToken);
 
-            if (latest.Outcome is not (LatestReleaseOutcome.Modified or LatestReleaseOutcome.NotModified))
+            if (!latestVerified)
             {
-                SetOperationState(latest.ErrorKind == ApiErrorKind.Cancelled
+                var verification = _authoritativeLatestBySlug[mode.Slug];
+                SetOperationState(verification.Outcome.Contains("Cancelled", StringComparison.Ordinal)
                     ? OperationState.Cancelled
                     : OperationState.Failed);
                 _logger.Warning(
-                    $"Install blocked by latest-release check: mode={mode.Slug}, outcome={latest.Outcome}, " +
-                    $"error={latest.ErrorKind}, detail={latest.ErrorMessage}, " +
-                    $"allowed={string.Join(",", latest.AllowedSlugs ?? Array.Empty<string>())}");
-                finalMessage = latest.Outcome switch
-                {
-                    LatestReleaseOutcome.UnknownMode =>
-                        "Режим локалізації більше не підтримується сервером. Оберіть інший режим або оновіть програму.",
-                    LatestReleaseOutcome.PatchUnconfirmed =>
-                        "Офіційний патч гри ще не підтверджено. Спробуйте пізніше.",
-                    _ when latest.ErrorKind == ApiErrorKind.Cancelled => "Встановлення скасовано.",
-                    _ => "Не вдалося перевірити актуальний реліз. Встановлення не виконано. Перевірте з'єднання та спробуйте ще раз."
-                };
+                    $"Install blocked by latest-release check: mode={mode.Slug}, outcome={verification.Outcome}; " +
+                    "aggregate metadata was not used as fallback.");
+                finalMessage = verification.Outcome.Contains("UnknownMode", StringComparison.Ordinal)
+                    ? "Режим локалізації більше не підтримується сервером. Оберіть інший режим або оновіть програму."
+                    : verification.Outcome.Contains("PatchUnconfirmed", StringComparison.Ordinal)
+                        ? "Офіційний патч гри ще не підтверджено. Спробуйте пізніше."
+                        : verification.Outcome.Contains("Cancelled", StringComparison.Ordinal)
+                            ? "Встановлення скасовано."
+                            : "Не вдалося перевірити актуальний реліз. Встановлення не виконано. Перевірте з'єднання та спробуйте ще раз.";
                 return;
             }
 
-            var current = latest.Data?.Current;
+            // Re-evaluate game/localization patch safety using this exact mode's
+            // freshly verified current release, never the aggregate catalog copy.
+            RefreshKnownGamePatchPresentation();
+            if (!AllowsLocalizationWriteActions())
+            {
+                SetOperationState(OperationState.Failed);
+                finalMessage = gameStatusLabel.Text;
+                return;
+            }
+
+            mode = GetSelectedApiMode();
+            if (mode?.Slug == null)
+            {
+                SetOperationState(OperationState.Failed);
+                finalMessage = "Не вдалося повторно визначити вибраний режим локалізації.";
+                return;
+            }
+            installedAttemptSlug = mode.Slug;
+            var current = mode.Current;
             if (current == null)
             {
                 SetOperationState(OperationState.Failed);
@@ -120,7 +141,7 @@ public partial class MainForm
                 {
                     var installedApiMode = _apiResponse?.Data?.Modes?
                         .FirstOrDefault(m => string.Equals(m.Slug, installedModeSlug, StringComparison.Ordinal));
-                    installedModeCurrent = installedApiMode?.Current;
+                    installedModeCurrent = ResolveCurrentRelease(installedModeSlug, installedApiMode?.Current);
                 }
             }
 
@@ -171,6 +192,14 @@ public partial class MainForm
 
             cancellationToken.ThrowIfCancellationRequested();
 
+            var selectedLatest = _authoritativeLatestBySlug[mode.Slug];
+            _logger.Info(
+                $"BDO localization selection: mode={mode.Slug}, public_id={current.PublicId}, " +
+                $"version={current.Version}, patch={current.Patch}, filename={current.Filename}, " +
+                $"size={current.SizeBytes}, sha256={current.Sha256}, " +
+                $"latest_outcome={selectedLatest.Outcome}, etag={selectedLatest.ETag ?? "none"}, " +
+                $"aggregate={FormatIdentity(FindAggregateCurrent(mode.Slug))}.");
+
             SetMessage("Встановлення локалізації...");
             SetProgress(0);
             SetOperationState(OperationState.Downloading);
@@ -191,6 +220,7 @@ public partial class MainForm
             {
                 SetOperationState(OperationState.Completed);
                 finalMessage = "Локалізацію успішно встановлено.";
+                installSucceeded = true;
             }
             else
             {
@@ -228,6 +258,14 @@ public partial class MainForm
 
             try
             {
+                if (installSucceeded && !string.IsNullOrWhiteSpace(installedAttemptSlug))
+                {
+                    await EnsureAuthoritativeLatestAsync(
+                        installedAttemptSlug,
+                        forceRefresh: true,
+                        cancellationToken: _gameSessionCts?.Token ?? default);
+                }
+
                 try
                 {
                     await RefreshStateAsync();

@@ -167,7 +167,8 @@ public sealed class BdoUaApiClient
 
     public async Task<LatestReleaseResult> GetLatestReleaseAsync(
         string slug,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool forceUnconditionalRevalidation = false)
     {
         if (!IsSafeSlug(slug))
             return LatestReleaseResult.Failure(ApiErrorKind.InvalidResponse, "A valid mode slug is required.");
@@ -186,10 +187,16 @@ public sealed class BdoUaApiClient
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            if (cachedEntry?.ETag is { Length: > 0 } etag
+            if (!forceUnconditionalRevalidation
+                && cachedEntry?.ETag is { Length: > 0 } etag
                 && EntityTagHeaderValue.TryParse(etag, out var parsedEtag))
             {
                 request.Headers.IfNoneMatch.Add(parsedEtag);
+            }
+            if (forceUnconditionalRevalidation)
+            {
+                request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
+                request.Headers.Pragma.ParseAdd("no-cache");
             }
 
             using var response = await _httpClient

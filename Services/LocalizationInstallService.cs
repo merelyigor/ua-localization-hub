@@ -35,7 +35,10 @@ public sealed class LocalizationInstallService
         IProgress<DownloadProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.Info($"Install transaction started: mode={modeSlug}, public_id={release.PublicId}");
+        _logger.Info(
+            $"Install transaction started: mode={modeSlug}, public_id={release.PublicId}, " +
+            $"version={release.Version}, patch={release.Patch}, filename={release.Filename}, " +
+            $"size={release.SizeBytes}, sha256={release.Sha256}, published_at={release.PublishedAt}.");
 
         // --- Phase 1: Input validation ---
         var gameLocFilePath = _gameDefinition.GetLocalizationFilePath(_gameRoot);
@@ -320,7 +323,10 @@ public sealed class LocalizationInstallService
         // --- Phase 10: Commit ---
         CleanupDownloadTemp(downloadTempPath);
         await _backupStore.PruneRestorePointsAsync(restorePointDir).ConfigureAwait(false);
-        _logger.Info($"Install transaction completed: mode={modeSlug}, public_id={release.PublicId}");
+        _logger.Info(
+            $"Install transaction completed and state saved: mode={newMetadata.ModeSlug}, " +
+            $"public_id={newMetadata.PublicId}, version={newMetadata.Version}, " +
+            $"patch={newMetadata.GamePatch}, sha256={newMetadata.Sha256}.");
         return InstallResult.Success();
     }
 

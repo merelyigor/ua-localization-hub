@@ -19,6 +19,8 @@ internal sealed class LocalizationModeCard : Control
     public bool IsSelected { get => _selected; set { if (_selected != value) { _selected = value; Invalidate(); } } }
     public bool IsInstalled { get => _installed; set { if (_installed != value) { _installed = value; Invalidate(); } } }
     internal string? StateTextForTest => _presentation.StateText;
+    internal string? ActionTextForTest => _presentation.ActionText;
+    internal bool ActionEnabledForTest => _presentation.ActionEnabled;
 
     public LocalizationModeCard(LocalizationMode mode)
     {

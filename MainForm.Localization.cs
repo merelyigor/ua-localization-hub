@@ -71,6 +71,7 @@ public partial class MainForm
             foreach (var mode in modes)
             {
                 var card = new WwmModeCard(mode);
+                card.SetReleaseVersion(_wwmFeed?.Data?.Current?.Version);
                 card.SelectionRequested += ModeCard_SelectionRequested;
                 card.ActionRequested += ModeCard_ActionRequested;
                 modesFlowPanel.Controls.Add(card);
@@ -262,6 +263,7 @@ public partial class MainForm
                 _logger.Warning($"WWM install blocked by fresh API metadata: mode={slug}/{variant}, detail={packageError}");
                 SetMessage("Вибраний режим Winds4UA зараз недоступний або його метадані некоректні.");
                 _wwmFeed = latest.Feed;
+                UpdateWwmReleaseVersionOnCards();
                 BuildWwmModes();
                 return;
             }
@@ -297,6 +299,7 @@ public partial class MainForm
                 installSucceeded = result.IsSuccess;
             }
             _wwmFeed = latest.Feed;
+            UpdateWwmReleaseVersionOnCards();
         }
         catch (OperationCanceledException)
         {
@@ -325,6 +328,13 @@ public partial class MainForm
             }
             session.Poller.Resume();
         }
+    }
+
+    private void UpdateWwmReleaseVersionOnCards()
+    {
+        var version = _wwmFeed?.Data?.Current?.Version;
+        foreach (var card in modesFlowPanel.Controls.OfType<WwmModeCard>())
+            card.SetReleaseVersion(version);
     }
 
     private async Task<WwmMutationResult> HandleWwmRestoreAsync()
@@ -625,8 +635,8 @@ public partial class MainForm
     {
         var slug = GetSelectedModeSlug();
         if (slug == null || _apiResponse?.Data?.Modes == null) return null;
-        return _apiResponse.Data.Modes
-            .FirstOrDefault(m => string.Equals(m.Slug, slug, StringComparison.Ordinal));
+        return WithAuthoritativeCurrent(_apiResponse.Data.Modes
+            .FirstOrDefault(m => string.Equals(m.Slug, slug, StringComparison.Ordinal)));
     }
 
 
@@ -1055,6 +1065,17 @@ public partial class MainForm
                 RefreshKnownGamePatchPresentation();
                 await RefreshStateAsync();
             }
+            else if (_releaseFeedSource == ReleaseFeedSource.Live
+                && !_operationInProgress
+                && !_switchInProgress
+                && !_closing)
+            {
+                if (await RefreshRelevantAuthoritativeLatestAsync(_gameSessionCts?.Token ?? default))
+                {
+                    RefreshKnownGamePatchPresentation();
+                    await RefreshStateAsync();
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -1167,13 +1188,25 @@ public partial class MainForm
             installedPublicId = installedLoad.Value.PublicId;
         }
 
-        // Factual LocalizationState uses INSTALLED mode's current
+        if (installedModeSlug != null && _releaseFeedSource == ReleaseFeedSource.Live)
+        {
+            await EnsureAuthoritativeLatestAsync(
+                    installedModeSlug,
+                    forceRefresh: false,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(true);
+            if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session))
+                return;
+            RefreshKnownGamePatchPresentation();
+        }
+
+        // Installed state is compared only against a successful per-mode latest check.
         CurrentRelease? installedModeCurrent = null;
         if (installedModeSlug != null)
         {
             var installedApiMode = _apiResponse?.Data?.Modes?
                 .FirstOrDefault(m => string.Equals(m.Slug, installedModeSlug, StringComparison.Ordinal));
-            installedModeCurrent = installedApiMode?.Current;
+            installedModeCurrent = ResolveCurrentRelease(installedModeSlug, installedApiMode?.Current);
         }
 
         var gameLocPath = _gameDefinition.GetLocalizationFilePath(_gameRoot);

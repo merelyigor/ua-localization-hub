@@ -9,6 +9,7 @@ internal sealed class WwmModeCard : UserControl
     private readonly Label _title;
     private readonly Label _description;
     private readonly Label _status;
+    private readonly Label _releaseVersion;
     private readonly Button _action;
     private readonly Label _installedBadge;
     private readonly Font _installedBadgeFont;
@@ -25,6 +26,9 @@ internal sealed class WwmModeCard : UserControl
     internal Color InstalledBadgeForeColorForTest => _installedBadge.ForeColor;
     internal Color InstalledBadgeBackColorForTest => _installedBadge.BackColor;
     internal bool StatusLabelVisibleForTest => _status.Visible;
+    internal bool ReleaseVersionVisibleForTest => _releaseVersion.Visible;
+    internal string ReleaseVersionTextForTest => _releaseVersion.Text;
+    internal Color ReleaseVersionForeColorForTest => _releaseVersion.ForeColor;
     internal bool IsInstalledForTest { get; private set; }
     public event EventHandler? SelectionRequested;
     public event EventHandler? ActionRequested;
@@ -40,6 +44,15 @@ internal sealed class WwmModeCard : UserControl
         Padding = new Padding(18);
         _title = new Label { Dock = DockStyle.Top, Height = 32, Text = mode.Label, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = UiTheme.PrimaryText };
         _description = new Label { Dock = DockStyle.Fill, Text = JoinDescription(mode), ForeColor = UiTheme.SecondaryText, AutoEllipsis = true };
+        _releaseVersion = new Label
+        {
+            Dock = DockStyle.Bottom,
+            Height = UiTheme.Scale(this, 24),
+            ForeColor = UiTheme.SecondaryText,
+            AutoEllipsis = true,
+            Visible = false,
+            Margin = Padding.Empty
+        };
         _status = new Label { Dock = DockStyle.Bottom, Height = 30, ForeColor = UiTheme.SecondaryText };
         _action = new Button { Dock = DockStyle.Bottom, Height = 34, Visible = false, TabStop = true };
         _installedBadgeFont = new Font(Font.FontFamily, 8.5F, FontStyle.Bold);
@@ -60,6 +73,7 @@ internal sealed class WwmModeCard : UserControl
         UiTheme.StyleAccentSecondaryButton(_action);
         _action.Click += (_, _) => ActionRequested?.Invoke(this, EventArgs.Empty);
         Controls.Add(_description);
+        Controls.Add(_releaseVersion);
         Controls.Add(_status);
         Controls.Add(_action);
         Controls.Add(_title);
@@ -89,6 +103,15 @@ internal sealed class WwmModeCard : UserControl
         if (showInstalledBadge)
             _installedBadge.BringToFront();
         Invalidate();
+    }
+
+    public void SetReleaseVersion(string? version)
+    {
+        _releaseVersion.Visible = !string.IsNullOrWhiteSpace(version);
+        _releaseVersion.Text = string.IsNullOrWhiteSpace(version)
+            ? string.Empty
+            : $"Версія релізу: {version.Trim()}";
+        PerformLayout();
     }
 
     protected override void OnLayout(LayoutEventArgs e)

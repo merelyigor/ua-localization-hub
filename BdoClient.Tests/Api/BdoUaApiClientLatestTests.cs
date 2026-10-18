@@ -158,6 +158,25 @@ public class BdoUaApiClientLatestTests
     }
 
     [Fact]
+    public async Task GetLatestReleaseAsync_ForcedRevalidationSkipsCachedEtagAndRequestsNoCache()
+    {
+        var handler = new RecordingHandler((_, _) =>
+            Task.FromResult(JsonResponse(HttpStatusCode.OK, LatestJson(Slug))));
+        using var httpClient = new HttpClient(handler);
+        var client = new BdoUaApiClient(httpClient, new NullLogger());
+
+        await client.GetLatestReleaseAsync(Slug);
+        var revalidated = await client.GetLatestReleaseAsync(
+            Slug,
+            forceUnconditionalRevalidation: true);
+
+        Assert.Equal(LatestReleaseOutcome.Modified, revalidated.Outcome);
+        Assert.Empty(handler.Requests[1].IfNoneMatch);
+        Assert.Contains("no-cache", handler.Requests[1].CacheControl, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("no-cache", handler.Requests[1].Pragma, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GetLatestReleaseAsync_EtagCacheIsPerSlug()
     {
         var handler = new RecordingHandler((request, _) =>
@@ -419,12 +438,19 @@ public class BdoUaApiClientLatestTests
             Requests.Add(new RequestSnapshot(
                 request.Method,
                 request.RequestUri!.ToString(),
-                request.Headers.IfNoneMatch.Select(value => value.ToString()).ToArray()));
+                request.Headers.IfNoneMatch.Select(value => value.ToString()).ToArray(),
+                request.Headers.CacheControl?.ToString() ?? string.Empty,
+                string.Join(",", request.Headers.Pragma.Select(value => value.Name))));
             return send(request, cancellationToken);
         }
     }
 
-    private sealed record RequestSnapshot(HttpMethod Method, string Uri, IReadOnlyList<string> IfNoneMatch);
+    private sealed record RequestSnapshot(
+        HttpMethod Method,
+        string Uri,
+        IReadOnlyList<string> IfNoneMatch,
+        string CacheControl,
+        string Pragma);
 
     private sealed class NullLogger : ILogger
     {

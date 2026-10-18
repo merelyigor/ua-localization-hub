@@ -156,6 +156,40 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task WwmModeCardsShowCurrentApiReleaseVersionAndRefreshInPlace()
+    {
+        string? version = "v2.6.3";
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(
+                CreateTinyWwmArchive(), currentVersion: () => version));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => form.WwmReleaseVersionVisibleForTest("ukrainian", "default"));
+        Assert.Equal("Версія релізу: v2.6.3", fixture.Form.WwmReleaseVersionForTest("ukrainian", "default"));
+
+        version = "v2.6.4";
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+        await session.Poller.RequestImmediatePollAsync();
+        await fixture.WaitForAsync(form => form.WwmReleaseVersionForTest("ukrainian", "default") == "Версія релізу: v2.6.4");
+
+        version = null;
+        await session.Poller.RequestImmediatePollAsync();
+        await fixture.WaitForAsync(form => !form.WwmReleaseVersionVisibleForTest("ukrainian", "default"));
+        Assert.Empty(fixture.Form.WwmReleaseVersionForTest("ukrainian", "default") ?? string.Empty);
+
+        version = "v2.6.4";
+        await session.Poller.RequestImmediatePollAsync();
+        await fixture.WaitForAsync(form => form.WwmReleaseVersionForTest("ukrainian", "default") == "Версія релізу: v2.6.4");
+        await fixture.RunWwmInstallAsync("ukrainian", "default", confirm: true);
+        Assert.True(fixture.Form.WwmModeInstalledForTest("ukrainian", "default"));
+        Assert.Equal("Версія релізу: v2.6.4", fixture.Form.WwmReleaseVersionForTest("ukrainian", "default"));
+    }
+
+    [Fact]
     public async Task WwmRecognizedUnknownWindowsRoot_IsNotPresentedAsSteamAndUsesUnambiguousLayout()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
@@ -1491,18 +1525,24 @@ public sealed class MainFormLifecycleIntegrationTests
     [Fact]
     public async Task NewerGameThanAvailableLocalizationKeepsWriteActionsDisabled()
     {
-        using var fixture = await MainFormTestFixture.StartAsync(
-            MainFormTestFixture.CreateSingleModeApiHandler(401),
-            gamePatch: 402);
+        var payload = Encoding.UTF8.GetBytes("patch 401 localization");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01AGGREGATEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01LATEST401", payload, "verified", patch: 401), "\"latest-401\"")]),
+            payload);
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 402);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardActionTextForTest == "Встановити");
 
-        await fixture.WaitForAsync(form =>
-            MainFormTestFixture.FindControlText(
-                form,
-                text => text.StartsWith("⚠ Гра новіша за доступну локалізацію", StringComparison.Ordinal)) != null);
+        var gameFile = BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot);
+        var originalBytes = await File.ReadAllBytesAsync(gameFile);
+        await fixture.InstallForTestAsync();
 
-        var card = MainFormTestFixture.FindFirstModeCard(fixture.Form);
-        Assert.NotNull(card);
-        Assert.False(card!.Controls.OfType<Button>().Single().Enabled);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(gameFile));
+        Assert.DoesNotContain(handler.RequestPaths, path => path.StartsWith("/download/", StringComparison.Ordinal));
+        Assert.Equal(GamePatchStatus.NewerThanLatestLocalization, fixture.Form.GamePatchStatusForTest);
+        Assert.False(fixture.Form.SelectedModeCardActionEnabledForTest);
     }
 
     [Fact]
@@ -1605,7 +1645,8 @@ public sealed class MainFormLifecycleIntegrationTests
         var handler = CreateInstallHandler(
             aggregatePublicId: "01STALEA",
             latestResponses: new Queue<HttpResponseMessage>
-            ([JsonResponse(HttpStatusCode.OK, latestJson, "\"latest-b\"")]),
+            ([JsonResponse(HttpStatusCode.OK, latestJson, "\"latest-b\""),
+                JsonResponse(HttpStatusCode.OK, latestJson, "\"latest-b\"")]),
             installedBytes);
         using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
         await fixture.WaitForStartupAsync();
@@ -1643,6 +1684,280 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task InstalledMode_UsesPerModeLatestForUpdateAndCannotRegressToStaleAggregate()
+    {
+        var installedA = Encoding.UTF8.GetBytes("installed release A");
+        var latestB = Encoding.UTF8.GetBytes("authoritative release B");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01RELEASEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01RELEASEB", latestB, "verified"), "\"release-b\""),
+                new HttpResponseMessage(HttpStatusCode.NotModified),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01RELEASEB", latestB, "verified"), "\"release-b\""),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01RELEASEB", latestB, "verified"), "\"release-b\"")]),
+            latestB);
+        using var fixture = await MainFormTestFixture.StartAsync(
+            handler,
+            gamePatch: 395,
+            beforeUiThreadStart: async currentFixture =>
+            {
+                var path = BdoGameDefinition.Default.GetLocalizationFilePath(currentFixture.GameRoot);
+                var paths = currentFixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id);
+                paths.EnsureDirectories();
+                var logger = new MainFormTestFixture.TestLogger();
+                var backupStore = new BackupStore(paths, logger);
+                var snapshot = await backupStore.CreateOriginalSnapshotAsync(currentFixture.GameRoot, 395);
+                Assert.True(snapshot.IsSuccess, snapshot.ErrorMessage);
+                await File.WriteAllBytesAsync(path, installedA);
+                await new InstallationStateStore(paths, logger).SaveAsync(new InstallationMetadata
+                {
+                    ModeSlug = "english-items",
+                    PublicId = "01RELEASEA",
+                    Version = 1,
+                    GamePatch = 395,
+                    Sha256 = Convert.ToHexString(SHA256.HashData(installedA)).ToLowerInvariant(),
+                    InstalledAt = DateTimeOffset.UtcNow
+                });
+            });
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardActionTextForTest == "Оновити");
+        Assert.Equal("Доступне оновлення", fixture.Form.SelectedModeCardStateTextForTest);
+        Assert.True(fixture.Form.SelectedModeCardActionEnabledForTest);
+        Assert.Equal(installedA, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+
+        await fixture.InstallForTestAsync();
+
+        var gameFile = BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot);
+        Assert.Equal(latestB, await File.ReadAllBytesAsync(gameFile));
+        var state = new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load();
+        Assert.Equal(FileLoadStatus.Valid, state.Status);
+        Assert.Equal("01RELEASEB", state.Value!.PublicId);
+        Assert.Equal(2, state.Value.Version);
+        Assert.Equal(Convert.ToHexString(SHA256.HashData(latestB)).ToLowerInvariant(), state.Value.Sha256);
+        Assert.Equal("✓ Встановлено", fixture.Form.SelectedModeCardStateTextForTest);
+        Assert.Null(fixture.Form.SelectedModeCardActionTextForTest);
+        Assert.Equal(4, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
+        Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01RELEASEB"));
+        Assert.Contains(fixture.Logger.Warnings, message => message.Contains("latest/aggregate identity conflict", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task FirstInstall_StaleAggregatePatchDoesNotBlockAuthoritativeLatestAtGamePatch()
+    {
+        var payload = Encoding.UTF8.GetBytes("authoritative patch 396 localization");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01STALEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01LATESTB", payload, "verified", patch: 396), "\"latest-b\""),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01LATESTB", payload, "verified", patch: 396), "\"latest-b\"")]),
+            payload);
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 396);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardActionTextForTest == "Встановити");
+
+        await fixture.InstallForTestAsync();
+
+        Assert.Equal(payload, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+        var state = new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load();
+        Assert.Equal("01LATESTB", state.Value!.PublicId);
+        Assert.Equal(396, state.Value.GamePatch);
+        Assert.Equal("✓ Встановлено", fixture.Form.SelectedModeCardStateTextForTest);
+    }
+
+    [Fact]
+    public async Task InstalledMode_StaleAggregatePatchUsesAuthoritativePatchForUpdateEligibility()
+    {
+        var installedA = Encoding.UTF8.GetBytes("installed release A");
+        var latestB = Encoding.UTF8.GetBytes("latest release B at game patch");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01RELEASEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01RELEASEB", latestB, "verified", patch: 396), "\"release-b\"")]),
+            latestB);
+        using var fixture = await MainFormTestFixture.StartAsync(
+            handler,
+            gamePatch: 396,
+            beforeUiThreadStart: async currentFixture =>
+            {
+                var path = BdoGameDefinition.Default.GetLocalizationFilePath(currentFixture.GameRoot);
+                var paths = currentFixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id);
+                paths.EnsureDirectories();
+                var logger = new MainFormTestFixture.TestLogger();
+                var snapshot = await new BackupStore(paths, logger).CreateOriginalSnapshotAsync(currentFixture.GameRoot, 395);
+                Assert.True(snapshot.IsSuccess, snapshot.ErrorMessage);
+                await File.WriteAllBytesAsync(path, installedA);
+                await new InstallationStateStore(paths, logger).SaveAsync(new InstallationMetadata
+                {
+                    ModeSlug = "english-items", PublicId = "01RELEASEA", Version = 1, GamePatch = 395,
+                    Sha256 = Convert.ToHexString(SHA256.HashData(installedA)).ToLowerInvariant(),
+                    InstalledAt = DateTimeOffset.UtcNow
+                });
+            });
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardActionTextForTest == "Оновити");
+
+        Assert.Equal("Доступне оновлення", fixture.Form.SelectedModeCardStateTextForTest);
+        Assert.True(fixture.Form.SelectedModeCardActionEnabledForTest);
+        Assert.Equal(installedA, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+    }
+
+    [Fact]
+    public async Task AuthoritativeLatestPatchBehindGameStillBlocksInstall()
+    {
+        var payload = Encoding.UTF8.GetBytes("too old localization");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01STALEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01OLD", payload, "verified", patch: 395), "\"old\"")]),
+            payload);
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 396);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardActionTextForTest == "Встановити");
+        var gameFile = BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot);
+        var originalBytes = await File.ReadAllBytesAsync(gameFile);
+
+        await fixture.InstallForTestAsync();
+
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(gameFile));
+        Assert.Equal(FileLoadStatus.Missing, new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load().Status);
+        Assert.DoesNotContain(handler.RequestPaths, path => path.StartsWith("/download/", StringComparison.Ordinal));
+        Assert.Equal(GamePatchStatus.NewerThanLatestLocalization, fixture.Form.GamePatchStatusForTest);
+    }
+
+    [Fact]
+    public async Task LatestFailureCanRecoverInSameSessionWithoutAggregateMutationFallback()
+    {
+        var payload = Encoding.UTF8.GetBytes("release after temporary API failure");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01AGGREGATEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.BadGateway, "temporary latest failure"),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01LATESTB", payload, "verified"), "\"latest-b\""),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01LATESTB", payload, "verified"), "\"latest-b\""),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01LATESTB", payload, "verified"), "\"latest-b\"")]),
+            payload);
+        using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => MainFormTestFixture.CountModeCards(form) == 1);
+        var gameFile = BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot);
+        var originalBytes = await File.ReadAllBytesAsync(gameFile);
+
+        await fixture.InstallForTestAsync();
+        Assert.DoesNotContain(handler.RequestPaths, path => path.StartsWith("/download/", StringComparison.Ordinal));
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(gameFile));
+
+        await fixture.Form.RefreshRelevantLatestForTestAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardActionTextForTest == "Встановити");
+        await fixture.InstallForTestAsync();
+
+        Assert.Equal(payload, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+        Assert.Equal("01LATESTB", new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load().Value!.PublicId);
+        Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01LATESTB"));
+    }
+
+    [Fact]
+    public async Task InstalledMode_DetectsNewPerModeLatestWhileApplicationRemainsRunning()
+    {
+        var installedA = Encoding.UTF8.GetBytes("installed release A");
+        var latestB = Encoding.UTF8.GetBytes("new latest release B");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01RELEASEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01RELEASEA", installedA, "verified"), "\"release-a\""),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01RELEASEB", latestB, "verified"), "\"release-b\"")]),
+            latestB);
+        using var fixture = await MainFormTestFixture.StartAsync(
+            handler,
+            gamePatch: 395,
+            beforeUiThreadStart: async currentFixture =>
+            {
+                var path = BdoGameDefinition.Default.GetLocalizationFilePath(currentFixture.GameRoot);
+                var paths = currentFixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id);
+                paths.EnsureDirectories();
+                var logger = new MainFormTestFixture.TestLogger();
+                var snapshot = await new BackupStore(paths, logger).CreateOriginalSnapshotAsync(currentFixture.GameRoot, 395);
+                Assert.True(snapshot.IsSuccess, snapshot.ErrorMessage);
+                await File.WriteAllBytesAsync(path, installedA);
+                await new InstallationStateStore(paths, logger).SaveAsync(new InstallationMetadata
+                {
+                    ModeSlug = "english-items", PublicId = "01RELEASEA", Version = 1, GamePatch = 395,
+                    Sha256 = Convert.ToHexString(SHA256.HashData(installedA)).ToLowerInvariant(),
+                    InstalledAt = DateTimeOffset.UtcNow
+                });
+            });
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardStateTextForTest == "✓ Встановлено");
+        await fixture.RefreshInstalledModeLatestAsync();
+
+        Assert.Equal("Доступне оновлення", fixture.Form.SelectedModeCardStateTextForTest);
+        Assert.Equal("Оновити", fixture.Form.SelectedModeCardActionTextForTest);
+        Assert.True(fixture.Form.SelectedModeCardActionEnabledForTest);
+        Assert.Equal(installedA, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+    }
+
+    [Fact]
+    public async Task Conflicting304ThenFailedUnconditionalRevalidation_BlocksMutation()
+    {
+        var installedA = Encoding.UTF8.GetBytes("installed release A");
+        var latestB = Encoding.UTF8.GetBytes("authoritative release B");
+        var handler = CreateInstallHandler(
+            aggregatePublicId: "01RELEASEA",
+            latestResponses: new Queue<HttpResponseMessage>
+            ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01RELEASEB", latestB, "verified"), "\"release-b\""),
+                new HttpResponseMessage(HttpStatusCode.NotModified),
+                JsonResponse(HttpStatusCode.InternalServerError, "revalidation failed")]),
+            latestB);
+        using var fixture = await MainFormTestFixture.StartAsync(
+            handler,
+            gamePatch: 395,
+            beforeUiThreadStart: async currentFixture =>
+            {
+                var path = BdoGameDefinition.Default.GetLocalizationFilePath(currentFixture.GameRoot);
+                var paths = currentFixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id);
+                paths.EnsureDirectories();
+                var logger = new MainFormTestFixture.TestLogger();
+                var snapshot = await new BackupStore(paths, logger).CreateOriginalSnapshotAsync(currentFixture.GameRoot, 395);
+                Assert.True(snapshot.IsSuccess, snapshot.ErrorMessage);
+                await File.WriteAllBytesAsync(path, installedA);
+                await new InstallationStateStore(paths, logger).SaveAsync(new InstallationMetadata
+                {
+                    ModeSlug = "english-items", PublicId = "01RELEASEA", Version = 1, GamePatch = 395,
+                    Sha256 = Convert.ToHexString(SHA256.HashData(installedA)).ToLowerInvariant(),
+                    InstalledAt = DateTimeOffset.UtcNow
+                });
+            });
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.SelectedModeCardActionTextForTest == "Оновити");
+        await fixture.InstallForTestAsync();
+
+        Assert.Equal(installedA, await File.ReadAllBytesAsync(
+            BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
+        Assert.Equal("01RELEASEA", new InstallationStateStore(
+            fixture.AppPaths.GetGamePersistencePaths(BdoGameDefinition.Default.Id),
+            new MainFormTestFixture.TestLogger()).Load().Value!.PublicId);
+        Assert.Null(fixture.Form.SelectedModeCardActionTextForTest);
+        Assert.DoesNotContain(handler.RequestPaths, path => path.StartsWith("/download/", StringComparison.Ordinal));
+        Assert.Contains(fixture.Logger.Warnings, message => message.Contains("Aggregate metadata will not be used as fallback", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Install_304UsesCachedFreshTargetAndDoesNotReinstallExactInstalledRelease()
     {
         var installedBytes = Encoding.UTF8.GetBytes("latest release B");
@@ -1650,7 +1965,10 @@ public sealed class MainFormLifecycleIntegrationTests
             aggregatePublicId: "01STALEA",
             latestResponses: new Queue<HttpResponseMessage>
             ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01FRESHB", installedBytes, "verified"), "\"latest-b\""),
-                new HttpResponseMessage(HttpStatusCode.NotModified)]),
+                new HttpResponseMessage(HttpStatusCode.NotModified),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01FRESHB", installedBytes, "verified"), "\"latest-b\""),
+                new HttpResponseMessage(HttpStatusCode.NotModified),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01FRESHB", installedBytes, "verified"), "\"latest-b\"")]),
             installedBytes);
         using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
         await fixture.WaitForStartupAsync();
@@ -1659,7 +1977,7 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.InstallForTestAsync();
         await fixture.InstallForTestAsync();
 
-        Assert.Equal(2, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
+        Assert.Equal(5, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
         Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01FRESHB"));
         Assert.Equal(installedBytes, await File.ReadAllBytesAsync(
             BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
@@ -1719,7 +2037,9 @@ public sealed class MainFormLifecycleIntegrationTests
             aggregatePublicId: "01AGGREGATEA",
             latestResponses: new Queue<HttpResponseMessage>
             ([JsonResponse(HttpStatusCode.OK, CreateLatestJson("01ISSUES", payload, "known_issues"), "\"issues\""),
-                new HttpResponseMessage(HttpStatusCode.NotModified)]),
+                new HttpResponseMessage(HttpStatusCode.NotModified),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01ISSUES", payload, "known_issues"), "\"issues\""),
+                JsonResponse(HttpStatusCode.OK, CreateLatestJson("01ISSUES", payload, "known_issues"), "\"issues\"")]),
             payload);
         using var fixture = await MainFormTestFixture.StartAsync(handler, gamePatch: 395);
         await fixture.WaitForStartupAsync();
@@ -1810,7 +2130,7 @@ public sealed class MainFormLifecycleIntegrationTests
         }
     });
 
-    private static string CreateLatestJson(string publicId, byte[] bytes, string gameTestState, bool compatible = true) => JsonSerializer.Serialize(new
+    private static string CreateLatestJson(string publicId, byte[] bytes, string gameTestState, bool compatible = true, int patch = 395) => JsonSerializer.Serialize(new
     {
         success = true,
         generated_at = "2026-10-04T12:00:00+03:00",
@@ -1828,7 +2148,7 @@ public sealed class MainFormLifecycleIntegrationTests
                 download_url = $"https://bdo-ua.com.ua/download/releases/{publicId}",
                 size_bytes = bytes.Length,
                 sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(),
-                patch = 395,
+                patch,
                 compatible_with_official_patch = compatible,
                 game_test = new { state = gameTestState, label = "Server label", note = "Server note" }
             }
@@ -2285,6 +2605,17 @@ internal sealed class MainFormTestFixture : IDisposable
         await completion.Task.WaitAsync(Timeout);
     }
 
+    internal async Task RefreshInstalledModeLatestAsync()
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(async () =>
+        {
+            try { await Form.RefreshInstalledModeLatestForTestAsync(); completion.TrySetResult(null); }
+            catch (Exception ex) { completion.TrySetException(ex); }
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
     internal static async Task<MainFormTestFixture> StartAsync(
         MainFormTestHttpHandler bdoHandler,
         bool startInBackground = false,
@@ -2350,7 +2681,7 @@ internal sealed class MainFormTestFixture : IDisposable
 
     internal static Func<HttpMessageHandler> CreateWwmApiHandlerFactory(byte[]? package = null, List<string>? requests = null,
         Func<bool>? modeAvailable = null, HttpStatusCode latestStatus = HttpStatusCode.OK, bool omitCurrentArtifact = false,
-        Func<bool?>? gameTested = null)
+        Func<bool?>? gameTested = null, Func<string?>? currentVersion = null)
         => () => new MainFormTestHttpHandler((request, _) =>
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -2360,7 +2691,8 @@ internal sealed class MainFormTestFixture : IDisposable
                 {
                     Content = new StringContent(latestStatus == HttpStatusCode.OK
                         ? CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null, omitCurrentArtifact,
-                            gameTested == null ? true : gameTested.Invoke())
+                            gameTested == null ? true : gameTested.Invoke(),
+                            currentVersion == null ? "v-test" : currentVersion.Invoke())
                         : "{\"success\":false,\"error\":\"temporary_failure\"}", Encoding.UTF8, "application/json")
                 });
             if (path == "/releases/test.zip" && package != null)
@@ -2368,7 +2700,8 @@ internal sealed class MainFormTestFixture : IDisposable
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         });
 
-    private static string CreateWwmLatestJson(byte[]? package, bool modeAvailable, bool omitCurrentArtifact, bool? gameTested)
+    private static string CreateWwmLatestJson(byte[]? package, bool modeAvailable, bool omitCurrentArtifact, bool? gameTested,
+        string? currentVersion = "v-test")
     {
         var bytes = package ?? Array.Empty<byte>();
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
@@ -2380,7 +2713,7 @@ internal sealed class MainFormTestFixture : IDisposable
             {
                 current = new
                 {
-                    version = "v-test", published_at = "2026-10-09T00:00:00Z", game_version = (string?)null,
+                    version = currentVersion, published_at = "2026-10-09T00:00:00Z", game_version = (string?)null,
                     game_tested = gameTested, translated_rows = (long?)null, status = "current",
                     files = modeAvailable && !omitCurrentArtifact
                         ? new object[] { new { variant = "default", slug = "ukrainian", label = "Українська",

@@ -10,6 +10,8 @@ GET https://bdo-ua.com.ua/api/public/v1/releases
 
 Авторизація не потрібна. Відповідь — JSON.
 
+`/releases` є aggregate feed для каталогу режимів, описів і progress. Для конкретного API-driven mode актуальний реліз перевіряється через `GET /releases/latest/{slug}`; `public_id` є release identity, а numeric version — лише метадані. Клієнт кешує успішний latest окремо за точним slug, порівнює встановлений `public_id` із ним і періодично повторює перевірку для встановленого режиму. Застарілий aggregate не повинен скасувати новіший authoritative latest або спричинити downgrade. Перед install/update потрібен свіжий успішний latest і саме його immutable `CurrentRelease` передається в installer; помилка перевірки не дозволяє fallback до aggregate metadata та блокує mutation. Якщо cached latest, отриманий через `304`, суперечить aggregate identity того самого slug, клієнт виконує одну безумовну `no-cache` revalidation; її помилка також блокує mutation. Успішний download перевіряється за exact size/SHA, а persisted installation identity — за тим самим mode/public_id/version/patch/SHA.
+
 ## Winds4UA latest feed
 
 WWM має окремий API-контракт і DTO; він не десеріалізується у BDO `ReleasesResponse`.

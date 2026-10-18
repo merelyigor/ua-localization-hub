@@ -220,12 +220,18 @@ public partial class MainForm
 
     private int? GetLatestKnownLocalizationPatch()
     {
-        var patches = _apiResponse?.Data?.Modes?
-            .Select(mode => mode.Current?.Patch ?? 0)
-            .Where(patch => patch > 0)
-            .ToList();
+        var slug = GetSelectedModeSlug();
+        if (string.IsNullOrWhiteSpace(slug))
+            slug = _lastInstalledModeSlug;
 
-        return patches is { Count: > 0 } ? patches.Max() : null;
+        // The game/localization patch gate must not use stale aggregate metadata.
+        // Until this exact mode has a successful latest result, keep the gate
+        // indeterminate; the install handler rechecks latest before mutation.
+        return slug != null
+            && _authoritativeLatestBySlug.TryGetValue(slug, out var latest)
+            && latest.Succeeded
+                ? latest.Data?.Current?.Patch
+                : null;
     }
 
     private bool AllowsLocalizationWriteActions()
@@ -339,7 +345,7 @@ public partial class MainForm
     {
         foreach (var card in modesFlowPanel.Controls.OfType<LocalizationModeCard>())
         {
-            var mode = card.Mode;
+            var mode = WithAuthoritativeCurrent(card.Mode)!;
 
             // Exact installed: same ModeSlug AND same PublicId of current release
             bool isExactInstalled = InstallActionPolicy.IsExactInstalledTarget(
@@ -362,9 +368,10 @@ public partial class MainForm
         var selectedSlug = GetSelectedModeSlug();
         foreach (var card in modesFlowPanel.Controls.OfType<LocalizationModeCard>())
         {
-            var compatibility = _compatService.Check(card.Mode.Current);
+            var mode = WithAuthoritativeCurrent(card.Mode)!;
+            var compatibility = _compatService.Check(mode.Current);
             card.ApplyPresentation(ModeCardPresentationPolicy.Create(
-                factualState, installedModeSlug, installedPublicId, card.Mode, compatibility,
+                factualState, installedModeSlug, installedPublicId, mode, compatibility,
                 operationInProgress,
                 operationInProgress && string.Equals(selectedSlug, card.ModeSlug, StringComparison.Ordinal),
                 allowWriteActions: _releaseFeedSource == ReleaseFeedSource.Live

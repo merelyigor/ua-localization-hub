@@ -376,6 +376,7 @@ public partial class MainForm : Form
         _gamePatchStatus = GamePatchStatus.Unknown;
         _gamePatchRefreshFailed = false;
         _apiResponse = null;
+        _authoritativeLatestBySlug.Clear();
         _apiLoadedSuccessfully = false;
         _releaseFeedSource = ReleaseFeedSource.Unavailable;
         _cachedFeedSavedAtUtc = null;
@@ -476,6 +477,10 @@ public partial class MainForm : Form
     internal bool WwmInstallActionsEnabledForTest => modesFlowPanel.Controls.OfType<WwmModeCard>().Any(card => card.ActionVisibleForTest && card.ActionEnabledForTest);
     internal bool WwmModeInstalledForTest(string slug, string variant) => modesFlowPanel.Controls.OfType<WwmModeCard>()
         .Any(card => card.ModeSlug == slug && card.ModeVariant == variant && card.IsInstalledForTest);
+    internal string? WwmReleaseVersionForTest(string slug, string variant) => modesFlowPanel.Controls.OfType<WwmModeCard>()
+        .FirstOrDefault(card => card.ModeSlug == slug && card.ModeVariant == variant)?.ReleaseVersionTextForTest;
+    internal bool WwmReleaseVersionVisibleForTest(string slug, string variant) => modesFlowPanel.Controls.OfType<WwmModeCard>()
+        .FirstOrDefault(card => card.ModeSlug == slug && card.ModeVariant == variant)?.ReleaseVersionVisibleForTest ?? false;
     internal bool WwmRestoreEnabledForTest => restoreOriginalButton.Enabled;
     internal bool WwmManualDetectionInProgressForTest => _wwmManualDetectionInProgress;
     internal bool WwmDetectEnabledForTest => detectGameButton.Enabled;
@@ -496,9 +501,38 @@ public partial class MainForm : Form
         .OfType<LocalizationModeCard>()
         .FirstOrDefault(card => string.Equals(card.ModeSlug, GetSelectedModeSlug(), StringComparison.Ordinal))?
         .StateTextForTest;
+    internal string? SelectedModeCardActionTextForTest => modesFlowPanel.Controls
+        .OfType<LocalizationModeCard>()
+        .FirstOrDefault(card => string.Equals(card.ModeSlug, GetSelectedModeSlug(), StringComparison.Ordinal))?
+        .ActionTextForTest;
+    internal bool SelectedModeCardActionEnabledForTest => modesFlowPanel.Controls
+        .OfType<LocalizationModeCard>()
+        .FirstOrDefault(card => string.Equals(card.ModeSlug, GetSelectedModeSlug(), StringComparison.Ordinal))?
+        .ActionEnabledForTest ?? false;
     internal OperationState OperationStateForTest => _operationState;
     internal string OperationMessageForTest => operationMessageLabel.Text;
     internal Task HandleInstallForTestAsync() => HandleInstallAsync();
+    internal async Task RefreshInstalledModeLatestForTestAsync()
+    {
+        var installed = _stateStore.Load();
+        var slug = installed.Status == FileLoadStatus.Valid
+            && installed.Value?.Source == InstallationSource.Api
+            ? installed.Value.ModeSlug
+            : null;
+        if (!string.IsNullOrWhiteSpace(slug))
+            await EnsureAuthoritativeLatestAsync(
+                slug,
+                forceRefresh: true,
+                cancellationToken: _gameSessionCts?.Token ?? default);
+        await RefreshStateAsync();
+    }
+    internal async Task RefreshRelevantLatestForTestAsync()
+    {
+        await RefreshRelevantAuthoritativeLatestAsync(_gameSessionCts?.Token ?? default, forceRefresh: true);
+        RefreshKnownGamePatchPresentation();
+        await RefreshStateAsync();
+    }
+    internal GamePatchStatus GamePatchStatusForTest => _gamePatchStatus;
     internal Task HandleWwmInstallForTestAsync(string slug, string variant) => HandleWwmInstallAsync(slug, variant);
     internal Task RefreshWwmStateForTestAsync() => RefreshWwmStateAsync(_gameSessionGeneration, _gameSessionCts?.Token ?? default);
     internal Task<WwmMutationResult> HandleWwmRestoreForTestAsync() => HandleWwmRestoreAsync();

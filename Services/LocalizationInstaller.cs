@@ -52,6 +52,9 @@ public sealed class LocalizationInstaller
         var downloadUrl = release.DownloadUrl!;
         var expectedSize = release.SizeBytes;
         var expectedSha256 = release.Sha256!;
+        _logger.Info(
+            $"BDO localization download selected: public_id={release.PublicId}, version={release.Version}, " +
+            $"patch={release.Patch}, filename={release.Filename}, size={expectedSize}, sha256={expectedSha256}.");
 
         DownloadError lastError = default;
         string? lastErrorMessage = null;
@@ -68,7 +71,12 @@ public sealed class LocalizationInstaller
                 downloadUrl, expectedSize, expectedSha256, progress, cancellationToken).ConfigureAwait(false);
 
             if (result.IsSuccess)
+            {
+                _logger.Info(
+                    $"BDO localization download verified: public_id={release.PublicId}, version={release.Version}, " +
+                    $"bytes={result.SizeBytes}, computed_sha256={result.Sha256}.");
                 return result;
+            }
 
             lastError = result.Error!.Value;
             lastErrorMessage = result.ErrorMessage;

@@ -1,14 +1,18 @@
 # Current Engineering Context
 
-Оновлено: 2026-10-17
+Оновлено: 2026-10-18
+
+## Owner-authorized v1.2.12 implementation
+
+The v1.2.11 docs-only post-release finalization is complete at commit `8cbb7ccad0eb80365fe03e7c1ecb8708f217f7bf`; exact-SHA CI #267 / run `39069163227` succeeded. v1.2.11 is **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**. v1.2.12 is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW** on review branch `review/v1.2.12-authoritative-latest`; `main` remains at `8cbb7ccad0eb80365fe03e7c1ecb8708f217f7bf` pending review. Release build passed with 0 warnings/errors; full suite 1218/1218; focused BDO latest/API/state/install/feed, WWM card and MainForm lifecycle suite 111/111. Release-note generator, version resolver (13/13; production resolution 1.2.12), Project Chat Rules, NEXT schema/render, secret/private scan and `git diff --check` passed. Corrective coverage proves stale aggregate patch 395 cannot block authoritative mode patch 396 at local patch 396; authoritative patch 395 remains blocked; a failed latest request can recover through the same-session selected-mode refresh path without aggregate mutation fallback. Scope remains authoritative BDO per-mode latest consistency/update detection plus the Winds4UA `data.current.version` card row. No native/Owner smoke was performed and no real game files were touched. No RC, tag or release was created.
 
 ## Project Purpose / Status
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Стабільний реліз: **v1.2.11**. Публічний Release ID `416033195` опубліковано як stable із annotated tag `v1.2.11`, що peels до source SHA `758755058e3a197a59ec41452fb6a95938b54d7a`. Canonical і legacy assets повторно завантажено та перевірено за точними RC SHA-256; release body відповідає canonical RC #43 notes. Lifecycle: **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**.
+Стабільний реліз: **v1.2.11**. Публічний Release ID `416033195` опубліковано як stable із annotated tag `v1.2.11`, що peels до source SHA `758755058e3a197a59ec41452fb6a95938b54d7a`. Canonical і legacy assets повторно завантажено та перевірено за точними RC SHA-256; release body відповідає canonical RC #43 notes. Lifecycle: **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**.
 
-v1.2.11 RC #43 пройшов Owner end-to-end WWM install smoke та опублікований stable. Попередні RC #39/#40/#41/#42 лишаються невдалими й не перевикористовуються. У рамках цього task Owner авторизував bounded v1.2.12 роботу: authoritative latest localization consistency/update detection і Winds4UA API release-version label у WWM cards. Вона починається після docs-only release finalization.
+v1.2.11 RC #43 пройшов Owner end-to-end WWM install smoke та опублікований stable. Попередні RC #39/#40/#41/#42 лишаються невдалими й не перевикористовуються. У рамках цього task Owner авторизував bounded v1.2.12 роботу: authoritative latest localization consistency/update detection і Winds4UA API release-version label у WWM cards. Docs-only release finalization завершено перед початком цього implementation.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
