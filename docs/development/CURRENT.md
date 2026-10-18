@@ -2,9 +2,15 @@
 
 Оновлено: 2026-10-18
 
-## v1.2.17 release preparation — application update notification retry
+## v1.2.17 release lifecycle — application update notification retry
 
-Owner authorized a focused fix so a launcher update first detected while its window is visible remains pending for a tray notification after the app is hidden. The tracker now records a tag only when notification is allowed; regression coverage checks repeated visible checks, later tray delivery, and deduplication. Release build/test and RC validation are in progress; external Architect review is waived by Owner for this publication. No game files are changed.
+Owner authorized and waived external Architect review for this focused fix: an application update first detected while the window is visible remains pending for a tray notification after the app is hidden. Implementation `2d48f6652cc36620ea7e7dac1f6320837efb3b0c` (parent `556758ea759f5288064fe3259580f3588f6d32ea`) passed exact-SHA normal CI #277 / run `39156890397` and Release Candidate #49 / run `39157150228`; 1232/1232 tests passed. Stable Release ID `416645461` was published at `2026-10-18T19:11:56Z`; annotated tag `v1.2.17` peels to the implementation SHA. Both public assets were independently downloaded and match their RC SHA-256. Facts are archived in [`docs/releases/v1.2.17.md`](../releases/v1.2.17.md). `NEXT.json` is reset to canonical empty schema-v1. No external Architect acceptance is claimed and no game files were changed. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**.
+
+## v1.2.17 publication facts
+
+- Canonical public asset ID `654257696`, 68,006,525 bytes, SHA-256 `3cd245f30b7125611ceca545a68b6a54457e0a07ed37da06c2e945c4147810af`.
+- Legacy public asset ID `654257695`, 68,006,501 bytes, SHA-256 `aa74be2b5171e066d20b614af8a29d1b73f12e3329773d00f5819fad2bf9d9b5`.
+- Internal EXE SHA-256 `e1aa353ebbaae58eb957ceec7deb1388a7d1178772caea766dcfb8d64e234cde`; FileVersion `1.2.17.0`; ProductVersion `1.2.17`.
 
 ## v1.2.16 release lifecycle
 
@@ -30,13 +36,13 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.16** (Release ID `416633779`), source SHA `caaba7c11a698c47ddfdc17f7298de8d272a6e53`; live latest — v1.2.16. Точні asset facts записані у [`docs/releases/v1.2.16.md`](../releases/v1.2.16.md).
+Останній стабільний реліз: **v1.2.17** (Release ID `416645461`), source SHA `2d48f6652cc36620ea7e7dac1f6320837efb3b0c`; live latest — v1.2.17. Точні asset facts записані у [`docs/releases/v1.2.17.md`](../releases/v1.2.17.md).
 
 v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install; їхній вміст не змінюється. У цьому циклі реальні файли гри не змінювалися. Owner waived external Architect review; acceptance не заявляється.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.15 is **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.17 is **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
 
 ## Architecture Summary
 
