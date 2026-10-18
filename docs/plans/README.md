@@ -3,7 +3,7 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.12 — RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW
+**Current phase:** v1.2.13 — RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW
 **Next:** OWNER DECISION REQUIRED.
 **Implementation authorization:** NONE. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
@@ -11,11 +11,11 @@
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.12 — RELEASED / PUBLIC VERIFIED | OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.13 — RELEASED / PUBLIC VERIFIED | OWNER DECISION REQUIRED |
 
-Release cycles: `v1.2.9`, `v1.2.10`, and `v1.2.11` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.11 evidence is archived in [`../releases/v1.2.11.md`](../releases/v1.2.11.md). v1.2.12 is RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW and archived in [`../releases/v1.2.12.md`](../releases/v1.2.12.md).
+Release cycles: `v1.2.9`, `v1.2.10`, and `v1.2.11` — RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED. v1.2.11 evidence is archived in [`../releases/v1.2.11.md`](../releases/v1.2.11.md). v1.2.12 and v1.2.13 are RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW and archived in [`../releases/v1.2.12.md`](../releases/v1.2.12.md) and [`../releases/v1.2.13.md`](../releases/v1.2.13.md).
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.12 is published stable as Release ID `416416383`, tag peeling to `f35a9457fbd7294c02ff86de781fc46952a0e887`; lifecycle is RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW. Stage 8B remains OPTIONAL / NOT STARTED. Next implementation authorization: OWNER DECISION REQUIRED; no Stage 11C.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.13 is published stable as Release ID `416446964`, tag peeling to `4ca4199e2fd540459cf8e37857c9d0e6d361e623`; lifecycle is RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW. Stage 8B remains OPTIONAL / NOT STARTED. Next implementation authorization: OWNER DECISION REQUIRED; no Stage 11C.
 
 ## Backlog
 

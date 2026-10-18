@@ -2,9 +2,13 @@
 
 Оновлено: 2026-10-18
 
+## v1.2.13 release lifecycle
+
+Stable v1.2.13 (Release ID `416446964`) was published at `2026-10-18T12:48:29Z` from source `4ca4199e2fd540459cf8e37857c9d0e6d361e623`; annotated tag `v1.2.13` peels to that exact commit. Normal CI #270 / run `39127970968` and RC #45 / run `39128159096` succeeded. Both canonical and legacy assets were independently downloaded and hash-verified; exact evidence is archived in [`docs/releases/v1.2.13.md`](../releases/v1.2.13.md). The public release is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. `NEXT.json` is reset to the canonical empty schema-v1 state. No game files were modified.
+
 ## v1.2.12 release lifecycle
 
-The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887` was fast-forwarded unchanged from parent `8cbb7ccad0eb80365fe03e7c1ecb8708f217f7bf`. Exact-SHA normal CI #268 / run `39123483766` succeeded; RC #44 / run `39123687761` produced v1.2.12 and passed all bundle, manifest, source-SHA, EXE identity and release-notes checks. Stable Release ID `416416383` was published at `2026-10-18T11:42:14Z`; annotated tag `v1.2.12` peels to the implementation SHA, and both public assets were independently downloaded and hash-verified. v1.2.12 is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. Exact evidence is archived in [`docs/releases/v1.2.12.md`](../releases/v1.2.12.md). `NEXT.json` was reset at publication and now carries the Owner-requested WWM compatibility-dialog removal for a future release. No native or Owner smoke was performed for v1.2.12, as explicitly waived; no real game files were changed.
+The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887` was fast-forwarded unchanged from parent `8cbb7ccad0eb80365fe03e7c1ecb8708f217f7bf`. Exact-SHA normal CI #268 / run `39123483766` succeeded; RC #44 / run `39123687761` produced v1.2.12 and passed all bundle, manifest, source-SHA, EXE identity and release-notes checks. Stable Release ID `416416383` was published at `2026-10-18T11:42:14Z`; annotated tag `v1.2.12` peels to the implementation SHA, and both public assets were independently downloaded and hash-verified. v1.2.12 is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. Exact evidence is archived in [`docs/releases/v1.2.12.md`](../releases/v1.2.12.md). `NEXT.json` was reset at publication; the subsequent Owner-requested WWM compatibility-dialog removal shipped in v1.2.13. No native or Owner smoke was performed for v1.2.12, as explicitly waived; no real game files were changed.
 
 ## Project Purpose / Status
 
