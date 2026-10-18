@@ -21,12 +21,12 @@ public sealed class LocalizationNotificationTrackerTests
     }
 
     [Fact]
-    public void FirstVisibleUpdateAvailable_DoesNotNotifyButLatches()
+    public void FirstVisibleUpdateAvailable_RemainsPendingUntilHidden()
     {
         var tracker = new LocalizationNotificationTracker();
 
         Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: false));
-        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
@@ -39,13 +39,13 @@ public sealed class LocalizationNotificationTrackerTests
     }
 
     [Fact]
-    public void VisibleThenHiddenUpdateAvailable_DoesNotNotify()
+    public void VisibleThenHiddenUpdateAvailable_NotifiesWhenTrayBecomesAvailable()
     {
         var tracker = new LocalizationNotificationTracker();
 
         tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: false);
 
-        Assert.False(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
+        Assert.True(tracker.Observe("bdo", "full", "release-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]
@@ -117,6 +117,24 @@ public sealed class LocalizationNotificationTrackerTests
 
         Assert.True(tracker.Observe("wwm", "ukrainian/default", "sha-a", updateAvailable: true, canNotify: true));
         Assert.True(tracker.Observe("wwm", "ukrainian/default", "sha-b", updateAvailable: true, canNotify: true));
+    }
+
+    [Fact]
+    public void ConfirmedNotificationIsDeduplicatedButUnconfirmedAttemptCanRetry()
+    {
+        var tracker = new LocalizationNotificationTracker();
+        var firstAttempt = DateTimeOffset.UtcNow;
+
+        Assert.True(tracker.Observe("wwm", "english-terms/english_terms", "sha-b",
+            updateAvailable: true, canNotify: true, now: firstAttempt));
+        Assert.False(tracker.Observe("wwm", "english-terms/english_terms", "sha-b",
+            updateAvailable: true, canNotify: true, now: firstAttempt.AddSeconds(30)));
+        Assert.True(tracker.Observe("wwm", "english-terms/english_terms", "sha-b",
+            updateAvailable: true, canNotify: true, now: firstAttempt.AddMinutes(3)));
+
+        tracker.MarkDelivered("wwm", "english-terms/english_terms", "sha-b");
+        Assert.False(tracker.Observe("wwm", "english-terms/english_terms", "sha-b",
+            updateAvailable: true, canNotify: true, now: firstAttempt.AddMinutes(4)));
     }
 
     [Fact]

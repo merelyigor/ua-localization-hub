@@ -21,6 +21,7 @@ public sealed class Winds4UaApiClient
 
     public async Task<WwmApiResult> GetLatestAsync(CancellationToken cancellationToken = default)
     {
+        _logger.Debug($"Winds4UA latest request started: endpoint={LatestUrl}.");
         using var timeout = new CancellationTokenSource(_timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
@@ -28,21 +29,38 @@ public sealed class Winds4UaApiClient
             using var response = await _httpClient.GetAsync(LatestUrl, HttpCompletionOption.ResponseHeadersRead, linked.Token)
                 .ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
+            {
+                _logger.Warning($"Winds4UA latest request returned HTTP {(int)response.StatusCode}.");
                 return WwmApiResult.Failure($"HTTP {(int)response.StatusCode}");
+            }
 
             await using var stream = await response.Content.ReadAsStreamAsync(linked.Token).ConfigureAwait(false);
             var feed = await JsonSerializer.DeserializeAsync<WwmReleaseFeed>(stream,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, linked.Token).ConfigureAwait(false);
             if (feed?.Success != true || feed.Data?.Modes == null)
+            {
+                _logger.Warning("Winds4UA latest response rejected: successful data/modes are missing.");
                 return WwmApiResult.Failure("The API response has no successful data/modes.");
+            }
 
             var identities = new HashSet<string>(StringComparer.Ordinal);
             foreach (var mode in feed.Data.Modes)
             {
                 if (string.IsNullOrWhiteSpace(mode.Slug) || string.IsNullOrWhiteSpace(mode.Variant)
                     || string.IsNullOrWhiteSpace(mode.Label) || !identities.Add($"{mode.Slug}\0{mode.Variant}"))
+                {
+                    _logger.Warning("Winds4UA latest response rejected: mode identity is invalid or duplicated.");
                     return WwmApiResult.Failure("The API response contains invalid or duplicate mode identity.");
+                }
             }
+
+            var availableModes = string.Join(",", feed.Data.Modes
+                .Where(mode => mode.Available)
+                .Select(mode => $"{mode.Slug}/{mode.Variant}"));
+            var currentVersion = string.IsNullOrWhiteSpace(feed.Data.Current?.Version)
+                ? "none"
+                : feed.Data.Current.Version;
+            _logger.Info($"Winds4UA latest response accepted: current_version={currentVersion} available_modes={availableModes} generated_at={feed.GeneratedAt ?? "none"}.");
 
             return WwmApiResult.SuccessResult(feed);
         }

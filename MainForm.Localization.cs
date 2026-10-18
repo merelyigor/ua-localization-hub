@@ -154,6 +154,16 @@ public partial class MainForm
                 : await session.InstallService.ResolveStateAsync(session.CurrentDetection, hasPackage ? package : null, cancellationToken).ConfigureAwait(true);
             if (expectedGeneration.HasValue && !IsCurrentGameSession(generation, session)) return;
             var sameMode = installed?.ModeSlug == card.ModeSlug && installed.ModeVariant == card.ModeVariant;
+            if (sameMode)
+            {
+                var installedIdentity = string.IsNullOrWhiteSpace(installed!.ArchiveSha256)
+                    ? "unknown"
+                    : installed.ArchiveSha256[..Math.Min(12, installed.ArchiveSha256.Length)];
+                var latestIdentity = hasPackage && package != null
+                    ? $"{card.ModeSlug}/{card.ModeVariant}@{package.Version}"
+                    : "unavailable";
+                _logger.Debug($"WWM localization notification evaluation: installed={installed.ModeSlug}/{installed.ModeVariant}@{installed.ReleaseVersion ?? "unknown"} sha={installedIdentity} latest={latestIdentity} state={state.State}.");
+            }
             var presentation = WwmModeCardPresentation.Create(sameMode, state.State,
                 stateTrusted: stateError == null, recoveryBlocked: _wwmRecoveryBlocked, gameDetected: true, operationInProgress: IsUiWorkBlocked);
             card.Present(presentation);

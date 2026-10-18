@@ -12,6 +12,7 @@ public partial class MainForm
     private ToolStripMenuItem _autostartMenuItem = null!;
     private bool _explicitExitRequested;
     private Icon? _trayIcon;
+    private TrayNotificationAttempt? _pendingTrayNotification;
 
     private readonly WindowsAutostartService _autostartService;
     private readonly bool _startInBackground;
@@ -73,6 +74,9 @@ public partial class MainForm
         _notifyIcon.Icon = _trayIcon ?? SystemIcons.Application;
 
         _notifyIcon.DoubleClick += (_, _) => RestoreFromTray();
+        _notifyIcon.BalloonTipShown += (_, _) => OnTrayNotificationShown();
+        _notifyIcon.BalloonTipClosed += (_, _) => OnTrayNotificationClosed();
+        _notifyIcon.BalloonTipClicked += (_, _) => OnTrayNotificationClicked();
 
         // Registered before MainForm_Shown so the form is moved to tray first on
         // background startup, while the normal async startup pipeline still runs after.
@@ -110,12 +114,9 @@ public partial class MainForm
         string releaseVersion,
         bool updateAvailable)
     {
-        var canNotify = !Visible
-            && _notifyIcon.Visible
-            && !_closing
-            && !_updateHandoffInProgress
-            && !IsDisposed
-            && !Disposing;
+        var blockedReason = GetTrayNotificationBlockedReason();
+        var canNotify = blockedReason == null;
+        _logger.Debug($"Tray notification evaluated: type=localization game={gameId} mode={modeKey} identity={releaseIdentity} version={releaseVersion} update_available={updateAvailable.ToString().ToLowerInvariant()} eligible={canNotify.ToString().ToLowerInvariant()} reason={blockedReason ?? "none"}.");
 
         if (!_localizationNotificationTracker.Observe(
                 gameId,
@@ -123,54 +124,145 @@ public partial class MainForm
                 releaseIdentity,
                 updateAvailable,
                 canNotify))
+        {
+            if (updateAvailable && canNotify)
+                _logger.Debug($"Tray notification skipped: type=localization game={gameId} mode={modeKey} identity={releaseIdentity} reason=duplicate_or_pending.");
             return;
+        }
 
         var versionText = string.IsNullOrWhiteSpace(releaseVersion) ? string.Empty : $" до {releaseVersion}";
         var message = $"Для «{modeName}» у {_selectedGame.DisplayName} доступне оновлення{versionText}. Відкрийте Хаб, щоб оновити.";
         if (LocalizationNotificationForTest is { } notificationObserver)
         {
             notificationObserver(message);
+            _localizationNotificationTracker.MarkDelivered(gameId, modeKey, releaseIdentity);
             return;
         }
 
-        try
-        {
-            _notifyIcon.ShowBalloonTip(
-                5000,
-                ApplicationBrand.DisplayName,
-                message,
-                ToolTipIcon.Info);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning($"Failed to show localization notification: {ex.Message}");
-        }
+        RequestTrayNotification(
+            "localization",
+            $"{gameId}/{modeKey}/{releaseIdentity}",
+            message,
+            () => _localizationNotificationTracker.MarkDelivered(gameId, modeKey, releaseIdentity),
+            () => _localizationNotificationTracker.MarkFailed(gameId, modeKey, releaseIdentity));
     }
 
     private void ObserveApplicationUpdateNotification(string? candidateTag)
     {
-        var canNotify = !Visible
-            && _notifyIcon.Visible
-            && !_closing
-            && !_updateHandoffInProgress
-            && !IsDisposed
-            && !Disposing;
+        var blockedReason = GetTrayNotificationBlockedReason();
+        var canNotify = blockedReason == null;
+        _logger.Debug($"Tray notification evaluated: type=application_update tag={candidateTag ?? "none"} eligible={canNotify.ToString().ToLowerInvariant()} reason={blockedReason ?? "none"}.");
 
         if (!_applicationUpdateNotificationTracker.Observe(candidateTag, canNotify))
+        {
+            if (!string.IsNullOrWhiteSpace(candidateTag) && canNotify)
+                _logger.Debug($"Tray notification skipped: type=application_update tag={candidateTag} reason=duplicate_or_pending.");
             return;
+        }
 
+        RequestTrayNotification(
+            "application_update",
+            candidateTag!,
+            $"Доступна нова версія «{ApplicationBrand.DisplayName}» {candidateTag}. Відкрийте застосунок, щоб оновитися.",
+            () => _applicationUpdateNotificationTracker.MarkDelivered(candidateTag),
+            () => _applicationUpdateNotificationTracker.MarkFailed(candidateTag));
+    }
+
+    private string? GetTrayNotificationBlockedReason()
+    {
+        if (_closing) return "closing";
+        if (_updateHandoffInProgress) return "update_handoff";
+        if (IsDisposed || Disposing) return "form_disposed";
+        if (Visible) return "window_visible";
+        if (_notifyIcon == null || !_notifyIcon.Visible) return "tray_icon_hidden";
+        return null;
+    }
+
+    private void RequestTrayNotification(string type, string identity, string message,
+        Action markDelivered, Action markFailed)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (_pendingTrayNotification is { } previous)
+        {
+            if (now - previous.RequestedAt < TimeSpan.FromMinutes(2))
+            {
+                markFailed();
+                _logger.Debug($"Tray notification deferred: type={type} identity={identity} reason=another_request_unresolved.");
+                return;
+            }
+
+            if (!previous.Shown)
+            {
+                previous.MarkFailed();
+                _logger.Warning($"Tray notification was not acknowledged by Windows within two minutes: type={previous.Type} identity={previous.Identity}; retrying.");
+            }
+            else
+            {
+                _logger.Debug($"Tray notification closed without a close event before next request: type={previous.Type} identity={previous.Identity}.");
+            }
+        }
+
+        _pendingTrayNotification = new TrayNotificationAttempt(type, identity, now, markDelivered, markFailed);
+        _logger.Info($"Tray notification request: type={type} identity={identity}.");
         try
         {
-            _notifyIcon.ShowBalloonTip(
-                5000,
-                ApplicationBrand.DisplayName,
-                $"Доступна нова версія «{ApplicationBrand.DisplayName}» {candidateTag}. Відкрийте застосунок, щоб оновитися.",
-                ToolTipIcon.Info);
+            _notifyIcon.ShowBalloonTip(5000, ApplicationBrand.DisplayName, message, ToolTipIcon.Info);
         }
         catch (Exception ex)
         {
-            _logger.Warning($"Failed to show application update notification: {ex.Message}");
+            _pendingTrayNotification = null;
+            markFailed();
+            _logger.Warning($"Tray notification request failed: type={type} identity={identity} error={ex.Message}");
         }
+    }
+
+    private void OnTrayNotificationShown()
+    {
+        if (_pendingTrayNotification is not { } attempt)
+        {
+            _logger.Info("Tray notification shown event received without a pending request.");
+            return;
+        }
+
+        attempt.Shown = true;
+        attempt.MarkDelivered();
+        _logger.Info($"Tray notification shown event received: type={attempt.Type} identity={attempt.Identity}.");
+    }
+
+    private void OnTrayNotificationClosed()
+    {
+        if (_pendingTrayNotification is not { } attempt)
+        {
+            _logger.Debug("Tray notification closed event received without a pending request.");
+            return;
+        }
+
+        attempt.MarkDelivered();
+        _pendingTrayNotification = null;
+        _logger.Info($"Tray notification closed by Windows: type={attempt.Type} identity={attempt.Identity}.");
+    }
+
+    private void OnTrayNotificationClicked()
+    {
+        if (_pendingTrayNotification is not { } attempt)
+        {
+            _logger.Info("Tray notification clicked event received without a pending request.");
+            return;
+        }
+
+        attempt.MarkDelivered();
+        _pendingTrayNotification = null;
+        _logger.Info($"Tray notification clicked: type={attempt.Type} identity={attempt.Identity}.");
+    }
+
+    private sealed record TrayNotificationAttempt(
+        string Type,
+        string Identity,
+        DateTimeOffset RequestedAt,
+        Action MarkDelivered,
+        Action MarkFailed)
+    {
+        public bool Shown { get; set; }
     }
 
     private void RegisterSecondaryActivationListener()

@@ -28,6 +28,21 @@ public sealed class WwmStage10Tests
         Assert.False(result.Feed.Data.Modes[1].Available);
     }
 
+    [Fact]
+    public async Task ApiClient_LogsReleaseVersionAndInstallableModes()
+    {
+        using var client = CreateClient(_ => JsonResponse("""
+            {"success":true,"generated_at":"2026-10-18T20:05:00Z","data":{"current":{"version":"v2.6.7"},"modes":[{"variant":"default","slug":"ukrainian","label":"Українська","available":false},{"variant":"english_terms","slug":"english-terms","label":"Українська (Всі терміни англійською)","available":true}]}}
+            """));
+        var logger = new CapturingLogger();
+
+        var result = await new Winds4UaApiClient(client, logger).GetLatestAsync();
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(logger.Infos, line => line.Contains("current_version=v2.6.7", StringComparison.Ordinal));
+        Assert.Contains(logger.Infos, line => line.Contains("available_modes=english-terms/english_terms", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("{\"success\":false,\"data\":{\"modes\":[]}}")]
     [InlineData("not-json")]
@@ -3160,6 +3175,15 @@ public sealed class WwmStage10Tests
         public void Info(string message) { }
         public void Warning(string message) { }
         public void Error(string message) => Errors.Add(message);
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<string> Infos { get; } = new();
+        public void Debug(string message) { }
+        public void Info(string message) => Infos.Add(message);
+        public void Warning(string message) { }
+        public void Error(string message) { }
     }
 
     private sealed class TestTemp : IDisposable

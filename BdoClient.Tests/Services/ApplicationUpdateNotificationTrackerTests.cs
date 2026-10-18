@@ -30,6 +30,28 @@ public sealed class ApplicationUpdateNotificationTrackerTests
     }
 
     [Fact]
+    public void ConfirmedNotificationIsDeduplicated()
+    {
+        var tracker = new ApplicationUpdateNotificationTracker();
+
+        Assert.True(tracker.Observe("v1.2.1", canNotify: true));
+        tracker.MarkDelivered("v1.2.1");
+
+        Assert.False(tracker.Observe("v1.2.1", canNotify: true));
+    }
+
+    [Fact]
+    public void UnconfirmedNotificationCanRetryAfterCooldown()
+    {
+        var tracker = new ApplicationUpdateNotificationTracker();
+        var firstAttempt = DateTimeOffset.UtcNow;
+
+        Assert.True(tracker.Observe("v1.2.1", canNotify: true, now: firstAttempt));
+        Assert.False(tracker.Observe("v1.2.1", canNotify: true, now: firstAttempt.AddSeconds(30)));
+        Assert.True(tracker.Observe("v1.2.1", canNotify: true, now: firstAttempt.AddMinutes(3)));
+    }
+
+    [Fact]
     public void FirstVisibleTag_RemainsPendingAndNotifiesWhenHiddenLater()
     {
         var tracker = new ApplicationUpdateNotificationTracker();

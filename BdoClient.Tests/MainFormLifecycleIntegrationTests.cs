@@ -212,6 +212,8 @@ public sealed class MainFormLifecycleIntegrationTests
     public async Task HiddenWwmSession_NotifiesOnceForNewInstalledModeRelease()
     {
         var archive = CreateTinyWwmArchive();
+        var updatedArchive = CreateTinyWwmArchive(4);
+        var activeArchive = archive;
         string? currentVersion = "v2.6.3";
         using var fixture = await MainFormTestFixture.StartAsync(
             MainFormTestFixture.CreateSuccessfulApiHandler(),
@@ -244,6 +246,53 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Contains("Відкрийте Хаб, щоб оновити", message, StringComparison.Ordinal);
         Assert.Contains(FindWwmModeCards(fixture.Form), card => card.ModeSlug == "ukrainian"
             && card.StateTextForTest == "Доступне оновлення");
+    }
+
+    [Fact]
+    public async Task VisibleWwmUpdateIsLoggedAsDeferredAndNotifiesAfterHiding()
+    {
+        var archive = CreateTinyWwmArchive();
+        var updatedArchive = CreateTinyWwmArchive(4);
+        var activeArchive = archive;
+        string? currentVersion = "v2.6.3";
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(),
+            startInBackground: false,
+            includeWwm: true,
+            wwmHandlerFactory: MainFormTestFixture.CreateWwmApiHandlerFactory(
+                archive, currentVersion: () => currentVersion, packageProvider: () => activeArchive));
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.Visible && form.GameSelector.Enabled);
+        await fixture.SelectGameAsync("where-winds-meet");
+        await fixture.WaitForSwitchCompletionAsync();
+        await fixture.WaitForAsync(form => FindWwmModeCards(form).Any(card => card.ModeSlug == "ukrainian" && card.ActionEnabledForTest));
+        await fixture.RunWwmInstallAsync("ukrainian", "default");
+        await fixture.WaitForAsync(form => form.WwmModeInstalledForTest("ukrainian", "default"));
+
+        var notification = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await fixture.SetLocalizationNotificationObserverAsync(message => notification.TrySetResult(message));
+        currentVersion = "v2.6.4";
+        activeArchive = updatedArchive;
+        var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
+
+        await session.Poller.RequestImmediatePollAsync();
+        await Task.Delay(500);
+        Assert.True(FindWwmModeCards(fixture.Form).Any(card => card.ModeSlug == "ukrainian"
+            && card.StateTextForTest == "Доступне оновлення"), string.Join(Environment.NewLine, fixture.Logger.DebugMessages));
+        Assert.False(notification.Task.IsCompleted);
+        Assert.Contains(fixture.Logger.DebugMessages, line => line.Contains(
+            "type=localization", StringComparison.Ordinal)
+            && line.Contains("eligible=false reason=window_visible", StringComparison.Ordinal));
+
+        await fixture.HideToTrayAsync();
+        await session.Poller.RequestImmediatePollAsync();
+
+        var message = await notification.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Contains("v2.6.4", message, StringComparison.Ordinal);
+        Assert.Contains(fixture.Logger.DebugMessages, line => line.Contains(
+            "type=localization", StringComparison.Ordinal)
+            && line.Contains("eligible=true reason=none", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1073,7 +1122,7 @@ public sealed class MainFormLifecycleIntegrationTests
         return cards;
     }
 
-    private static byte[] CreateTinyWwmArchive()
+    private static byte[] CreateTinyWwmArchive(byte marker = 1)
     {
         using var memory = new MemoryStream();
         using (var zip = new System.IO.Compression.ZipArchive(memory, System.IO.Compression.ZipArchiveMode.Create, true))
@@ -1081,6 +1130,7 @@ public sealed class MainFormLifecycleIntegrationTests
             foreach (var path in WwmGameDefinition.Default.ManagedRelativePaths)
             {
                 var entry = zip.CreateEntry(path.Replace('\\', '/'));
+                entry.LastWriteTime = new DateTimeOffset(2026, 1, 1, 0, marker, 0, TimeSpan.Zero);
                 using var output = entry.Open();
                 output.Write(new byte[] { 1, 2, 3 });
             }
@@ -2718,22 +2768,24 @@ internal sealed class MainFormTestFixture : IDisposable
 
     internal static Func<HttpMessageHandler> CreateWwmApiHandlerFactory(byte[]? package = null, List<string>? requests = null,
         Func<bool>? modeAvailable = null, HttpStatusCode latestStatus = HttpStatusCode.OK, bool omitCurrentArtifact = false,
-        Func<bool?>? gameTested = null, Func<string?>? currentVersion = null, bool includeEnglishTerms = false)
+        Func<bool?>? gameTested = null, Func<string?>? currentVersion = null, bool includeEnglishTerms = false,
+        Func<byte[]?>? packageProvider = null)
         => () => new MainFormTestHttpHandler((request, _) =>
         {
             var path = request.RequestUri!.AbsolutePath;
             requests?.Add(path);
+            var responsePackage = packageProvider?.Invoke() ?? package;
             if (path == "/api/public/v1/releases/latest")
                 return Task.FromResult(new HttpResponseMessage(latestStatus)
                 {
                     Content = new StringContent(latestStatus == HttpStatusCode.OK
-                        ? CreateWwmLatestJson(package, modeAvailable?.Invoke() ?? package != null, omitCurrentArtifact,
+                        ? CreateWwmLatestJson(responsePackage, modeAvailable?.Invoke() ?? responsePackage != null, omitCurrentArtifact,
                             gameTested == null ? true : gameTested.Invoke(),
                             currentVersion == null ? "v-test" : currentVersion.Invoke(), includeEnglishTerms)
                         : "{\"success\":false,\"error\":\"temporary_failure\"}", Encoding.UTF8, "application/json")
                 });
-            if (path is "/releases/test.zip" or "/releases/english-terms-test.zip" && package != null)
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(package) });
+            if (path is "/releases/test.zip" or "/releases/english-terms-test.zip" && responsePackage != null)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(responsePackage) });
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         });
 
@@ -2903,6 +2955,24 @@ internal sealed class MainFormTestFixture : IDisposable
         {
             Form.LocalizationNotificationForTest = observer;
             completion.TrySetResult(null);
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task HideToTrayAsync()
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(() =>
+        {
+            try
+            {
+                var hide = typeof(MainForm).GetMethod(
+                    "HideToTray",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                hide!.Invoke(Form, null);
+                completion.TrySetResult(null);
+            }
+            catch (Exception ex) { completion.TrySetException(ex); }
         });
         await completion.Task.WaitAsync(Timeout);
     }
@@ -3165,8 +3235,10 @@ internal sealed class MainFormTestFixture : IDisposable
     internal sealed class TestLogger : ILogger
     {
         public List<string> Warnings { get; } = new();
-        public void Debug(string message) { }
-        public void Info(string message) { }
+        public List<string> DebugMessages { get; } = new();
+        public List<string> InfoMessages { get; } = new();
+        public void Debug(string message) => DebugMessages.Add(message);
+        public void Info(string message) => InfoMessages.Add(message);
         public void Warning(string message) => Warnings.Add(message);
         public void Error(string message) => Warnings.Add(message);
     }
