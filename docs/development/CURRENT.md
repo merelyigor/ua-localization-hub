@@ -2,21 +2,21 @@
 
 Оновлено: 2026-10-18
 
-## Owner-authorized v1.2.12 implementation
+## v1.2.12 release lifecycle
 
-The v1.2.11 docs-only post-release finalization is complete at commit `8cbb7ccad0eb80365fe03e7c1ecb8708f217f7bf`; exact-SHA CI #267 / run `39069163227` succeeded. v1.2.11 is **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**. v1.2.12 is **IMPLEMENTED / VALIDATED / PENDING EXTERNAL ARCHITECT REVIEW** on review branch `review/v1.2.12-authoritative-latest`; `main` remains at `8cbb7ccad0eb80365fe03e7c1ecb8708f217f7bf` pending review. Release build passed with 0 warnings/errors; full suite 1218/1218; focused BDO latest/API/state/install/feed, WWM card and MainForm lifecycle suite 111/111. Release-note generator, version resolver (13/13; production resolution 1.2.12), Project Chat Rules, NEXT schema/render, secret/private scan and `git diff --check` passed. Corrective coverage proves stale aggregate patch 395 cannot block authoritative mode patch 396 at local patch 396; authoritative patch 395 remains blocked; a failed latest request can recover through the same-session selected-mode refresh path without aggregate mutation fallback. Scope remains authoritative BDO per-mode latest consistency/update detection plus the Winds4UA `data.current.version` card row. No native/Owner smoke was performed and no real game files were touched. No RC, tag or release was created.
+The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887` was fast-forwarded unchanged from parent `8cbb7ccad0eb80365fe03e7c1ecb8708f217f7bf`. Exact-SHA normal CI #268 / run `39123483766` succeeded; RC #44 / run `39123687761` produced v1.2.12 and passed all bundle, manifest, source-SHA, EXE identity and release-notes checks. Stable Release ID `416416383` was published at `2026-10-18T11:42:14Z`; annotated tag `v1.2.12` peels to the implementation SHA, and both public assets were independently downloaded and hash-verified. v1.2.12 is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. Exact evidence is archived in [`docs/releases/v1.2.12.md`](../releases/v1.2.12.md). `NEXT.json` is reset to the empty canonical schema-v1 state. No native or Owner smoke was performed, as explicitly waived; no real game files were changed.
 
 ## Project Purpose / Status
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Стабільний реліз: **v1.2.11**. Публічний Release ID `416033195` опубліковано як stable із annotated tag `v1.2.11`, що peels до source SHA `758755058e3a197a59ec41452fb6a95938b54d7a`. Canonical і legacy assets повторно завантажено та перевірено за точними RC SHA-256; release body відповідає canonical RC #43 notes. Lifecycle: **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**.
+Останній стабільний реліз: **v1.2.12** (Release ID `416416383`), stable із annotated tag `v1.2.12`, що peels до source SHA `f35a9457fbd7294c02ff86de781fc46952a0e887`. Public latest перевірено; обидва assets повторно завантажені та hash-verified. Lifecycle: **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. Попередній v1.2.11 також залишається **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**.
 
 v1.2.11 RC #43 пройшов Owner end-to-end WWM install smoke та опублікований stable. Попередні RC #39/#40/#41/#42 лишаються невдалими й не перевикористовуються. У рамках цього task Owner авторизував bounded v1.2.12 роботу: authoritative latest localization consistency/update detection і Winds4UA API release-version label у WWM cards. Docs-only release finalization завершено перед початком цього implementation.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. RC #39/#40/#41/#42 remain failed Owner smoke and must not be reused. v1.2.11 is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. The next authorized work is the bounded v1.2.12 authoritative-localization freshness and WWM release-version presentation task. No Stage 11C.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.12 is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**; the implementation/release cycle is complete. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or other follow-up is inferred.
 
 ## Architecture Summary
 
@@ -140,7 +140,7 @@ Owner smoke RC #41 / run `38844562243` **FAILED / NOT ACCEPTED / DO NOT REUSE**:
 
 - v1.2.3 release cycle is completed and archived.
 - Offline/degraded release-feed mode is completed, reviewed and accepted; `offline-degraded-reliability` is archived.
-- `localization-hub-multigame` remains the sole ACTIVE PRIMARY roadmap; Stages 8D.1, 8D.2, 9, 10, 11A and 11B plus WWM compatibility/legacy migration corrections are **REVIEWED / ACCEPTED**; Stage 8B is OPTIONAL / NOT STARTED. v1.2.11 (Release ID `416033195`, tag `v1.2.11`, source `758755058e3a197a59ec41452fb6a95938b54d7a`) is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. Current Owner-authorized work: v1.2.12 authoritative latest localization consistency/update detection and WWM API release-version card display; no Stage 11C.
+- `localization-hub-multigame` remains the sole ACTIVE PRIMARY roadmap; Stages 8D.1, 8D.2, 9, 10, 11A and 11B plus WWM compatibility/legacy migration corrections are **REVIEWED / ACCEPTED**; Stage 8B is OPTIONAL / NOT STARTED. v1.2.12 (Release ID `416416383`, tag `v1.2.12`, source `f35a9457fbd7294c02ff86de781fc46952a0e887`) is **RELEASED / PUBLIC VERIFIED / PENDING EXTERNAL RELEASE REVIEW**. The next implementation authorization is **OWNER DECISION REQUIRED**; no Stage 11C.
 - v1.2.5 release cycle completed; public Release verified and `NEXT.json` reset for the next cycle.
 - v15.64/v15.65 — **REVIEWED / ACCEPTED; OWNER VISUAL SMOKE ACCEPTED**: для трьох і більше режимів локалізації додано компактний minimum window width і збережено його під час semantic rebuild; single-mode global status width збережено.
 - v1.2.7 — **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**: public Release ID `391117230` опубліковано на tag `v1.2.7`, який вказує на exact approved RC SHA `b21118d1ec8e6d0342fb0e47544e911fcb875739`; canonical ZIP і внутрішні hashes повторно перевірено, Owner native smoke exact RC прийнято.
