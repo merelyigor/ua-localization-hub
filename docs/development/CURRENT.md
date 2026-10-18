@@ -2,9 +2,9 @@
 
 Оновлено: 2026-10-18
 
-## Tray notification diagnosis / correction
+## v1.2.19 — RELEASED / PUBLIC VERIFIED
 
-The running hidden v1.2.17 process repeatedly discovered application v1.2.18, but its log did not record notification eligibility or Windows balloon events. Read-only production check confirmed Winds4UA latest `v2.6.7` with `english-terms/english_terms` available; the Owner screenshot showed the installed WWM mode in `UpdateAvailable`. `LocalizationNotificationTracker` incorrectly consumed a release identity even while the main window was visible and `canNotify=false`, preventing a later tray alert. The correction keeps visible-window observations pending, logs API and notification lifecycle decisions/events, and retries if Windows does not acknowledge a tray request. Validation: Release build 0 warnings / 0 errors; focused notification/API/WWM/MainForm tests 212/212; full Release suite 1237/1237; version resolver 13/13; release-note generator, Project Chat Rules, NEXT schema/render, secret/private scan, and `git diff --check` pass. No commit or release was performed; no game files were modified.
+Tray notification diagnostics and the WWM deferred-notification correction shipped in stable v1.2.19. Source `b1820d7011923ce90eb1b2f07b88652f61eaf0e0`; normal CI #280 / run `39164912753` and Release Candidate #51 / run `39165112480` passed, with 1237/1237 tests. Release ID `416710767` was published at `2026-10-18T20:59:10Z`; annotated tag `v1.2.19` peels to the exact source. Public canonical and legacy ZIPs were downloaded and matched their RC SHA-256 values. Details are archived in [`docs/releases/v1.2.19.md`](../releases/v1.2.19.md). The client initially inspected as v1.2.17 self-updated to v1.2.18 at 23:45, then while hidden detected v1.2.19 at `2026-10-19 00:00:30`; its old log confirms discovery but cannot attest Windows balloon delivery. Detailed notification events are logged after updating to v1.2.19. No real game files were changed. Owner authorized publication; no Architect acceptance is claimed.
 
 ## v1.2.18 release lifecycle — notification delivery test
 
