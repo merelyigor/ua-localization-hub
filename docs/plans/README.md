@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** Owner-authorized v1.2.16 — LOCALIZATION UPDATE NOTIFICATION PARITY
-**Next:** external review of the committed implementation.
-**Implementation authorization:** bounded BDO/WWM tray notification parity only. No release publication authorized. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
+**Current phase:** v1.2.16 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
+**Next:** OWNER DECISION REQUIRED
+**Implementation authorization:** NONE. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.16 — localization update notification parity | exact-SHA CI / external review |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.16 — RELEASED / PUBLIC VERIFIED | OWNER DECISION REQUIRED |
 
-Release cycles through `v1.2.15` are published and archived. Owner explicitly waived Architect review for v1.2.15; no self-acceptance is claimed.
+Release cycles through `v1.2.16` are published and archived. Owner explicitly waived Architect review for v1.2.15 and v1.2.16; no external acceptance is claimed for either waiver.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.15 is published stable as Release ID `416608010`, tag peeling to `4cc97d616577786725a3878af4a1da46546dbf0f`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. The only currently authorized work is tray localization-notification parity for BDO/WWM; no Stage 11C or release publication is authorized.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.16 is published stable as Release ID `416633779`, tag peeling to `caaba7c11a698c47ddfdc17f7298de8d272a6e53`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. No implementation or release work is currently authorized; no Stage 11C is introduced.
 
 ## Backlog
 

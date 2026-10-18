@@ -2,13 +2,13 @@
 
 Оновлено: 2026-10-18
 
+## v1.2.16 release lifecycle
+
+Stable v1.2.16 (Release ID `416633779`) was published at `2026-10-18T18:47:32Z` from source `caaba7c11a698c47ddfdc17f7298de8d272a6e53`; annotated tag `v1.2.16` peels to that exact commit. Normal CI #275 / run `39154554322` and RC #48 / run `39155210817` succeeded; the RC passed 1231/1231 tests. Both exact RC artifacts were published unchanged and independently downloaded from the public release with matching SHA-256. Facts are archived in [`docs/releases/v1.2.16.md`](../releases/v1.2.16.md). Owner waived external Architect review for this publication; no external acceptance is claimed. `NEXT.json` is reset to canonical empty schema-v1. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. No real game files were modified.
+
 ## v1.2.15 release lifecycle
 
 Stable v1.2.15 (Release ID `416608010`) was published at `2026-10-18T17:56:20Z` from source `4cc97d616577786725a3878af4a1da46546dbf0f`; annotated tag `v1.2.15` peels to that exact commit. Normal CI #273 / run `39150722823` and RC #47 / run `39150949238` succeeded; the RC passed 1228/1228 tests. Both exact RC artifacts were published without repacking, then independently downloaded from the public release and hash-verified. Facts are archived in [`docs/releases/v1.2.15.md`](../releases/v1.2.15.md). Owner waived external Architect review; no external acceptance is claimed. `NEXT.json` is reset to canonical empty schema-v1. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**.
-
-## Current follow-up — localization update notifications
-
-Owner authorized a bounded follow-up to make tray notifications consistent for BDO and WWM. Hidden-tray notifications are keyed by game, installed mode and release identity; they include the mode and available release version, do not repeat for the same release, and never install automatically. In-window updates remain represented by the mode cards. Implementation and Release validation passed locally; external review is pending.
 
 ## v1.2.14 release lifecycle
 

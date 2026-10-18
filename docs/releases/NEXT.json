@@ -1,9 +1,7 @@
 {
   "schema_version": 1,
   "summary": "",
-  "new": [
-    "Коли Хаб згорнутий у трей, він сповіщає про оновлення встановленої локалізації BDO або WWM."
-  ],
+  "new": [],
   "fixed": [],
   "reliability": [],
   "performance": [],
