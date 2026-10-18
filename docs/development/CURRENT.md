@@ -2,6 +2,10 @@
 
 Оновлено: 2026-10-18
 
+## v1.2.17 release preparation — application update notification retry
+
+Owner authorized a focused fix so a launcher update first detected while its window is visible remains pending for a tray notification after the app is hidden. The tracker now records a tag only when notification is allowed; regression coverage checks repeated visible checks, later tray delivery, and deduplication. Release build/test and RC validation are in progress; external Architect review is waived by Owner for this publication. No game files are changed.
+
 ## v1.2.16 release lifecycle
 
 Stable v1.2.16 (Release ID `416633779`) was published at `2026-10-18T18:47:32Z` from source `caaba7c11a698c47ddfdc17f7298de8d272a6e53`; annotated tag `v1.2.16` peels to that exact commit. Normal CI #275 / run `39154554322` and RC #48 / run `39155210817` succeeded; the RC passed 1231/1231 tests. Both exact RC artifacts were published unchanged and independently downloaded from the public release with matching SHA-256. Facts are archived in [`docs/releases/v1.2.16.md`](../releases/v1.2.16.md). Owner waived external Architect review for this publication; no external acceptance is claimed. `NEXT.json` is reset to canonical empty schema-v1. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. No real game files were modified.
@@ -26,7 +30,7 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.15** (Release ID `416608010`), source SHA `4cc97d616577786725a3878af4a1da46546dbf0f`; live latest — v1.2.15. Точні asset facts записані у [`docs/releases/v1.2.15.md`](../releases/v1.2.15.md).
+Останній стабільний реліз: **v1.2.16** (Release ID `416633779`), source SHA `caaba7c11a698c47ddfdc17f7298de8d272a6e53`; live latest — v1.2.16. Точні asset facts записані у [`docs/releases/v1.2.16.md`](../releases/v1.2.16.md).
 
 v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install; їхній вміст не змінюється. У цьому циклі реальні файли гри не змінювалися. Owner waived external Architect review; acceptance не заявляється.
 

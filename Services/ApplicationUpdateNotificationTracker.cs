@@ -15,7 +15,10 @@ internal sealed class ApplicationUpdateNotificationTracker
         if (string.Equals(_activeTag, candidateTag, StringComparison.OrdinalIgnoreCase))
             return false;
 
+        if (!canNotify)
+            return false;
+
         _activeTag = candidateTag;
-        return canNotify;
+        return true;
     }
 }

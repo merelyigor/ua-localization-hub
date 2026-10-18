@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.16 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
-**Next:** OWNER DECISION REQUIRED
-**Implementation authorization:** NONE. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
+**Current phase:** Owner-authorized v1.2.17 — application update notification retry
+**Next:** complete validation, publish stable release; external Architect review waived by Owner.
+**Implementation authorization:** bounded tray-notification retry fix and v1.2.17 publication only. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.16 — RELEASED / PUBLIC VERIFIED | OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.17 — application update notification retry | validation / release |
 
-Release cycles through `v1.2.16` are published and archived. Owner explicitly waived Architect review for v1.2.15 and v1.2.16; no external acceptance is claimed for either waiver.
+Release cycles through `v1.2.16` are published and archived. Owner explicitly waived Architect review for v1.2.15 and v1.2.16; no external acceptance is claimed for either waiver. Owner has also waived Architect review for this bounded v1.2.17 notification correction and authorized publication after automated gates pass.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.16 is published stable as Release ID `416633779`, tag peeling to `caaba7c11a698c47ddfdc17f7298de8d272a6e53`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. No implementation or release work is currently authorized; no Stage 11C is introduced.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.16 is published stable as Release ID `416633779`, tag peeling to `caaba7c11a698c47ddfdc17f7298de8d272a6e53`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. The only active authorization is the bounded v1.2.17 notification correction/publication; no Stage 11C is introduced.
 
 ## Backlog
 

@@ -30,12 +30,23 @@ public sealed class ApplicationUpdateNotificationTrackerTests
     }
 
     [Fact]
-    public void FirstVisibleTag_LatchesAndDoesNotNotifyWhenHiddenLater()
+    public void FirstVisibleTag_RemainsPendingAndNotifiesWhenHiddenLater()
     {
         var tracker = new ApplicationUpdateNotificationTracker();
 
         Assert.False(tracker.Observe("v1.2.1", canNotify: false));
+        Assert.True(tracker.Observe("v1.2.1", canNotify: true));
         Assert.False(tracker.Observe("v1.2.1", canNotify: true));
+    }
+
+    [Fact]
+    public void RepeatedVisibleChecks_KeepCandidatePendingUntilTrayNotificationCanShow()
+    {
+        var tracker = new ApplicationUpdateNotificationTracker();
+
+        Assert.False(tracker.Observe("v1.2.1", canNotify: false));
+        Assert.False(tracker.Observe("v1.2.1", canNotify: false));
+        Assert.True(tracker.Observe("v1.2.1", canNotify: true));
     }
 
     [Fact]
