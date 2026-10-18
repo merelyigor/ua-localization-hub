@@ -2,6 +2,10 @@
 
 Оновлено: 2026-10-18
 
+## v1.2.15 release lifecycle
+
+Stable v1.2.15 (Release ID `416608010`) was published at `2026-10-18T17:56:20Z` from source `4cc97d616577786725a3878af4a1da46546dbf0f`; annotated tag `v1.2.15` peels to that exact commit. Normal CI #273 / run `39150722823` and RC #47 / run `39150949238` succeeded; the RC passed 1228/1228 tests. Both exact RC artifacts were published without repacking, then independently downloaded from the public release and hash-verified. Facts are archived in [`docs/releases/v1.2.15.md`](../releases/v1.2.15.md). Owner waived external Architect review; no external acceptance is claimed. `NEXT.json` is reset to canonical empty schema-v1. Lifecycle: **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**.
+
 ## v1.2.14 release lifecycle
 
 Stable v1.2.14 (Release ID `416460308`) was published at `2026-10-18T13:15:50Z` from source `2156d36f08cd1fa7ac72c70b48fd94bf468fd2d3`; annotated tag `v1.2.14` peels to that exact commit. Normal CI #272 / run `39130202262` and RC #46 / run `39130386049` succeeded. Public canonical and legacy assets and exact release body are archived in [`docs/releases/v1.2.14.md`](../releases/v1.2.14.md). Lifecycle: **RELEASED / PUBLIC VERIFIED**.
@@ -18,13 +22,13 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.14** (Release ID `416460308`), source SHA `2156d36f08cd1fa7ac72c70b48fd94bf468fd2d3`; public latest — v1.2.14. Точні asset facts записані у [`docs/releases/v1.2.14.md`](../releases/v1.2.14.md).
+Останній стабільний реліз: **v1.2.15** (Release ID `416608010`), source SHA `4cc97d616577786725a3878af4a1da46546dbf0f`; live latest — v1.2.15. Точні asset facts записані у [`docs/releases/v1.2.15.md`](../releases/v1.2.15.md).
 
-У межах Owner-authorized v1.2.15 preparation узгоджуються взаємодія BDO/WWM карток, тимчасові повтори GitHub asset download та зняття `ReadOnly` лише з наявних LocalData WWM override-файлів під час Package install. Їхній вміст не змінюється. Owner explicitly waived external Architect review for this release; automated build/test/CI/RC and artifact integrity gates remain required. No real game files were modified during local validation.
+v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install; їхній вміст не змінюється. У цьому циклі реальні файли гри не змінювалися. Owner waived external Architect review; acceptance не заявляється.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. Current dependent work is the Owner-authorized v1.2.15 release; no Stage 11C or additional feature is inferred.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.15 is **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
 
 ## Architecture Summary
 
@@ -148,7 +152,7 @@ Owner smoke RC #41 / run `38844562243` **FAILED / NOT ACCEPTED / DO NOT REUSE**:
 
 - v1.2.3 release cycle is completed and archived.
 - Offline/degraded release-feed mode is completed, reviewed and accepted; `offline-degraded-reliability` is archived.
-- `localization-hub-multigame` remains the sole ACTIVE PRIMARY roadmap; Stages 8D.1, 8D.2, 9, 10, 11A and 11B plus WWM compatibility/legacy migration corrections are **REVIEWED / ACCEPTED**; Stage 8B is OPTIONAL / NOT STARTED. v1.2.14 (Release ID `416460308`, tag `v1.2.14`, source `2156d36f08cd1fa7ac72c70b48fd94bf468fd2d3`) is **RELEASED / PUBLIC VERIFIED**. Owner-authorized v1.2.15 preparation is underway; no Stage 11C.
+- `localization-hub-multigame` remains the sole ACTIVE PRIMARY roadmap; Stages 8D.1, 8D.2, 9, 10, 11A and 11B plus WWM compatibility/legacy migration corrections are **REVIEWED / ACCEPTED**; Stage 8B is OPTIONAL / NOT STARTED. v1.2.15 (Release ID `416608010`, tag `v1.2.15`, source `4cc97d616577786725a3878af4a1da46546dbf0f`) is **RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER**. Next implementation authorization is **OWNER DECISION REQUIRED**; no Stage 11C.
 - v1.2.5 release cycle completed; public Release verified and `NEXT.json` reset for the next cycle.
 - v15.64/v15.65 — **REVIEWED / ACCEPTED; OWNER VISUAL SMOKE ACCEPTED**: для трьох і більше режимів локалізації додано компактний minimum window width і збережено його під час semantic rebuild; single-mode global status width збережено.
 - v1.2.7 — **RELEASED / PUBLIC VERIFIED / RELEASE REVIEWED / ACCEPTED**: public Release ID `391117230` опубліковано на tag `v1.2.7`, який вказує на exact approved RC SHA `b21118d1ec8e6d0342fb0e47544e911fcb875739`; canonical ZIP і внутрішні hashes повторно перевірено, Owner native smoke exact RC прийнято.

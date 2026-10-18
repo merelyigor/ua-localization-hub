@@ -3,9 +3,9 @@
 Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
-Implementation authorization: **Owner-authorized v1.2.15 release preparation only.**
-Current phase: v1.2.15 — RELEASE PREPARATION
-Next action: **exact-SHA CI → Release Candidate → verify bundles → publish.** Stable v1.2.14 (Release ID `416460308`, source `2156d36f08cd1fa7ac72c70b48fd94bf468fd2d3`) is archived at [`../../releases/v1.2.14.md`](../../releases/v1.2.14.md). Owner waived external Architect review for v1.2.15; no acceptance by the Implementation Agent is claimed. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
+Implementation authorization: **NONE; next implementation work requires OWNER DECISION.**
+Current phase: v1.2.15 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
+Next action: **OWNER DECISION REQUIRED.** Stable v1.2.15 (Release ID `416608010`, source `4cc97d616577786725a3878af4a1da46546dbf0f`) is archived at [`../../releases/v1.2.15.md`](../../releases/v1.2.15.md). Owner explicitly waived external Architect review; no external acceptance is claimed. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 ## Goal

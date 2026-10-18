@@ -3,19 +3,19 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.15 — OWNER-AUTHORIZED RELEASE PREPARATION
-**Next:** exact-SHA CI → Release Candidate → artifact validation → publication.
-**Implementation authorization:** bounded v1.2.15 changes only. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
+**Current phase:** v1.2.15 — RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER
+**Next:** OWNER DECISION REQUIRED.
+**Implementation authorization:** NONE. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
 ## Active plans
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.15 — RELEASE PREPARATION | exact-SHA CI and RC |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.15 — RELEASED / PUBLIC VERIFIED | OWNER DECISION REQUIRED |
 
-Release cycles through `v1.2.14` are published; v1.2.14 facts are archived in [`../releases/v1.2.14.md`](../releases/v1.2.14.md). Owner explicitly waived Architect review for the v1.2.15 release; no self-acceptance is claimed.
+Release cycles through `v1.2.15` are published and archived. Owner explicitly waived Architect review for v1.2.15; no self-acceptance is claimed.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.14 is published stable as Release ID `416460308`, tag peeling to `2156d36f08cd1fa7ac72c70b48fd94bf468fd2d3`; lifecycle is RELEASED / PUBLIC VERIFIED. Stage 8B remains OPTIONAL / NOT STARTED. Current authorized work is limited to v1.2.15 release preparation; no Stage 11C.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.15 is published stable as Release ID `416608010`, tag peeling to `4cc97d616577786725a3878af4a1da46546dbf0f`; lifecycle is RELEASED / PUBLIC VERIFIED / ARCHITECT REVIEW WAIVED BY OWNER. Stage 8B remains OPTIONAL / NOT STARTED. Next implementation authorization: OWNER DECISION REQUIRED; no Stage 11C.
 
 ## Backlog
 
