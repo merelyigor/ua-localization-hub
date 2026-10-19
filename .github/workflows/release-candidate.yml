@@ -85,6 +85,18 @@ jobs:
     - name: Restore
       run: dotnet restore BdoUaClient.sln
 
+    - name: Workflow contract
+      shell: pwsh
+      run: scripts/Check-WorkflowContract.ps1
+
+    - name: Repository safety scan
+      shell: pwsh
+      run: scripts/Check-RepositorySafety.ps1
+
+    - name: Harness regression tests
+      shell: pwsh
+      run: scripts/Test-ProjectHarness.ps1
+
     - name: Build Release
       shell: pwsh
       run: |
@@ -95,6 +107,7 @@ jobs:
         dotnet build BdoUaClient.sln `
           -c Release `
           --no-restore `
+          -warnaserror `
           -p:Version=$version `
           -p:AssemblyVersion=$assemblyVersion `
           -p:FileVersion=$assemblyVersion `
@@ -290,16 +303,17 @@ jobs:
 
         ### Next steps
 
-        1. Download and test canonical artifact ``BDO-WWM-UAClient-v$version-win-x64``
+        1. Download and validate canonical artifact ``BDO-WWM-UAClient-v$version-win-x64``
         2. Verify the legacy compatibility artifact ``BDO-UA-Client-v$version-win-x64`` is also present
         3. Do NOT unpack/repackage either downloaded artifact ZIP for publication
-        4. Perform Owner native UI smoke on ``BDO-WWM-UAClient.exe`` from this exact RC/source SHA
-        5. After Owner approval, create and push ``$tag`` on the exact source SHA ``$sha``
+        4. Verify source/run binding, manifests, sums, version metadata, notes and identical EXE payloads; native/Owner smoke only when explicitly requested
+        5. With existing Owner publication authorization and automated gates PASS, create annotated ``$tag`` on exact source SHA ``$sha`` and verify the remote peeled target
         6. Draft GitHub Release → select the existing tag ``$tag``
         7. Use ``RELEASE_NOTES-v$version.md`` generated from ``docs/releases/NEXT.json`` directly as the release body; edit only to correct a factual defect found during owner validation
         8. Upload both EXACT downloaded artifact ZIPs as the canonical and legacy compatibility application assets
         9. Do NOT separately upload either EXE, ``release-manifest.json`` or ``SHA256SUMS.txt``
         10. Click **Publish release**
+        11. Independently verify the live release, tag, public asset downloads and hashes; then archive release facts, reset NEXT and complete docs finalization with exact-SHA CI
 
         > Final tag creation and GitHub Release publication are intentionally outside this RC workflow.
         "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8

@@ -15,7 +15,7 @@
 - `docs/plans/` містить implementation plans та їх lifecycle; він не замінюється journal-ом.
 - `docs/releases/` містить user-facing release notes; він не замінюється journal-ом.
 - `AGENTS.md` містить обов'язкові правила роботи, контракти та Definition of Done.
-- `docs/ai-workflow/` містить canonical orchestration/process contract між Owner, Architect/Reviewer та Implementation Agent.
+- `docs/ai-workflow/` містить чинний CODEX-OWNED процес: Owner goal, агентські planning/implementation/internal review, автоматичні gates й handoff без обов'язкового зовнішнього архітектора.
 
 ## Відновлення контексту
 

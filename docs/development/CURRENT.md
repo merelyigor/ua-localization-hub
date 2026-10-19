@@ -2,6 +2,14 @@
 
 Оновлено: 2026-10-19
 
+## Чинний процес — CODEX-OWNED
+
+Owner авторизував постійний перехід до планування, реалізації та внутрішньої перевірки в агентських сесіях Codex без обов'язкового зовнішнього архітектора. Ризик визначає depth перевірки: для game mutation/recovery/migration/updater потрібні synthetic failure/rollback/restart докази й окремий pre-commit review у Codex. External/Owner acceptance не приписується внутрішнім перевіркам; історичні записи лишаються незмінними.
+
+Harness: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs|Code` (обрати одне значення). Code включає Release build/full suite та repository/release-tooling gates; scripts/CI/config зміни потребують Code. Normal CI та RC також перевіряють workflow contract, hygiene й негативні тести harness. `.codex/config.toml` задає project-local instruction budget 128 KiB для повного AGENTS.md без зміни глобальних permissions. Workflow та release contract: `docs/ai-workflow/README.md`, `docs/releases/README.md`.
+
+Це process-only зміна, не новий продукт/Stage/реліз. Останній stable залишається v1.2.21; NEXT не змінюється. Подальша продуктова робота — OWNER DECISION REQUIRED.
+
 ## v1.2.21 — RELEASED / PUBLIC VERIFIED
 
 Persistent Windows update notifications for Hub and BDO/WWM localization updates shipped using Windows toast notifications under a stable AUMID, with diagnostic lifecycle logging and retry after reported delivery failures. Normal CI #284 / run `39179115550` passed on source `2927fbfb1eba12b69c073299e2f68d44f42a463a` (1247/1247 tests); RC #53 / run `39179392341` passed and produced source-bound schema-2 bundles. Stable Release ID `416789267` was published at `2026-10-19T00:14:52Z`; annotated tag `v1.2.21` peels to the source SHA. Public canonical and legacy ZIPs were independently downloaded and matched RC digests. Windows may still suppress banners/history according to user notification/privacy settings. No real game files were touched. Owner waived native smoke and Architect review for this publication; no external review acceptance is claimed. Details: [`docs/releases/v1.2.21.md`](../releases/v1.2.21.md).

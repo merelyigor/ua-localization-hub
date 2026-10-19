@@ -23,8 +23,20 @@ jobs:
     - name: Restore
       run: dotnet restore BdoUaClient.sln
 
+    - name: Workflow contract
+      shell: pwsh
+      run: scripts/Check-WorkflowContract.ps1
+
+    - name: Repository safety scan
+      shell: pwsh
+      run: scripts/Check-RepositorySafety.ps1
+
+    - name: Harness regression tests
+      shell: pwsh
+      run: scripts/Test-ProjectHarness.ps1
+
     - name: Build
-      run: dotnet build BdoUaClient.sln --configuration Release --no-restore
+      run: dotnet build BdoUaClient.sln --configuration Release --no-restore -warnaserror
 
     - name: Test
       run: dotnet test BdoUaClient.sln --configuration Release --no-build

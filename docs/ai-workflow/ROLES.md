@@ -1,53 +1,23 @@
-# Roles and authority
+# Відповідальність і повноваження
 
 ## Owner
 
-Owner визначає product goal, priority та дозвіл на нову roadmap/feature direction, надає real-world requirements/observations, виконує owner-specific visual/release gates і приймає продуктову direction. Owner може змінювати пріоритети між tasks та навмисно авторизувати зміну repository rules, але до фактичної зміни правил вони залишаються обов'язковими.
+Owner визначає продуктову мету, пріоритет і publication intent. Може вимагати local-only/pre-commit режим, native smoke чи зовнішню перевірку; ці додаткові gates діють лише коли прямо задані. Чинний дозвіл не перепитувати.
 
-## Architect / Analyst / Reviewer
+## Провідний агент Codex
 
-Architect / Analyst / Reviewer:
+Агент відповідає за inspection, risk/plan, архітектуру в межах задачі, implementation, tests, docs, review, commit/push та exact-SHA CI. Не очікує зовнішнього prompt builder або Architect GO. Сам виправляє підтверджені defects у межах мети.
 
-- розуміє task і перевіряє repository, коли це потрібно;
-- визначає requirements, constraints, edge cases, dependencies, regressions, security, performance, concurrency та data-integrity risks;
-- спочатку обирає існуючі patterns, мінімізує scope і визначає architecture до risky implementation;
-- визначає affected/non-affected components, interfaces, data ownership, lifecycle та error propagation;
-- декомпонує роботу за risk і вирішує, чи потрібна read-only inspection;
-- створює implementation prompt, перевіряє фактичний diff/result і класифікує findings;
-- створює corrective prompt, коли потрібно, та вирішує ACCEPT або NEEDS CORRECTION;
-- видає release GO/NO-GO на підставі evidence.
+Default bounded implementation task дозволяє commit/push після перевірок; явна заборона Owner має пріоритет. Implementation не авторизує release або роботу з реальними game files.
 
-Architect має перевіряти actual code, diff, logs і tests, а не лише довіряти Implementation Agent report.
+## Підлеглий агент / внутрішній рецензент
 
-## Implementation Agent
+Дозволено делегувати вузьку задачу або read-only review. Для високого ризику використовувати окремого рецензента до commit, коли інструмент доступний. Передавати exact baseline/diff, інваріанти й сценарії відмов; перевіряти source/tests, а не тільки звіт.
 
-Implementation Agent:
+Write scopes не перетинаються. Підлеглий агент не publish-ить, не змінює реальні game files і не авторизує нову мету. Провідний агент перевіряє інтеграцію та лишається відповідальним. Fallback для недоступного delegation описано в [REVIEW.md](REVIEW.md).
 
-- читає mandatory context і перевіряє prompt baseline;
-- виконує лише approved scope, зберігає existing patterns і додає relevant tests;
-- синхронізує plan/CURRENT/journal, коли це вимагають правила task;
-- запускає build/test/validation, перевіряє diff, status і secrets;
-- у default Combined mode commit/push є частиною bounded task, якщо prompt явно не забороняє їх; для high-risk змін дотримується pre-commit review mode;
-- звітує exact evidence, deviations і unresolved issues.
+## Рішення Owner
 
-Implementation Agent не має права самостійно позначати нову роботу `REVIEWED / ACCEPTED`. До external review використовуються factual states на кшталт `IMPLEMENTED / VALIDATED / PENDING ARCHITECT REVIEW`.
+Потрібне для матеріально іншої мети, несумісного контракту поза scope, невідновної дії з реальними даними, публікації без intent або material baseline mismatch. Спочатку виконати безпечні перевірки й незалежну роботу.
 
-## Repositories and environments
-
-Якщо проєкт охоплює кілька репозиторіїв, prompt і repository rules називають явно, у якому з них Implementation Agent комітить сам, у якому лише готує зміну для Owner, і що в production read-only. Без цього agent або блокується на дозволі, якого не потрібно, або комітить туди, де не має authority.
-
-Робота доводиться в локальному середовищі. У default Combined mode Implementation Agent може commit/push після required validation, якщо це дозволено task prompt; normal CI є частиною handoff. Deploy/publish виконується, коли зміна справді має бути в цільовому середовищі, а не після кожного commit: інакше production стає місцем перевірки замість локального середовища.
-
-## Autonomy and STOP conditions
-
-Автономні лише локальні naming/syntax/implementation details, які не змінюють architecture, correctness, safety, compatibility, external contract, schema або scope.
-
-Implementation Agent повинен STOP і звітувати, якщо потрібні unapproved public API redesign, storage/schema/database change, dependency, framework/build-system change, architecture-style change, broad refactor, destructive behavior, safety-invariant або release-contract change, scope expansion чи є materially conflicting rule. STOP також потрібен при baseline mismatch.
-
-## Separation of roles
-
-Architect і Implementation Agent мають розглядатися як окремі review roles, навіть якщо фактично вони виконуються автоматизованими системами. Self-review є preflight, але не external acceptance.
-
-Для bounded low/medium-risk задач ціль — один implementation prompt і один external review. Pre-commit review є винятком для high-risk змін, а не default.
-
-Після `REVIEWED / ACCEPTED`, якщо немає unresolved BLOCKER/IMPORTANT і approved dependent next step, Architect повертає terminal state `WORK CYCLE COMPLETE / OWNER DECISION REQUIRED` і не створює наступну роботу без explicit Owner decision.
+Зовнішній reviewer можливий за бажанням Owner. Його відсутність не блокує роботу. Внутрішню перевірку не називати external/Owner acceptance.

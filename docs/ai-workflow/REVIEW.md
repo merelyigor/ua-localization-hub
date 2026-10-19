@@ -1,41 +1,37 @@
-# External review contract
+# Внутрішня перевірка в Codex
 
-## Evidence hierarchy
+## Докази
 
-Порядок джерел: diff → validation output із exit code → tests → runtime/CI evidence, artifacts, hashes → **і лише потім implementation report**. Report є supporting evidence, але не заміною inspectable repository evidence; звіт читається останнім саме тому, що він найзручніший і тому найлегше підміняє собою перевірку самої роботи.
+Перевіряти actual diff/source, тести й результати команд із exit codes, потім CI/artifacts/runtime. Звіт автора допомагає навігації, але не доводить коректність. Green tests не доводять відсутності дефектів.
 
-## Review checklist
+## За ризиком
 
-Перевіряються requirements і acceptance criteria, correctness, scope, compatibility, architecture, error handling, edge cases, security, concurrency/data integrity, performance, tests, validation, plan/docs/CURRENT synchronization, unresolved issues і public-repository/secret hygiene.
+- Низький: self-review фінального diff і відповідності меті.
+- Середній: focused review lifecycle/concurrency, error paths і regressions.
+- Високий: окремий read-only агент-рецензент у Codex до commit. Передати baseline/diff, інваріанти й тести; просити шукати defects. Якщо delegation недоступне — окремий adversarial pass, перевірка failure paths і явне повідомлення про відсутність незалежного агента. Не вигадувати review PASS.
 
-## Severity
+## Checklist
 
-**BLOCKER** — incorrect behavior, crash, security defect, data corruption/loss risk, broken public contract/API, safety violation, unmet mandatory requirement або release-integrity failure.
+- Відтворено повний affected flow, включно зі startup/restart.
+- Ownership/root/layout/package identity збережено на mutation boundary.
+- Помилка/скасування/гонка не лишають partial result або неправдивий success.
+- Fixtures існують ДО lifecycle gate, який перевіряють.
+- Compatibility, TLS/path/hash validation не послаблено.
+- Логи діагностичні, без secrets/private data.
+- Docs/context правдиві; untracked artifacts не stage-яться автоматично.
 
-**IMPORTANT** — substantial defect або inconsistency, яку слід виправити до dependent progress чи release.
+## Findings
 
-**OPTIONAL** — non-required improvement, polish або cleanup, що не перешкоджає acceptance.
+`BLOCKER` — incorrect behavior, crash, data loss/security/safety violation, broken contract або unmet mandatory requirement.
 
-Поки BLOCKER/IMPORTANT не закриті, implementation iterations на OPTIONAL не витрачаються.
+`IMPORTANT` — суттєвий defect/evidence gap до залежного кроку.
 
-## Outcomes and correction loop
+`OPTIONAL` — polish; сам по собі не запускає corrective loop.
 
-External outcomes: `ACCEPTED`, `NEEDS CORRECTION`, `BLOCKED / INSUFFICIENT EVIDENCE`.
+Невиправлені BLOCKER/IMPORTANT блокують commit/release. Кожну correction перевірити й закрити доказом. Review стосується останнього diff.
 
-Для correction Architect формулює focused prompt із confirmed issue та validation. Implementation Agent corrects, validates і reports; Architect повторно перевіряє correction та affected invariant і лише тоді accepts або просить наступну correction.
+Результат: `INTERNAL REVIEW COMPLETE`, `NEEDS CORRECTION` або `BLOCKED / INSUFFICIENT EVIDENCE`. Назвати спосіб перевірки, findings і limitations. Не приписувати external acceptance.
 
-Малий diff із green relevant validation і без risky behavior може потребувати одного focused review. Finalization iteration без реального issue не створюється. Якщо report суперечить diff/tests/logs, repository evidence wins.
+## Release
 
-Default для bounded low/medium-risk задач — один external Architect review після implementation prompt, validation, commit/push і CI. Corrective iteration створюється лише для `BLOCKER`, `IMPORTANT`, failed required validation або material baseline mismatch; `OPTIONAL` сам по собі не є підставою для нового prompt.
-
-Після acceptance, якщо немає unresolved BLOCKER/IMPORTANT, approved dependent next step і активного незавершеного roadmap, Architect завершує цикл станом `WORK CYCLE COMPLETE / OWNER DECISION REQUIRED` та не створює автоматично новий audit, roadmap, refactoring, feature, release cycle або task. Наступний development cycle починає Owner.
-
-Evidence policy: actual repository/diff/CI/test/artifact evidence має пріоритет. Structured agent evidence з exact SHA, run IDs і hashes допустимий fallback, коли external connector тимчасово недоступний; простого prose «все працює» недостатньо.
-
-Task lifecycle: `IMPLEMENTED → VALIDATED → PENDING EXTERNAL REVIEW → REVIEWED / ACCEPTED`.
-
-Release lifecycle: `RC READY → OWNER SMOKE ACCEPTED → RELEASED → PUBLIC VERIFIED → RELEASE REVIEWED / ACCEPTED`.
-
-## Release review
-
-Для release, де застосовно, перевіряються exact commit/tag target, CI, tests, version metadata, artifact composition/hash, manifest, generated public notes, draft/prerelease flags, public asset і live release після publication. Architect дає GO/NO-GO; Owner виконує manual publication/visual gates.
+Перед publication перевірити exact-SHA CI, RC source/run, versions/hashes/manifests і notes. Після — live Release/tag/latest/assets/downloads. Внутрішній GO означає hard gates PASS і чинний Owner publication intent; зовнішній GO не потрібний за замовчуванням.

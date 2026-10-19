@@ -8,6 +8,8 @@ Current phase: v1.2.21 — RELEASED / PUBLIC VERIFIED
 Next action: **OWNER DECISION REQUIRED.** Stable v1.2.21 (Release ID `416789267`, source `2927fbfb1eba12b69c073299e2f68d44f42a463a`) is archived at [`../../releases/v1.2.21.md`](../../releases/v1.2.21.md). Windows toast notifications for Hub and localization updates now have diagnostic lifecycle logging. Owner waived smoke and Architect review for this publication; no external acceptance is claimed. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
+Чинний workflow — **CODEX-OWNED**: planning/implementation/internal review у Codex, automated risk-based gates, без обов'язкового зовнішнього архітектора. Це process-only рішення Owner; історичні external acceptance залишаються фактами. Stage 8B не авторизований, новий Stage не створюється. Деталі: `docs/ai-workflow/README.md`.
+
 ## Goal
 
 Перетворити BDO-UA Client на один Windows launcher/hub для кількох незалежних ігор із локалізаціями. Поточна публічна назва застосунку — `Хаб Українізаторів BDO - WWM`. Production catalog містить Black Desert Online та Windows multi-layout Where Winds Meet із окремими game-specific API/install boundaries.

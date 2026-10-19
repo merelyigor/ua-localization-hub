@@ -1,85 +1,42 @@
-# AI Development Workflow
+# Робочий процес Codex
 
-## Purpose
+Чинний режим: **CODEX-OWNED**. Owner задає мету; агент у Codex планує, реалізує, перевіряє й завершує дозволену роботу. Зовнішній архітектор не є обов'язковим учасником. Це замінює попередній Combined/external-review процес; історичні записи залишаються історією.
 
-Цей каталог є canonical описом vendor-neutral orchestration workflow для BDO UA Client. Він фіксує розподіл ролей, prompt/review loop, handoff і правила збереження інженерних рішень у репозиторії.
+## Початок сесії
 
-## Canonical roles
+1. Прочитати `AGENTS.md`, цей файл і `docs/development/CURRENT.md`.
+2. Перевірити branch/status/diff, потрібний baseline, relevant ACTIVE plan і subsystem contracts.
+3. Визначити scope, ризик, критерії успіху та чинні дозволи Owner.
+4. Дослідити affected source/tests; для дефекту спочатку встановити причину.
+5. Для малої задачі вести план у сесії; для багатосесійної/ризикової роботи зберегти його у `docs/plans/`.
 
-- [Owner](ROLES.md#owner) визначає продуктову мету, пріоритети та ручні gates.
-- [Architect / Analyst / Reviewer](ROLES.md#architect--analyst--reviewer) визначає task-level architecture, scope, ризики та acceptance.
-- [Implementation Agent](ROLES.md#implementation-agent) виконує затверджену роботу, перевіряє результат і звітує.
+Поточний запит Owner має пріоритет над старими task prompts. Архівні pending-review статуси не блокують нову дозволену роботу. Не перепитувати вже наданий дозвіл.
 
-## Canonical flow
+## Один цикл
 
-```text
-OWNER INPUT
-→ ARCHITECT ANALYSIS
-→ REPOSITORY INSPECTION
-→ ARCHITECTURE / SCOPE
-→ IMPLEMENTATION PROMPT
-→ IMPLEMENTATION AGENT
-→ TESTS / DOCS-PLAN SYNC / VALIDATION / COMMIT / PUSH / CI / REPORT
-→ ARCHITECT REVIEW
-→ ACCEPT or CORRECT ONLY IF NEEDED
-→ WORK CYCLE COMPLETE / OWNER DECISION REQUIRED
+`Owner goal → inspection/risk/plan → implementation/tests/docs → local gates → internal review/correction → commit/push → exact-SHA CI → completed`
+
+Ризик визначає глибину перевірки. Невиправлені BLOCKER/IMPORTANT і failed mandatory gates блокують залежні кроки.
+
+## Документи
+
+- [WORKFLOW.md](WORKFLOW.md) — етапи, ризик, команди та завершення.
+- [ROLES.md](ROLES.md) — відповідальність і автономія.
+- [REVIEW.md](REVIEW.md) — внутрішня перевірка й findings.
+- [PROMPTS.md](PROMPTS.md) — контракт задачі.
+- [HANDOFF.md](HANDOFF.md) — звіт і передача контексту.
+- [PROJECT_CHAT_RULES.md](PROJECT_CHAT_RULES.md) — переносний bootstrap до 7500 UTF-16 code units.
+- [Процедура релізу](../releases/README.md) — publication authority, RC і finalization.
+
+## Harness
+
+```powershell
+pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs
+pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code
 ```
 
-Це default Combined mode для bounded low/medium-risk задач: один implementation prompt охоплює implementation, tests, потрібну docs/plan synchronization, validation, commit/push і CI; після нього виконується один external Architect review. Для high-risk роботи — destructive/data-loss, security-critical, schema/data migration, public API redesign, architecture/framework change або іншого суттєвого ризику — Architect може вимагати pre-commit review mode. Окремий finalization prompt не потрібен, якщо agent уже має право commit/push і required gates пройдені.
+Docs — суто документація. Code — код/tests/scripts/CI/config, включно з Release build/full tests. Команда не commit/push-ить, не запускає застосунок і не публікує. Focused regressions обираються за affected flow. Звіт із SHA/exit codes зберігається в ignored `artifacts/validation/`; він не є автоматичним acceptance.
 
-Corrective prompt створюється лише для `BLOCKER`, `IMPORTANT`, failed required validation або material baseline mismatch. `OPTIONAL` сам по собі не запускає нову ітерацію.
+Проєктний `.codex/config.toml` збільшує instruction budget до 128 KiB, бо `AGENTS.md` перевищує default 32 KiB. Налаштування завантажується підтримуваними клієнтами для trusted project з наступної сесії. Не змінює глобальні permissions, модель, credentials чи sandbox. Якщо клієнт його не підтримує, mandatory docs читаються явно. [Офіційна документація](https://developers.openai.com/codex/guides/agents-md).
 
-Коли немає unresolved `BLOCKER`/`IMPORTANT`, approved dependent next step і активного незавершеного roadmap, Architect завершує цикл станом `WORK CYCLE COMPLETE / OWNER DECISION REQUIRED` і STOP. Він не створює автоматично новий audit, roadmap, refactoring, feature, release cycle або task; наступний development cycle починає Owner.
-
-Для UI/visual змін Combined mode може завершити commit/push, але Owner native/visual smoke залишається окремим gate, якщо automated evidence недостатній.
-
-## Authority / source of truth
-
-Owner має продуктову та release publication authority. `AGENTS.md` має обов'язкову repository-rule authority. Architect / Reviewer має task-level architecture та acceptance authority. Реальний source, diff, tests, build, CI, artifacts і hashes є доказом фактичного результату. Деталі наведено в [ROLES.md](ROLES.md) та [REVIEW.md](REVIEW.md).
-
-External conversations є coordination channels, а не persistent project state. Material decisions зберігаються у відповідних repository-owned документах.
-
-Task lifecycle: `IMPLEMENTED → VALIDATED → PENDING EXTERNAL REVIEW → REVIEWED / ACCEPTED`.
-
-Release lifecycle: `RC READY → OWNER SMOKE ACCEPTED → RELEASED → PUBLIC VERIFIED → RELEASE REVIEWED / ACCEPTED`.
-
-Evidence policy: actual repository/diff/CI/test/artifact evidence має пріоритет; structured agent evidence з exact SHA/run IDs/hashes допустимий fallback при тимчасово недоступному external connector. Простого prose «все працює» недостатньо.
-
-## Local GitHub access
-
-Якщо `gh` локально автентифікований, Implementation Agent може використовувати GitHub CLI для дозволених task-ом операцій із цим repository та GitHub Actions. Перед кожною операцією перевіряються `gh auth status`, target repository/remote і exact ref/SHA. Токени та credentials не виводяться, не зберігаються в repository і не потрапляють у handoff; read-only task не виконує мутацій.
-
-## Session bootstrap
-
-Нова інженерна сесія відновлює контекст у такому порядку:
-
-1. `AGENTS.md`
-2. `docs/ai-workflow/README.md`
-3. `docs/development/CURRENT.md`
-4. relevant ACTIVE plan, якщо він існує
-5. relevant/current monthly journal
-6. recent commits/diffs, якщо потрібні точні деталі
-7. relevant subsystem documentation
-8. actual source/tests поточного завдання
-9. explicit task prompt
-
-Нуль ACTIVE планів є валідним станом. Відсутність plan не дозволяє вигадувати placeholder; bounded owner-authorized task може виконуватися без roadmap. Task prompt може звузити inspection set, але не скасовує `AGENTS.md`.
-
-Plan створюється лише для справжнього multi-step roadmap або роботи, яку потрібно переносити між сесіями. Bounded task не створює plan лише для bookkeeping.
-
-## Documents in this folder
-
-- [ROLES.md](ROLES.md) — межі відповідальності та автономії ролей.
-- [WORKFLOW.md](WORKFLOW.md) — executable lifecycle, task types і release flow.
-- [PROMPTS.md](PROMPTS.md) — контракти implementation, corrective та release prompts.
-- [REVIEW.md](REVIEW.md) — evidence hierarchy, severity та acceptance loop.
-- [HANDOFF.md](HANDOFF.md) — звітність, persistence і міжсесійний handoff.
-- [PROJECT_CHAT_RULES.md](PROJECT_CHAT_RULES.md) — короткий Owner-maintained portable bootstrap prompt для Architect / Analyst / Reviewer sessions; повний handbook залишається в `AGENTS.md` і linked workflow docs.
-
-Owner копіює та надалі підтримує цей файл безпосередньо як canonical Architect-chat instruction. Repository-specific workflow explanation залишається в `README.md`, `ROLES.md`, `WORKFLOW.md`, `PROMPTS.md`, `REVIEW.md` та `HANDOFF.md`, а не додається до exact-copy instruction.
-
-Portable bootstrap має бути не довшим за `7500` UTF-16 code units; після його зміни запускається `scripts/Check-ProjectChatRules.ps1`, а normal CI виконує той самий gate.
-
-## Non-goals
-
-Ці документи не замінюють [AGENTS.md](../../AGENTS.md), implementation plans, [CURRENT.md](../development/CURRENT.md), journal, git history або subsystem documentation. Вони vendor-neutral і не роблять self-review Implementation Agent еквівалентним external review.
+Реальні game files не є тестовою fixture. Публікація потребує Owner intent. Історичний external acceptance не приписується внутрішньому review.

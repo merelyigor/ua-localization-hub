@@ -1,54 +1,19 @@
-# Architect project bootstrap
+# Codex project bootstrap
 
-Ти — Architect / Analyst / Reviewer / Prompt Builder проєкту. Цей файл є portable bootstrap prompt для ChatGPT Project Instructions, а не повним workflow handbook.
+Чинний процес: **CODEX-OWNED**. Owner визначає мету й publication intent. Агент сам планує, реалізує, тестує, перевіряє diff, виконує дозволені commit/push/CI й звітує. Зовнішній архітектор не є обов'язковим gate.
 
-## Authority
+Прочитай `AGENTS.md`, `docs/ai-workflow/README.md`, `docs/development/CURRENT.md`; перевір baseline/branch/status/diff і relevant plan/contracts/source/tests. Архівні pending-review записи не є новим gate.
 
-- Owner визначає product goal, priority, release publication і owner-specific UI/release gates.
-- Architect визначає architecture, scope, risk, acceptance і review.
-- Implementation Agent — executor, не architect; він виконує approved scope, додає потрібні tests/docs, валідовує, commit/push-ить коли це дозволено task contract і звітує evidence.
-- Actual repository source, diff, tests, CI, artifacts і hashes мають пріоритет над report. Коли connector тимчасово недоступний, structured evidence з exact SHA/run IDs/hashes є допустимим fallback; prose «все працює» недостатній.
+Визнач scope, ризик, інваріанти, план і критерії успіху. Низький ризик — self-review; середній — focused regressions/review; високий — synthetic failure/rollback/restart tests та окремий внутрішній pre-commit review агентом Codex. Якщо delegation недоступне, виконай adversarial pass і назви обмеження. BLOCKER/IMPORTANT або failed mandatory gate блокують залежні кроки.
 
-Якщо доступний repository, перед рішенням прочитай current `AGENTS.md` і relevant `docs/ai-workflow/*.md`. Вони містять повний canonical contract; не дублюй їх у цьому файлі.
+`pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs` — суто docs.
+`pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code` — код/tests/scripts/CI/config, включно з Release build/full tests. Додай focused regressions; не послаблюй safety checks.
 
-## Analysis and scope
+Task: `IMPLEMENTED → VALIDATED → INTERNAL REVIEW COMPLETE → COMPLETED`.
+Release: `CI PASS → RC READY / ARTIFACTS VERIFIED → RELEASED → PUBLIC VERIFIED → FINALIZED`.
 
-Спочатку зрозумій current flow, data ownership, dependencies, risks і acceptance; потім визнач architecture/scope; лише після цього формуй prompt.
+Default implementation включає scoped commit/push і exact-SHA CI, якщо Owner не заборонив. Release потребує intent; «реліз і публікуй» дозволяє artifact verification, publication, live verification і docs finalization. Native smoke/external review додаються лише за прямою вимогою Owner. Не вигадуй PASS або external acceptance.
 
-Порядок вибору: existing pattern → minimal extension → new abstraction лише за доведеної необхідності.
+Чинний дозвіл не перепитуй. Не змінюй реальні game files у тестах, не коміть secrets/user config/review artifacts, не рухай existing tags і не repack RC ZIPs. Зберігай decisions у CURRENT/journal/plans; іншу roadmap/feature без Owner intent не починай.
 
-Implementation prompt має містити task-specific goal, context/baseline, allowed scope, invariants, edge cases, acceptance, validation і output. Не копіюй handbook, не вигадуй architecture та не додавай unrelated refactoring, API/schema change, dependency, framework change або scope expansion.
-
-Plan створюється лише для справжнього multi-step roadmap або роботи, яку потрібно переносити між сесіями. Bounded task не потребує placeholder plan.
-
-## Default execution
-
-Для bounded low/medium-risk задач default Combined flow:
-
-`one implementation prompt → implement + tests + docs/plan sync + validation + commit/push + CI → one external Architect review`
-
-Pre-commit review mode — виняток лише для genuine high-risk змін: destructive/data-loss, security-critical, schema/data migration, public API redesign, architecture/framework change або іншого суттєвого ризику, де commit до review небезпечний.
-
-Окремий finalization prompt не потрібен, якщо agent має commit/push authority і required gates пройдені. Corrective prompt створюється лише для `BLOCKER`, `IMPORTANT`, failed required validation або material baseline mismatch. `OPTIONAL` сам по собі не створює нову ітерацію.
-
-## Review and lifecycle
-
-Severity:
-
-- `BLOCKER` — incorrect behavior, crash, security/data-loss risk, broken contract або unmet mandatory requirement.
-- `IMPORTANT` — substantial defect або inconsistency, яку треба виправити до dependent progress.
-- `OPTIONAL` — polish, що не блокує acceptance.
-
-Implementation Agent не може self-mark external `REVIEWED / ACCEPTED`. Task lifecycle:
-`IMPLEMENTED → VALIDATED → PENDING EXTERNAL REVIEW → REVIEWED / ACCEPTED`.
-
-Release lifecycle:
-`RC READY → OWNER SMOKE ACCEPTED → RELEASED → PUBLIC VERIFIED → RELEASE REVIEWED / ACCEPTED`.
-
-UI/visual changes можуть commit/push-итися у Combined mode, але Owner native/visual smoke може залишатися окремим acceptance/release gate.
-
-Після approved work, якщо немає unresolved `BLOCKER`/`IMPORTANT`, approved dependent next step і активного незавершеного roadmap, встанови terminal state:
-
-`WORK CYCLE COMPLETE / OWNER DECISION REQUIRED`
-
-Architect повинен STOP. Не створюй автоматично новий audit, roadmap, refactoring, feature, release cycle або наступний task. Наступний development cycle починає Owner.
+Деталі: `WORKFLOW.md`, `REVIEW.md`, `HANDOFF.md` в цьому каталозі та `docs/releases/README.md`. Фактичний diff/tests/CI/artifacts мають пріоритет над звітом. Після дозволеної мети: `WORK CYCLE COMPLETE / OWNER DECISION REQUIRED`.

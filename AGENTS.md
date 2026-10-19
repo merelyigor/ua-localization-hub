@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> Чинний процес: **CODEX-OWNED**. Owner задає мету; агент у Codex планує, реалізує, перевіряє та доводить дозволену роботу до завершення. Обов'язкового зовнішнього архітектора немає. Деталі — §43 та `docs/ai-workflow/`; старі pending-review записи в історії не є поточними gates.
+
 ---
 
 ## 📑 ЗМІСТ
@@ -512,12 +514,12 @@ BDO-UA-Client/
 
 ## §26 📦 Build та .exe
 
-§26.1 Після змін: syntax check → build → tests → виправлення.
+§26.1 Після змін виконати `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code`. Для суто документаційних змін достатньо `-Profile Docs`; зміни scripts, CI або build configuration потребують `Code`. Команда перевіряє workflow, repository hygiene, release tooling/NEXT та, у Code, Release build/full tests. Вона не замінює focused regression tests і внутрішню перевірку diff.
 
 §26.2 Пакетований `.exe` може відрізнятися від dev mode (working directory, bundled resources).
 
 §26.3 **GitHub Actions CI:**
-- Локальні build/tests перед commit залишаються обов'язковими.
+- Локальні перевірки за §26.1 перед commit залишаються обов'язковими; Code включає build/tests.
 - GitHub Actions є незалежною remote-перевіркою.
 - Не заявляти, що CI успішний, якщо результат реально не перевірено.
 - Failure CI не ігнорувати перед переходом до наступного етапу.
@@ -526,7 +528,7 @@ BDO-UA-Client/
 
 §26.5 Якщо локальний GitHub CLI (`gh`) автентифікований, Implementation Agent може використовувати його для дозволених task-ом операцій із цим repository та GitHub Actions. Перед операцією перевірити `gh auth status`, repository/remote і exact ref/SHA; токени, credentials і повні auth-виводи не друкувати, не зберігати в repository та не включати у звіти. Якщо task не дозволяє мутацію — використовувати лише read-only GitHub/API/CI перевірки.
 
-§26.6 Коли Implementation Agent працює у Windows-середовищі з доступним native UI control, він може самостійно виконати й задокументувати механічну перевірку застосунку: зібрати та запустити WinForms UI, перевірити runtime-сценарії, перемикання екранів/ігор і tray/window lifecycle, переглянути логи, запустити автоматизовані тести та зберегти screenshots як evidence. У звіті вказувати точні source/commit SHA, фактично запущений EXE, сценарії, PASS/FAIL і шляхи screenshots. Не вимагати від Owner повторення суто механічної перевірки, якщо агент може безпечно виконати її та надати evidence. Architect зберігає незалежний technical review; Owner — суб'єктивне product/visual acceptance та рішення про publication/release. Owner input залишається обов'язковим для явно визначених Owner gates і рішень, що потребують суб'єктивної оцінки. Native smoke не надає дозволу змінювати реальні game files, user data, external services, release/publication state чи інші destructive/high-risk ресурси: без явної авторизації використовувати read-only дії, synthetic/temp fixtures або зупинятися перед destructive confirmation boundary. Screenshots не повинні без потреби розкривати приватні дані.
+§26.6 Коли Implementation Agent працює у Windows-середовищі з доступним native UI control, він може самостійно виконати й задокументувати механічну перевірку застосунку: зібрати та запустити WinForms UI, перевірити runtime-сценарії, перемикання екранів/ігор і tray/window lifecycle, переглянути логи, запустити автоматизовані тести та зберегти screenshots як evidence. У звіті вказувати точні source/commit SHA, фактично запущений EXE, сценарії, PASS/FAIL і шляхи screenshots. Не вимагати від Owner повторення суто механічної перевірки, якщо агент може безпечно виконати її та надати evidence. Технічний review виконується в Codex за §43; Owner зберігає продуктове рішення й publication authority. Owner input залишається обов'язковим для явно визначених Owner gates і рішень, що потребують суб'єктивної оцінки. Native smoke не надає дозволу змінювати реальні game files, user data, external services, release/publication state чи інші destructive/high-risk ресурси: без явної авторизації використовувати read-only дії, synthetic/temp fixtures або зупинятися перед destructive confirmation boundary. Screenshots не повинні без потреби розкривати приватні дані.
 
 ---
 
@@ -612,9 +614,9 @@ BDO-UA-Client/
 
 §33.5 Код відповідає архітектурі.
 
-§33.6 `dotnet build BdoUaClient.sln` проходить без помилок.
+§33.6 Required profile за §26.1 проходить; Code включає Release build без warnings/errors, Docs не вимагає перебудови незміненого application code.
 
-§33.7 `dotnet test BdoUaClient.sln --no-build` проходить (якщо є тести).
+§33.7 Для Code повний Release suite та affected regressions проходять. Internal review завершено, BLOCKER/IMPORTANT закриті, exact-SHA CI перевірено після дозволеного push; пропущені перевірки чесно позначені.
 
 ---
 
@@ -746,7 +748,7 @@ BDO-UA-Client/
 
 §39.4 Moving lifecycle state requires file move + registry update in same commit. Folder status and registry status must always match.
 §39.5 Після кожного meaningful implementation commit, що просуває ACTIVE план, той самий commit повинен оновити відповідний active plan і `docs/plans/README.md`, правдиво зафіксувавши реалізовану задачу, фактичний validation/review status, невиконані частини та точну наступну дію.
-§39.6 Implementation-agent не має права позначати власну роботу як `REVIEWED`, `ACCEPTED` або `OWNER ACCEPTED`, якщо відповідний зовнішній review/acceptance фактично не відбувся. До нього використовувати фактичні статуси на кшталт `IMPLEMENTED / VALIDATED / PENDING ARCHITECT REVIEW`.
+§39.6 Фіксувати фактичні статуси: `IMPLEMENTED / VALIDATED / INTERNAL REVIEW COMPLETE / COMPLETED`. Внутрішню перевірку агентом не називати external review або Owner acceptance. `PENDING EXTERNAL REVIEW` застосовується лише коли Owner явно замовив такий review; історичні acceptance записи не переписуються.
 §39.7 Звичайне plan/progress bookkeeping належить implementation commit, який спричинив прогрес. Не створювати пізніший docs-only commit для виправлення застарілого плану; окремий corrective docs-only commit дозволений лише для виправлення вже закоміченої фактичної невідповідності.
 §39.8 Registry/plan не може продовжувати вказувати вже завершену задачу як current/next.
 
@@ -832,13 +834,13 @@ BDO-UA-Client/
 
 §43.1 Детальний canonical orchestration contract живе у [`docs/ai-workflow/README.md`](docs/ai-workflow/README.md) та linked files у цьому каталозі.
 
-§43.2 Roles є vendor-neutral: Owner, Architect / Analyst / Reviewer, Implementation Agent. Implementation Agent — executor; task-level architecture/review authority належить external Architect/Reviewer, якщо Owner явно не вирішив інакше.
+§43.2 Owner визначає мету, пріоритет, продуктове рішення та дозвіл на публікацію. Провідний агент Codex відповідає за аналіз, архітектурні рішення в межах задачі, план, реалізацію, тести, внутрішню перевірку й handoff. Зовнішній Architect/Reviewer не є обов'язковою роллю або gate.
 
-§43.3 Implementation Agent перевіряє repository context/baseline і дотримується approved scope. При unapproved API/schema/dependency/framework/architecture/safety/scope expansion або конфлікті з mandatory rules він STOP і звітує.
+§43.3 Агент перевіряє baseline і scope до редагування. Необхідні implementation decisions приймає сам і документує наслідки; окреме погодження потрібне для матеріального розширення продуктової мети, нової зовнішньої публікації без дозволу, несумісного контракту поза задачею або невідновної операції з реальними даними. Чинний дозвіл Owner не перепитувати.
 
-§43.4 Local autonomous decisions дозволені лише якщо не змінюють architecture, correctness, safety, compatibility, persistence/public contracts.
+§43.4 Перед роботою визначити низький/середній/високий ризик. Для високого ризику (game mutation, recovery, migration, security, release selection/updater) записати інваріанти й сценарії відмов, додати synthetic integration/rollback/cancellation/restart перевірки та провести окремий review фінального diff у Codex до commit. Дозволено делегувати вузькі завдання й read-only review підлеглим агентам; вони не успадковують право publish, торкатися реальних файлів гри або розширювати scope.
 
-§43.5 Коли workflow вимагає acceptance, implementation follow-up проходить external review. Implementation Agent не може self-mark нову роботу як `REVIEWED / ACCEPTED`.
+§43.5 Низький ризик проходить self-review. Середній ризик — focused review diff/регресій. Високий ризик — окремий агент-рецензент із фактичним diff, тестами та інваріантами; якщо інструмент недоступний, виконати окремий adversarial review pass, явно назвати обмеження й компенсувальні перевірки. Наявність reviewer без перевірки diff не є evidence. Не вигадувати зовнішнього acceptance.
 
 §43.6 Unresolved BLOCKER/IMPORTANT блокують dependent next work. OPTIONAL не вимагає corrective iteration автоматично.
 
@@ -846,18 +848,18 @@ BDO-UA-Client/
 
 §43.8 Нова session відновлює context із repository documentation/source, а не з hidden/opaque session history; canonical bootstrap описано у [`docs/ai-workflow/README.md`](docs/ai-workflow/README.md).
 
-§43.9 **Combined mode** є default для bounded low/medium-risk задач із визначеним scope: `Architect prompt → Implementation Agent implement + tests/docs/plan sync + validation + commit/push + CI → один external Architect review`. Цільовий цикл — один implementation prompt і один external review.
+§43.9 Default: `Owner goal → inspection/risk/plan → implement + tests + docs → local gates → internal review/correction → commit/push → exact-SHA CI → handoff`. Commit/push bounded task дозволений після gates, якщо Owner не встановив local-only/pre-commit режим. Не створювати зайвий prompt лише для наступного вже дозволеного кроку.
 
-§43.10 Pre-commit review mode використовується лише для реально high-risk змін: destructive/data-loss risk, security-critical behavior, schema/data migration, public API redesign, architecture/framework change або іншого випадку, де commit до review створює суттєвий ризик. Окремий finalization prompt не створюється, якщо Implementation Agent уже має право commit/push і всі required gates пройдені.
+§43.10 Високий ризик потребує внутрішнього pre-commit review, але не очікування зовнішнього архітектора. Явний Owner pre-commit/local-only режим забороняє commit/push до дозволу. Невиправлені BLOCKER/IMPORTANT або failed mandatory gate блокують commit/release незалежно від режиму.
 
 §43.11 Corrective iteration дозволена лише для `BLOCKER`, `IMPORTANT`, failed required validation або material baseline mismatch. `OPTIONAL` сам по собі не створює новий prompt.
 
-§43.12 Після завершення approved work, коли немає unresolved `BLOCKER`/`IMPORTANT`, already-approved dependent next step і активного незавершеного roadmap, кінцевий стан: `WORK CYCLE COMPLETE / OWNER DECISION REQUIRED`. Architect повинен STOP і не створювати автоматично audit, roadmap, refactoring, feature, release cycle або наступний task. Новий development cycle починає Owner.
+§43.12 Продовжувати всі вже дозволені залежні кроки автономно. Після завершення мети: `WORK CYCLE COMPLETE / OWNER DECISION REQUIRED`; не починати нову feature, roadmap, audit або release без Owner intent. ACTIVE roadmap сам по собі не авторизує наступний етап.
 
-§43.13 Для UI/visual changes commit/push дозволені у Combined mode, але Owner native/visual smoke може залишатися окремим acceptance або release gate, якщо automated evidence недостатній. Task lifecycle і release lifecycle не змішуються: task — `IMPLEMENTED → VALIDATED → PENDING EXTERNAL REVIEW → REVIEWED / ACCEPTED`; release — `RC READY → OWNER SMOKE ACCEPTED → RELEASED → PUBLIC VERIFIED → RELEASE REVIEWED / ACCEPTED`.
+§43.13 Task: `IMPLEMENTED → VALIDATED → INTERNAL REVIEW COMPLETE → COMPLETED`. Release: `CI PASS → RC READY / ARTIFACTS VERIFIED → RELEASED → PUBLIC VERIFIED → FINALIZED`. Owner smoke/external review додаються лише за явною вимогою Owner; не вигадувати PASS для пропущених перевірок. За дозволом «реліз і публікуй» агент доводить release до public verification та docs finalization; деталі в `docs/releases/README.md`.
 
 §43.14 Actual repository/diff/CI/test/artifact evidence має пріоритет. Structured agent evidence з exact SHA, run IDs і hashes є допустимим fallback лише за тимчасової недоступності external connector; prose без evidence недостатній. Plan створюється лише для справжнього multi-step roadmap або роботи, яку потрібно переносити між сесіями; bounded task не створює plan автоматично. Implementation prompt посилається на current `AGENTS.md` і `docs/ai-workflow/` та повторює лише task-specific scope, invariants і validation.
 
-§43.15 `docs/ai-workflow/PROJECT_CHAT_RULES.md` — portable bootstrap prompt для Architect Project Instructions, а не повний handbook. Його hard limit — `7500` UTF-16 code units; detailed rules залишаються в `AGENTS.md` та інших `docs/ai-workflow/*.md`. Не дублювати canonical docs лише для self-contained prose.
+§43.15 `docs/ai-workflow/PROJECT_CHAT_RULES.md` — короткий portable bootstrap для агентських сесій; hard limit `7500` UTF-16 code units. Деталі живуть у canonical docs. `.codex/config.toml` задає project-local instruction byte budget; глобальні permissions/models/credentials не змінювати як частину звичайної задачі.
 
 §43.16 Після кожної зміни `PROJECT_CHAT_RULES.md` Implementation Agent зобов'язаний запустити `scripts/Check-ProjectChatRules.ps1`; цей gate також є обов'язковим кроком normal CI.

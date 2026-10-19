@@ -12,6 +12,8 @@
 
 ## Build команди
 
+Повний локальний gate: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code`. Для суто docs — `-Profile Docs`. CODEX-OWNED процес описаний у [ai-workflow/README.md](ai-workflow/README.md).
+
 ```bash
 # Збірка рішення
 dotnet build BdoUaClient.sln
@@ -78,8 +80,9 @@ Trimming може видалити типи, які використовують
 1. Checkout
 2. Setup .NET 8
 3. Restore: `dotnet restore BdoUaClient.sln`
-4. Build Release: `dotnet build BdoUaClient.sln --configuration Release --no-restore`
-5. Test Release: `dotnet test BdoUaClient.sln --configuration Release --no-build`
+4. Workflow contract, repository safety scan та негативні harness regression tests
+5. Build Release: `dotnet build BdoUaClient.sln --configuration Release --no-restore -warnaserror`
+6. Test Release: `dotnet test BdoUaClient.sln --configuration Release --no-build`; resolver/release-note/portable-rule/version smoke gates
 
 Мета: швидка перевірка кожного коміту/PR на компільність та проходження тестів.
 
@@ -125,7 +128,7 @@ Trimming може видалити типи, які використовують
 - НЕ створює GitHub Release
 
 ### C. Release Candidate (`release-candidate.yml`)
-- **Trigger:** `workflow_dispatch` (ручний запуск власником), тільки з гілки **main**
+- **Trigger:** `workflow_dispatch` (Owner або авторизований агент), тільки з гілки **main**
 - Кроки:
   1. Validate main branch (заборона запуску не з main)
   2. Resolve version через `scripts/Resolve-ReleaseVersion.ps1` — автоматичний next-patch з останнього тега, або manual version якщо вказано
@@ -134,7 +137,7 @@ Trimming може видалити типи, які використовують
   5. Publish single-file з версіюванням: `-p:Version / -p:AssemblyVersion / -p:FileVersion / -p:InformationalVersion` + `-p:IncludeSourceRevisionInInformationalVersion=false`
   6. Verify EXE version metadata — exact FileVersion/ProductVersion match
   7. Генерація schema-2 manifest (`release-manifest.json`) + `SHA256SUMS.txt`
-  8. Release notes через `scripts/Generate-ReleaseNotes.ps1` (авто-генерація з git log)
+  8. Release notes через `scripts/Generate-ReleaseNotes.ps1` з `docs/releases/NEXT.json`
   9. Upload canonical та legacy compatibility artifacts з versioned names
 - НЕ створює GitHub Release автоматично
 
@@ -143,12 +146,13 @@ Trimming може видалити типи, які використовують
 | Скрипт | Призначення |
 |---|---|
 | `scripts/Resolve-ReleaseVersion.ps1` | Визначає версію RC: auto next-patch або manual; перевіряє унікальність тега |
-| `scripts/Generate-ReleaseNotes.ps1` | Генерує release notes з git log |
+| `scripts/Generate-ReleaseNotes.ps1` | Валідовує NEXT schema й рендерить public release notes |
+| `scripts/Invoke-ProjectValidation.ps1` | Docs/Code gates із локальним JSON-звітом та exit codes |
 | `scripts/Test-Resolve-ReleaseVersion.ps1` | Pester-подібні self-тести для Resolve-ReleaseVersion |
 
 Детальна процедура релізу — [releases/README.md](releases/README.md).
 
 ### D. GitHub Release
-- Створюється та публікується **вручну власником** репозиторію
-- Після успішного Release Candidate: завантажити artifact ZIP → створити release → обрати тег → завантажити exact artifact ZIP як єдиний application asset → Publish
+- Створюється Owner або агентом за чинним publication intent після hard gates; зовнішній Architect GO не обов'язковий
+- Після успішного RC: перевірити обидва artifacts → annotated tag на exact source SHA → Release з двома exact ZIP assets → public download/hash verification → docs finalization
 - Release notes використовуються як тіло GitHub Release.

@@ -17,16 +17,16 @@
 | [Дизайн](design/BDO_THEME_PLAN.md) | BDO-тема UI (план та кольори) |
 | [Плани](plans/README.md) | Плани реалізації |
 | [Development context](development/README.md) | Поточний engineering handoff та monthly journal |
-| [AI workflow](ai-workflow/README.md) | Canonical Owner / Architect-Reviewer / Implementation-Agent workflow, prompts, reviews та handoffs |
+| [AI workflow](ai-workflow/README.md) | CODEX-OWNED planning, implementation, internal review, automated gates та handoff |
 
 ## Поточний стан
 
 - **Платформа:** Windows x64, .NET 8, WinForms
 - **Пакування:** self-contained single-file (BDO-WWM-UAClient.exe); legacy bundle identity remains available for updates from published clients
 - **Оновлення застосунку:** GitHub Releases `merelyigor/ua-localization-hub`, canonical ZIP transport (schema-2 manifest)
-- **Тести:** остання локальна Stage 10 Release suite — 1092 passed / 0 failed / 0 skipped
-- **Стабільний реліз:** v1.2.9, опублікований з canonical ZIP self-update/release transport
-- **Плани:** `localization-hub-multigame` — єдиний ACTIVE PRIMARY plan; Stage 10 реалізовано локально та очікує external pre-commit Architect review
+- **Тести та поточний engineering status:** [CURRENT.md](development/CURRENT.md), exact-SHA CI та результати harness
+- **Релізні факти:** [архів релізів](releases/README.md); public state перевіряється live перед publication
+- **Плани:** [canonical registry](plans/README.md); зовнішній архітектор не є обов'язковим gate
 
 ## Пов'язані документи
 
