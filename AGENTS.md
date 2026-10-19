@@ -1,5 +1,7 @@
 # AGENTS.md
 
+<!-- dev-standard: plans=docs/plans/active/execution autonomous -->
+
 CODEX-OWNED — агент у Codex веде дозволену задачу від аналізу до internal review, commit/push та exact-SHA CI. Зовнішній архітектор не є обов'язковим gate.
 
 ## Область і джерела
@@ -431,7 +433,7 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 
 ## §39 📋 Плани
 
-Registry — `docs/plans/README.md`; active/backlog/archive збережені. §39.3 BACKLOG не виконується автоматично; PRIMARY рівно один за наявності ACTIVE. Інший формат планів не імпортувати.
+`docs/plans/README.md` лишається продуктовим roadmap registry. Виконавчі плани окремих задач ведуться DevStandard у `docs/plans/active/execution/`; конкретний план стає executable лише після прямого схвалення Owner. §39.3 BACKLOG roadmap автоматично не виконується; PRIMARY рівно один за наявності ACTIVE.
 
 Деталі: [§39](docs/ai-workflow/DOMAIN_RULES.md#section-39).
 

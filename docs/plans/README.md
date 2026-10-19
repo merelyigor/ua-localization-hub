@@ -4,7 +4,7 @@
 
 Чинний процес — **CODEX-OWNED**: дозволені задачі плануються, реалізуються й перевіряються в Codex без обов'язкового зовнішнього архітектора. Internal review та automated gates описані в `docs/ai-workflow/`; історичні acceptance записи не змінюються. Process/harness sync не авторизує новий продуктовий етап.
 
-Selected local skills і короткий root routing описані в `docs/ai-workflow/SKILLS.md`; поточні active/backlog/archive плани та один PRIMARY збережені. Інший planning framework і перенесення CI в local-only hooks не застосовуються.
+Selected local skills і root routing описані в `docs/ai-workflow/SKILLS.md`. Цей файл лишається канонічним продуктовим roadmap registry з одним PRIMARY. Виконавчі плани окремих багатокрокових/ризикових задач створюються DevStandard у [active/execution/README.md](active/execution/README.md) і не змінюють продуктовий Stage/authorization. Локальні hooks перевіряють зміни до commit/push; GitHub CI та release workflows залишаються обов'язковими.
 
 **Primary:** `localization-hub-multigame`
 **Current phase:** v1.2.21 — RELEASED / PUBLIC VERIFIED

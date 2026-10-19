@@ -11,6 +11,8 @@ Scoped technical contracts — `docs/ai-workflow/DOMAIN_RULES.md`; перед з
 `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs` — суто docs.
 `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code` — код/tests/scripts/CI/config, включно з Release build/full tests. Додай focused regressions; не послаблюй safety checks.
 
+Local hooks: `pwsh -File scripts/Install-ProjectHooks.ps1`; pre-commit перевіряє staged safety/diff, pre-push запускає fail-safe Docs/Code profile. У Windows Codex запускай `git commit`/`git push` через Git Bash: PowerShell runner не може запустити дочірній hook (`Function not implemented`); wrappers використовують Windows PowerShell для виклику перевірок. Hosted exact-SHA CI та release workflow не замінюються. Не використовуй `--no-verify`.
+
 Task: `IMPLEMENTED → VALIDATED → INTERNAL REVIEW COMPLETE → COMPLETED`.
 Release: `CI PASS → RC READY / ARTIFACTS VERIFIED → RELEASED → PUBLIC VERIFIED → FINALIZED`.
 

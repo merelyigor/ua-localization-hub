@@ -54,9 +54,11 @@ if ($present.Count -eq 0) {
     Write-Output 'Project skills: not installed; public workflow fallback active (CI needs no private access).'
     exit 0
 }
-if ($present.Count -ne $names.Count) { throw 'Partial skill installation; do not silently mix sources.' }
+if ($RequireInstalled -and $present.Count -ne $names.Count) {
+    throw 'Selected project skill set is incomplete.'
+}
 $count = 0
-foreach ($skill in $lock.skills) {
+foreach ($skill in ($lock.skills | Where-Object { $present -ccontains $_.name })) {
     $directory = Join-Path $imports $skill.name
     Assert-NoReparse $directory
     $expected = @($skill.files.path)
@@ -79,5 +81,9 @@ foreach ($skill in $lock.skills) {
         $count++
     }
 }
-Write-Output "Project skills verified: $($names.Count) skills / $count files; source $($lock.source_revision)."
+if ($present.Count -eq $names.Count) {
+    Write-Output "Project skills verified: $($names.Count) skills / $count files; source $($lock.source_revision)."
+} else {
+    Write-Output "Project skills partially restored: $($present.Count) / $($names.Count) skills verified; source $($lock.source_revision)."
+}
 exit 0

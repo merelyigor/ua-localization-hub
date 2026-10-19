@@ -153,6 +153,50 @@
           "sha256": "66bb5561fa188cab4fd560d30f36824e50cc60cd7c7409cc8eab5f6b1516d5d7"
         }
       ]
+    },
+    {
+      "name": "dev-standard",
+      "source_path": "plugins/merely/skills/dev-standard",
+      "files": [
+        { "path": "SKILL.md", "sha256": "53aa45a5e21fece90a410a4acdc06cdca603b2eb83c468ea288c0c65eb931017" },
+        { "path": "agents/openai.yaml", "sha256": "e7e62aba97fbf1db569fd4cfe578044ae34c2b85b3fe1106144f4b96ae09ecb4" },
+        { "path": "assets/plan.md", "sha256": "c6d8cd8815fe47537b34d4e69553645f87406826f2c5af0ae5075ff3f94c22ae" },
+        { "path": "assets/tasks.md", "sha256": "1b31647fa08310b02fe8ab4ac028637f535facac530deaf476010fb40c306e6a" },
+        { "path": "references/browser-check.md", "sha256": "a1d25f45a334f8bfdaf9f38c72c43082b8610e0c5515cee79487db2a5e406a49" },
+        { "path": "references/conventions-discovery.md", "sha256": "b996524f0359c80b42b3b2c7f94b9b2571411df883d0e2eb67829c54a3445c40" },
+        { "path": "references/parallel-packages.md", "sha256": "6aef5d1d458f63b307820e57ccde0b18ee2ba235a996a81d21535dbccd91ede9" },
+        { "path": "references/self-review.md", "sha256": "ca18c74cba29175413a683294049d01f021a344ceee1f3780c48e4daa4c54ad6" },
+        { "path": "references/standard.md", "sha256": "1f4cf90186e8629444209ed033f9e4896a3e2edb906edc6274caa815be152526" },
+        { "path": "references/step-example.md", "sha256": "36b96954fe7e2a4e12c626f093040536d914ba6d98b057e49a99a2d80e3f8588" },
+        { "path": "references/writing-plans.md", "sha256": "c517162db8ae2e0fa5fa6a2e01fecb54ab0903894ec69a2cd8d1c5614b1686d3" },
+        { "path": "scripts/active_plan.py", "sha256": "ea345be5ad92073ffea7da42d5775a5dd11de06edc736d306e25027f04f6841f" },
+        { "path": "scripts/plan.py", "sha256": "0a6b42ca90a08f88a96bd12fb6d95d0a2bc0edcd76141281ce82ba9798256698" },
+        { "path": "scripts/plan_check.py", "sha256": "a30c862f91ec668f633d2b0e21b0ab65e012ec6baef77c131bb6e3a0260d3822" }
+      ]
+    },
+    {
+      "name": "brygada",
+      "source_path": "plugins/merely/skills/brygada",
+      "files": [
+        { "path": "SKILL.md", "sha256": "a13b5e4e7cbf3b18c7a6fd5beeeb8c56c40be2bbdd499bb438b1b52b09002d10" },
+        { "path": "agents/openai.yaml", "sha256": "16b5387fce7a332d72218e0e805c78b78e2b1544df7359177704973aa58001c1" },
+        { "path": "assets/session-context.md", "sha256": "3973aea31d04a648ee23a6680bb21489758ddefa505c83bdf025152fa958173b" },
+        { "path": "assets/templates/task-package.md", "sha256": "a7891f0f7099a8a5a59bc4d9dde0379b86e1cd791a9e2b45c7c211fa0a6610fa" },
+        { "path": "references/claude-code.md", "sha256": "f17f476ba54c8d75e3f7fcaccd8c839de666fe19ac626bc4ea87ffe17a01bd1d" },
+        { "path": "references/codex.md", "sha256": "2ef28598d03e08cd37c585032c328858ec05fbce9e8ad35d2b9ebe2624c2cad2" },
+        { "path": "references/opencode.md", "sha256": "95c68eda4c0c0ce8623ba824e6de3fa76c2677b48505f667b98aa48d58e3bace" },
+        { "path": "references/review-lenses.md", "sha256": "4d6ebcc53a0bb637287fc40245c5371e042e106d848dc3a11f2bb6ef05d07455" },
+        { "path": "scripts/brygada_pause.py", "sha256": "3906b364b40e2b203e9ba9a22e58276b7d39fcbd394c810402b3cabbb48c858c" }
+      ]
+    },
+    {
+      "name": "implement-work-package",
+      "source_path": "plugins/merely/skills/implement-work-package",
+      "files": [
+        { "path": "SKILL.md", "sha256": "da711b2df9996e15591a8fa817584d5db77fd1944050fd2f021eb844e156e91b" },
+        { "path": "agents/openai.yaml", "sha256": "97fda6063e642e41ace6d69fb59963689a3e59a11eab4cb6a99a87c4b12fbc81" },
+        { "path": "references/work-package-format.md", "sha256": "e37a5470fbd60154996b9007dd3f770e1a57111c8c3f42087287426b08a69c2e" }
+      ]
     }
   ]
 }

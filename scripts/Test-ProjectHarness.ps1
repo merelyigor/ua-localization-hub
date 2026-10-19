@@ -88,6 +88,8 @@ try {
     Assert-True 'project skill integration regression suite' ($LASTEXITCODE -eq 0)
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'Test-Select-CiDotNetValidation.ps1') | Out-Host
     Assert-True 'CI .NET scope classifier regression suite' ($LASTEXITCODE -eq 0)
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'Test-ProjectGitHooks.ps1') | Out-Host
+    Assert-True 'repository-local hook setup regression suite' ($LASTEXITCODE -eq 0)
     Write-Output "Harness tests: $passed passed."
 } finally {
     $resolved = (Resolve-Path -LiteralPath $fixture).Path

@@ -4,7 +4,7 @@ Project evidence зберігається за AGENTS §34.5; цей докум�
 
 ## Persistence
 
-`AGENTS.md` — правила; `docs/ai-workflow/` — процес; `docs/plans/` — roadmap; `CURRENT.md` — handoff; append-only `history/YYYY-MM.md` — рішення; subsystem docs — contracts; `docs/releases/` — release facts.
+`AGENTS.md` — правила; `docs/ai-workflow/` — процес; `docs/plans/README.md` — продуктовий roadmap; `docs/plans/active/execution/` — DevStandard task plans; `CURRENT.md` — handoff; append-only `history/YYYY-MM.md` — рішення; subsystem docs — contracts; `docs/releases/` — release facts.
 
 Meaningful task синхронізує контекст у своєму implementation commit. Post-release archive/NEXT reset — окремий дозволений крок після live verification. Історичні acceptance записи не переписуються.
 

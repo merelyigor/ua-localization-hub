@@ -2,7 +2,7 @@
 
 ## План і ризик
 
-Перед редагуванням зафіксувати проблему, baseline, scope, ризик, інваріанти, етапи та критерії успіху. Для малої задачі достатньо плану в сесії; для роботи між сесіями використовувати canonical `docs/plans/`.
+Перед редагуванням зафіксувати проблему, baseline, scope, ризик, інваріанти, етапи та критерії успіху. Для малої задачі достатньо плану в сесії; багатокрокову/ризикову задачу вести через DevStandard у `docs/plans/active/execution/`. Продуктова roadmap лишається окремою в `docs/plans/README.md`.
 
 | Ризик | Приклади | Перевірки |
 |---|---|---|
@@ -11,6 +11,10 @@
 | Високий | game mutation, recovery/migration, updater, package selection, security | письмові інваріанти, synthetic E2E, failure/rollback/cancellation/restart за застосовністю, Code gates, окремий pre-commit review у Codex |
 
 Мінімальні технічні рішення в межах мети агент приймає сам. Матеріальне розширення мети, несумісний контракт поза задачею або невідновну дію з реальними даними повернути Owner.
+
+DevStandard створює план зі статусом `draft`; лише пряме схвалення Owner саме цього плану дозволяє статус `approved`. Після схвалення режим `autonomous` дозволяє працювати самостійно тільки всередині його Scope. Перед стартом `plan.py status` вимагає чистого дерева поза планом; ніколи не stash/clean/commit чужі чи review-файли, а відмову пояснити Owner.
+
+Для фаз плану або суттєвих незалежних пакетів застосовувати Brygada, коли поточна Codex-сесія надає сумісний native subagent tool. Головна сесія володіє планом, приймає diff/Verify, переглядає findings і лишається відповідальною. Якщо сумісного інструмента немає, виконати фазу самому й записати fallback.
 
 ## Етапи
 
@@ -21,8 +25,9 @@
 4. Запустити focused tests і harness; виправити failures, не маскувати їх skip або слабшими assertions.
 5. Перевірити фінальний diff за [REVIEW.md](REVIEW.md); після correction знову перевірити affected behavior.
    Перед твердженням про завершення застосувати verification-before-completion; зберегти actual command/exit/output evidence, а не лише звіт іншого агента.
-6. Якщо task не local-only/pre-commit: stage тільки intended files, повторити `scripts/Check-RepositorySafety.ps1` та `git diff --cached --check`, оглянути staged diff, commit/push і дочекатися normal CI на точному SHA.
-7. Звітувати completed або конкретний blocker із доказами. Продовжувати вже дозволені залежні кроки без нового prompt.
+6. Git hooks локально запускають staged safety/diff checks перед commit та Docs/Code profile перед push. У Windows Codex запускай Git-команди `commit`/`push` через Git Bash: PowerShell runner не може створити дочірній hook-процес (`Function not implemented`); hook-wrapper передає перевірки Windows PowerShell. Hosted CI лишається незалежним обов'язковим exact-SHA gate; ніколи не обходити hook через `--no-verify`.
+7. Якщо task не local-only/pre-commit: stage тільки intended files, повторити `scripts/Check-RepositorySafety.ps1` та `git diff --cached --check`, оглянути staged diff, commit/push і дочекатися normal CI на точному SHA.
+8. Звітувати completed або конкретний blocker із доказами. Продовжувати вже дозволені залежні кроки без нового prompt.
 
 ## Команди
 

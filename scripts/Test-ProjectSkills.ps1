@@ -44,7 +44,8 @@ try {
     $lock.skills[0].files[0].path = 'SKILL.md'
     $lock.skills += @{ name = 'second-skill'; source_path = 'plugins/merely/skills/second-skill'; files = @(@{ path = 'SKILL.md'; sha256 = $hash }) }
     $lock | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $lockPath -Encoding utf8
-    Assert-True 'partial installation cannot silently pass' ((Invoke-Check) -ne 0)
+    Assert-True 'valid partial installation is verified but not considered complete' ((Invoke-Check) -eq 0 -and
+        (Invoke-Check -Required) -ne 0)
     $lock.skills = @($lock.skills[0], $lock.skills[0])
     $lock | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $lockPath -Encoding utf8
     Assert-True 'duplicate manifest identities rejected' ((Invoke-Check) -ne 0)
@@ -70,10 +71,11 @@ p=argparse.ArgumentParser()
 p.add_argument('--repo');p.add_argument('--ref');p.add_argument('--method');p.add_argument('--dest');p.add_argument('--path',nargs='+')
 a=p.parse_args()
 assert a.repo=='fixture/source' and a.ref=='a'*40 and a.method=='git'
-assert a.path==['plugins/merely/skills/fixture-skill']
-target=Path(a.dest)/'fixture-skill'
-target.mkdir(parents=True)
-(target/'SKILL.md').write_bytes(b'# Synthetic skill\n')
+for source in a.path:
+    name=source.rsplit('/',1)[1]
+    target=Path(a.dest)/name
+    target.mkdir(parents=True)
+    (target/'SKILL.md').write_bytes(b'# Synthetic skill\n')
 (Path(__file__).parent/'installer-called').write_text('once')
 '@
     [IO.File]::WriteAllText($installer, $installerText)
@@ -83,6 +85,18 @@ target.mkdir(parents=True)
     [IO.File]::WriteAllText($installer, "raise RuntimeError('must not run twice')")
     & pwsh -NoProfile -File $restore -Repository fixture/source -InstallerPath $installer | Out-Host
     Assert-True 'verified restoration is idempotent and does not rerun installer' ($LASTEXITCODE -eq 0)
+    $previousSkill = [IO.File]::ReadAllText((Join-Path $directory 'SKILL.md'))
+    $lock.skills += @{ name = 'second-skill'; source_path = 'plugins/merely/skills/second-skill'; files = @(@{ path = 'SKILL.md'; sha256 = $hash }) }
+    $lock | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $lockPath -Encoding utf8
+    [IO.File]::WriteAllText($installer, $installerText)
+    & pwsh -NoProfile -File $restore -Repository fixture/source -InstallerPath $installer | Out-Host
+    Assert-True 'restoration adds a missing skill without overwriting a verified import' ($LASTEXITCODE -eq 0 -and
+        (Invoke-Check -Required) -eq 0 -and
+        [IO.File]::ReadAllText((Join-Path $directory 'SKILL.md')) -ceq $previousSkill -and
+        (Test-Path -LiteralPath (Join-Path $fixture '.agents/skills/second-skill/SKILL.md')))
+    Remove-Item -LiteralPath (Join-Path $fixture '.agents/skills/second-skill') -Recurse -Force
+    $lock.skills = @($lock.skills[0])
+    $lock | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $lockPath -Encoding utf8
     [IO.File]::WriteAllText((Join-Path $directory 'SKILL.md'), 'local changes')
     & pwsh -NoProfile -File $restore -Repository fixture/source -InstallerPath $installer *> $null
     Assert-True 'restoration rejects modified imports without overwriting' ($LASTEXITCODE -ne 0 -and
