@@ -14,14 +14,29 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Select .NET validation scope
+      id: scope
+      shell: pwsh
+      env:
+        GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: scripts/Select-CiDotNetValidation.ps1
+
+    - name: CI scope regression tests
+      shell: pwsh
+      run: scripts/Test-Select-CiDotNetValidation.ps1
 
     - name: Setup .NET 8
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
+      if: steps.scope.outputs.run_dotnet == 'true'
 
     - name: Restore
       run: dotnet restore BdoUaClient.sln
+      if: steps.scope.outputs.run_dotnet == 'true'
 
     - name: Workflow contract
       shell: pwsh
@@ -37,9 +52,17 @@ jobs:
 
     - name: Build
       run: dotnet build BdoUaClient.sln --configuration Release --no-restore -warnaserror
+      if: steps.scope.outputs.run_dotnet == 'true'
 
     - name: Test
       run: dotnet test BdoUaClient.sln --configuration Release --no-build
+      if: steps.scope.outputs.run_dotnet == 'true'
+
+    - name: Report skipped .NET validation scope
+      if: steps.scope.outputs.run_dotnet == 'false'
+      shell: pwsh
+      run: |
+        Write-Output 'Documentation/agent-only change: Release build and application tests remain available in local Code validation and are skipped on this CI run.'
 
     - name: Version resolver tests
       shell: pwsh

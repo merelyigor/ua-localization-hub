@@ -43,6 +43,9 @@ try {
 
     Copy-Item -LiteralPath (Join-Path $repoRoot 'AGENTS.md') -Destination $fixture
     Copy-Item -LiteralPath (Join-Path $repoRoot 'docs') -Destination $fixture -Recurse
+    New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts/Select-CiDotNetValidation.ps1') -Destination (Join-Path $fixture 'scripts')
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts/Test-Select-CiDotNetValidation.ps1') -Destination (Join-Path $fixture 'scripts')
     New-Item -ItemType Directory -Path (Join-Path $fixture '.codex') | Out-Null
     Copy-Item -LiteralPath (Join-Path $repoRoot '.codex/config.toml') -Destination (Join-Path $fixture '.codex/config.toml')
     $checker = Join-Path $PSScriptRoot 'Check-WorkflowContract.ps1'
@@ -63,7 +66,6 @@ try {
     Assert-True 'broken workflow link rejected' ($LASTEXITCODE -ne 0)
 
     # Негативний integration test: failed gate має зупинити runner й записати FAIL.
-    New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts') | Out-Null
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Invoke-ProjectValidation.ps1') -Destination (Join-Path $fixture 'scripts')
     [IO.File]::WriteAllText((Join-Path $fixture 'scripts/Check-WorkflowContract.ps1'), "exit 7`n")
     Push-Location $fixture
@@ -84,6 +86,8 @@ try {
         $report.steps.Count -eq 1 -and $report.steps[0].exit_code -eq 7)
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'Test-ProjectSkills.ps1') | Out-Host
     Assert-True 'project skill integration regression suite' ($LASTEXITCODE -eq 0)
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'Test-Select-CiDotNetValidation.ps1') | Out-Host
+    Assert-True 'CI .NET scope classifier regression suite' ($LASTEXITCODE -eq 0)
     Write-Output "Harness tests: $passed passed."
 } finally {
     $resolved = (Resolve-Path -LiteralPath $fixture).Path

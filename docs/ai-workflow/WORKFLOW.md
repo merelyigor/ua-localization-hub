@@ -32,7 +32,7 @@ pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code
 dotnet test BdoUaClient.sln -c Release --no-build --filter "<affected tests>"
 ```
 
-Docs — лише документація. Scripts/CI/config зміни потребують Code та власних негативних regression tests. Code включає Release build (0 warnings/errors), full tests, resolver/release-note tests, NEXT schema/render, workflow/portable rules, hygiene scan і diff-check. Scanner не замінює ручний secret/private огляд. Focused tests, exact-SHA CI й RC integrity не замінюються локальним harness.
+Docs — лише документація. Scripts/CI/config зміни потребують Code та власних негативних regression tests. Code включає Release build (0 warnings/errors), full tests, resolver/release-note tests, NEXT schema/render, workflow/portable rules, hygiene scan і diff-check. Обидва профілі локально виконують повний доречний набір. GitHub CI пропускає .NET restore/build/full tests лише коли всі зміни — Markdown/JSON/PNG усередині `docs/` або точно визначені root/agent-doc files; policy, safety, harness і release tooling gates лишаються. Будь-який app/test/build/workflow/script/unknown path, інший file type під `docs/`, невизначений diff чи manual run вимагає повного віддаленого .NET validation. RC завжди повний. Scanner не замінює ручний secret/private огляд. Focused tests, exact-SHA CI й RC integrity не замінюються локальним harness.
 
 ## Safety і відмови
 

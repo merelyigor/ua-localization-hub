@@ -5,7 +5,8 @@ $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $files = @('AGENTS.md', 'docs/ai-workflow/README.md', 'docs/ai-workflow/WORKFLOW.md',
     'docs/ai-workflow/ROLES.md', 'docs/ai-workflow/REVIEW.md', 'docs/ai-workflow/PROMPTS.md',
     'docs/ai-workflow/HANDOFF.md', 'docs/ai-workflow/PROJECT_CHAT_RULES.md',
-    'docs/ai-workflow/DOMAIN_RULES.md', 'docs/ai-workflow/SKILLS.md', 'docs/releases/README.md')
+    'docs/ai-workflow/DOMAIN_RULES.md', 'docs/ai-workflow/SKILLS.md', 'docs/releases/README.md',
+    'scripts/Select-CiDotNetValidation.ps1', 'scripts/Test-Select-CiDotNetValidation.ps1')
 
 foreach ($file in $files) {
     $path = Join-Path $root $file
