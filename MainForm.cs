@@ -120,6 +120,25 @@ public partial class MainForm : Form
         WindowsAutostartService autostartService,
         bool startInBackground,
         SingleInstanceCoordinator singleInstanceCoordinator)
+        : this(applicationConfigStore, gameCatalog, sessionHost, logger, appVersionInfo,
+            gitHubClient, selectionPolicy, appPaths, autostartService, startInBackground,
+            singleInstanceCoordinator, null)
+    {
+    }
+
+    internal MainForm(
+        ApplicationConfigStore applicationConfigStore,
+        GameCatalog gameCatalog,
+        SelectedGameSessionHost sessionHost,
+        ILogger logger,
+        AppVersionInfo appVersionInfo,
+        GitHubUpdateClient gitHubClient,
+        UpdateSelectionPolicy selectionPolicy,
+        AppPaths appPaths,
+        WindowsAutostartService autostartService,
+        bool startInBackground,
+        SingleInstanceCoordinator singleInstanceCoordinator,
+        IAppNotificationService? appNotificationService)
     {
         ArgumentNullException.ThrowIfNull(sessionHost);
         ArgumentNullException.ThrowIfNull(gameCatalog);
@@ -139,6 +158,7 @@ public partial class MainForm : Form
         _autostartService = autostartService;
         _startInBackground = startInBackground;
         _singleInstanceCoordinator = singleInstanceCoordinator;
+        _appNotificationService = appNotificationService;
 
         _updateSessionStore = new UpdateSessionStore(appPaths, logger);
         var manifestValidator = new UpdateManifestValidator(logger);
@@ -149,6 +169,11 @@ public partial class MainForm : Form
         InitializeComponent();
         _initialClientHeight = ClientSize.Height;
         InitializeTray();
+        if (_appNotificationService != null)
+        {
+            _appNotificationService.NotificationActivated += AppNotificationService_NotificationActivated;
+            _appNotificationService.NotificationFailed += AppNotificationService_NotificationFailed;
+        }
         rootScrollPanel.Resize += RootScrollPanel_Resize;
         ApplyTheme();
         InitializeGameSelector();
@@ -494,6 +519,9 @@ public partial class MainForm : Form
     internal int ModeSectionHeightForTest => modeGroupBox.Height;
     internal Func<CurrentRelease, bool>? GameTestConfirmationForTest { get; set; }
     internal Action<string>? LocalizationNotificationForTest { get; set; }
+    internal Action<AppNotificationContent>? AppNotificationForTest { get; set; }
+    internal void ObserveApplicationUpdateNotificationForTest(string? candidateTag)
+        => ObserveApplicationUpdateNotification(candidateTag);
     internal Func<string, string, bool>? WwmCompatibilityConfirmationForTest { get; set; }
     internal Func<CancellationToken, Task<WwmMutationResult>>? WwmInstallResultForTest { get; set; }
     internal string? SelectedModeCardStateTextForTest => modesFlowPanel.Controls
@@ -785,6 +813,16 @@ public partial class MainForm : Form
                 RequestOperationCancelForShutdown();
                 return;
         }
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        if (_appNotificationService != null)
+        {
+            _appNotificationService.NotificationActivated -= AppNotificationService_NotificationActivated;
+            _appNotificationService.NotificationFailed -= AppNotificationService_NotificationFailed;
+        }
+        base.OnFormClosed(e);
     }
 
     private void RequestOperationCancelForShutdown()

@@ -2,6 +2,10 @@
 
 Оновлено: 2026-10-19
 
+## Persistent Windows update notifications — IMPLEMENTED / VALIDATED
+
+Owner requested reliable notifications for Hub releases and BDO/WWM localization updates, including retention in Windows Notification Center. The v1.2.21 implementation replaces transient WinForms balloon tips with Windows toast notifications under a stable AUMID, logs Windows notification settings and lifecycle failures, and permits retry after a reported failure. Local Release build succeeded with 0 warnings/errors, full suite passed 1247/1247, focused notification tests passed 34/34, and the single-file publish workflow passed. Release facts and exact CI/artifact evidence will be recorded after the authorized publication. No real game files were touched. Windows may still suppress banners/history according to the user's notification/privacy settings.
+
 ## v1.2.20 — RELEASED / PUBLIC VERIFIED
 
 Owner-authorized stable test release for verifying application-update tray delivery to an already-running v1.2.19 client. No production code changed from v1.2.19. Normal CI #282 / run `39165996840` passed; RC #52 / run `39173763003` passed 1237/1237 tests and produced exact source-bound bundles. Release ID `416758893` was published at `2026-10-18T22:55:20Z`; tag `v1.2.20` peels to `507fc8031c74578af3d144341e1f1bee827c7c74`. At `2026-10-19 01:59:14` local time, the running v1.2.19 tray process selected v1.2.20 and the journal recorded `Tray notification shown event received`; Windows closed it at `01:59:20`. WWM remained current at v2.6.7, so no localization-update notification was expected. Release facts are archived in [`docs/releases/v1.2.20.md`](../releases/v1.2.20.md). `NEXT.json` was already the canonical empty schema-v1 state. No real game files were changed; no external Architect acceptance is claimed.

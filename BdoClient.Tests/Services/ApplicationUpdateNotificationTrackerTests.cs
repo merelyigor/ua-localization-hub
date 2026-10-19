@@ -30,12 +30,12 @@ public sealed class ApplicationUpdateNotificationTrackerTests
     }
 
     [Fact]
-    public void ConfirmedNotificationIsDeduplicated()
+    public void SubmittedNotificationIsDeduplicated()
     {
         var tracker = new ApplicationUpdateNotificationTracker();
 
         Assert.True(tracker.Observe("v1.2.1", canNotify: true));
-        tracker.MarkDelivered("v1.2.1");
+        tracker.MarkSubmitted("v1.2.1");
 
         Assert.False(tracker.Observe("v1.2.1", canNotify: true));
     }
@@ -49,6 +49,18 @@ public sealed class ApplicationUpdateNotificationTrackerTests
         Assert.True(tracker.Observe("v1.2.1", canNotify: true, now: firstAttempt));
         Assert.False(tracker.Observe("v1.2.1", canNotify: true, now: firstAttempt.AddSeconds(30)));
         Assert.True(tracker.Observe("v1.2.1", canNotify: true, now: firstAttempt.AddMinutes(3)));
+    }
+
+    [Fact]
+    public void WindowsFailureAfterQueueing_AllowsSameTagToRetry()
+    {
+        var tracker = new ApplicationUpdateNotificationTracker();
+
+        Assert.True(tracker.Observe("v1.2.1", canNotify: true));
+        tracker.MarkSubmitted("v1.2.1");
+        tracker.MarkFailed("v1.2.1");
+
+        Assert.True(tracker.Observe("v1.2.1", canNotify: true));
     }
 
     [Fact]

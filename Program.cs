@@ -149,6 +149,8 @@ static class Program
         var selectionPolicy = new UpdateSelectionPolicy(logger);
 
         var autostartService = new WindowsAutostartService(Application.ExecutablePath, logger);
+        using var appNotificationService = new WindowsAppNotificationService(logger);
+        appNotificationService.Register();
 
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -158,7 +160,7 @@ static class Program
             Application.Run(new MainForm(
                 applicationConfigStore, gameCatalog, gameSessionHost, logger,
                 appVersionInfo, gitHubClient, selectionPolicy, appPaths,
-                autostartService, startInBackground, coordinator));
+                autostartService, startInBackground, coordinator, appNotificationService));
         }
         catch (Exception ex)
         {

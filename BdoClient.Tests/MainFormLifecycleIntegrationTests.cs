@@ -17,6 +17,33 @@ namespace BdoClient.Tests;
 public sealed class MainFormLifecycleIntegrationTests
 {
     [Fact]
+    public async Task HiddenApplicationUpdate_QueuesPersistentNotificationContentOnce()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(), startInBackground: true);
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => !form.Visible);
+
+        var notification = new TaskCompletionSource<AppNotificationContent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var notificationCount = 0;
+        await fixture.SetAppNotificationObserverAsync(content =>
+        {
+            Interlocked.Increment(ref notificationCount);
+            notification.TrySetResult(content);
+        });
+        await fixture.TriggerApplicationUpdateNotificationAsync("v1.2.21");
+
+        var content = await notification.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("application_update", content.Type);
+        Assert.Equal("v1.2.21", content.Identity);
+        Assert.Contains("v1.2.21", content.Title, StringComparison.Ordinal);
+
+        await fixture.TriggerApplicationUpdateNotificationAsync("v1.2.21");
+        Assert.Equal(1, notificationCount);
+    }
+
+    [Fact]
     public async Task SwitchingSyntheticGame_DrainsOldSessionAndPersistsSelection()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
@@ -232,18 +259,20 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.RunWwmInstallAsync("ukrainian", "default");
         await fixture.WaitForAsync(form => form.WwmModeInstalledForTest("ukrainian", "default"));
 
-        var notification = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await fixture.SetLocalizationNotificationObserverAsync(message => notification.TrySetResult(message));
+        var notification = new TaskCompletionSource<AppNotificationContent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await fixture.SetAppNotificationObserverAsync(content => notification.TrySetResult(content));
         currentVersion = "v2.6.4";
 
         var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
         await session.Poller.RequestImmediatePollAsync();
 
-        var message = await notification.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Contains("Українська", message, StringComparison.Ordinal);
-        Assert.Contains("Where Winds Meet", message, StringComparison.Ordinal);
-        Assert.Contains("v2.6.4", message, StringComparison.Ordinal);
-        Assert.Contains("Відкрийте Хаб, щоб оновити", message, StringComparison.Ordinal);
+        var content = await notification.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("localization", content.Type);
+        Assert.StartsWith("wwm/ukrainian/default/", content.Identity, StringComparison.Ordinal);
+        Assert.Contains("Українська", content.Title, StringComparison.Ordinal);
+        Assert.Contains("Where Winds Meet", content.Body, StringComparison.Ordinal);
+        Assert.Contains("v2.6.4", content.Body, StringComparison.Ordinal);
+        Assert.Contains("Відкрийте Хаб, щоб оновити", content.Body, StringComparison.Ordinal);
         Assert.Contains(FindWwmModeCards(fixture.Form), card => card.ModeSlug == "ukrainian"
             && card.StateTextForTest == "Доступне оновлення");
     }
@@ -2955,6 +2984,32 @@ internal sealed class MainFormTestFixture : IDisposable
         {
             Form.LocalizationNotificationForTest = observer;
             completion.TrySetResult(null);
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task SetAppNotificationObserverAsync(Action<AppNotificationContent> observer)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(() =>
+        {
+            Form.AppNotificationForTest = observer;
+            completion.TrySetResult(null);
+        });
+        await completion.Task.WaitAsync(Timeout);
+    }
+
+    internal async Task TriggerApplicationUpdateNotificationAsync(string? tag)
+    {
+        var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        PostToUi(() =>
+        {
+            try
+            {
+                Form.ObserveApplicationUpdateNotificationForTest(tag);
+                completion.TrySetResult(null);
+            }
+            catch (Exception ex) { completion.TrySetException(ex); }
         });
         await completion.Task.WaitAsync(Timeout);
     }

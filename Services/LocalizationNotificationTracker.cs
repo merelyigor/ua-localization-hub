@@ -3,7 +3,7 @@ namespace BdoClient.Services;
 internal sealed class LocalizationNotificationTracker
 {
     private static readonly TimeSpan UnconfirmedRetryInterval = TimeSpan.FromMinutes(2);
-    private readonly HashSet<NotificationKey> _deliveredReleaseKeys = new();
+    private readonly HashSet<NotificationKey> _submittedReleaseKeys = new();
     private readonly Dictionary<NotificationKey, DateTimeOffset> _pendingReleaseKeys = new();
 
     public bool Observe(
@@ -26,7 +26,7 @@ internal sealed class LocalizationNotificationTracker
             return false;
 
         var key = new NotificationKey(gameId, modeKey, releaseIdentity);
-        if (_deliveredReleaseKeys.Contains(key))
+        if (_submittedReleaseKeys.Contains(key))
             return false;
 
         var currentTime = now ?? DateTimeOffset.UtcNow;
@@ -38,7 +38,7 @@ internal sealed class LocalizationNotificationTracker
         return true;
     }
 
-    public void MarkDelivered(string gameId, string modeKey, string releaseIdentity)
+    public void MarkSubmitted(string gameId, string modeKey, string releaseIdentity)
     {
         if (string.IsNullOrWhiteSpace(gameId)
             || string.IsNullOrWhiteSpace(modeKey)
@@ -47,7 +47,7 @@ internal sealed class LocalizationNotificationTracker
 
         var key = new NotificationKey(gameId, modeKey, releaseIdentity);
         _pendingReleaseKeys.Remove(key);
-        _deliveredReleaseKeys.Add(key);
+        _submittedReleaseKeys.Add(key);
     }
 
     public void MarkFailed(string gameId, string modeKey, string releaseIdentity)
@@ -57,7 +57,9 @@ internal sealed class LocalizationNotificationTracker
             || string.IsNullOrWhiteSpace(releaseIdentity))
             return;
 
-        _pendingReleaseKeys.Remove(new NotificationKey(gameId, modeKey, releaseIdentity));
+        var key = new NotificationKey(gameId, modeKey, releaseIdentity);
+        _pendingReleaseKeys.Remove(key);
+        _submittedReleaseKeys.Remove(key);
     }
 
     private readonly record struct NotificationKey(string GameId, string ModeKey, string ReleaseIdentity);

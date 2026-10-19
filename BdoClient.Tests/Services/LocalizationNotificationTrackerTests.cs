@@ -132,9 +132,21 @@ public sealed class LocalizationNotificationTrackerTests
         Assert.True(tracker.Observe("wwm", "english-terms/english_terms", "sha-b",
             updateAvailable: true, canNotify: true, now: firstAttempt.AddMinutes(3)));
 
-        tracker.MarkDelivered("wwm", "english-terms/english_terms", "sha-b");
+        tracker.MarkSubmitted("wwm", "english-terms/english_terms", "sha-b");
         Assert.False(tracker.Observe("wwm", "english-terms/english_terms", "sha-b",
             updateAvailable: true, canNotify: true, now: firstAttempt.AddMinutes(4)));
+    }
+
+    [Fact]
+    public void WindowsFailureAfterQueueing_AllowsSameReleaseToRetry()
+    {
+        var tracker = new LocalizationNotificationTracker();
+
+        Assert.True(tracker.Observe("wwm", "ukrainian/default", "sha-b", updateAvailable: true, canNotify: true));
+        tracker.MarkSubmitted("wwm", "ukrainian/default", "sha-b");
+        tracker.MarkFailed("wwm", "ukrainian/default", "sha-b");
+
+        Assert.True(tracker.Observe("wwm", "ukrainian/default", "sha-b", updateAvailable: true, canNotify: true));
     }
 
     [Fact]

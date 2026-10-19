@@ -12,7 +12,7 @@ public partial class MainForm
     private ToolStripMenuItem _autostartMenuItem = null!;
     private bool _explicitExitRequested;
     private Icon? _trayIcon;
-    private TrayNotificationAttempt? _pendingTrayNotification;
+    private readonly IAppNotificationService? _appNotificationService;
 
     private readonly WindowsAutostartService _autostartService;
     private readonly bool _startInBackground;
@@ -74,9 +74,6 @@ public partial class MainForm
         _notifyIcon.Icon = _trayIcon ?? SystemIcons.Application;
 
         _notifyIcon.DoubleClick += (_, _) => RestoreFromTray();
-        _notifyIcon.BalloonTipShown += (_, _) => OnTrayNotificationShown();
-        _notifyIcon.BalloonTipClosed += (_, _) => OnTrayNotificationClosed();
-        _notifyIcon.BalloonTipClicked += (_, _) => OnTrayNotificationClicked();
 
         // Registered before MainForm_Shown so the form is moved to tray first on
         // background startup, while the normal async startup pipeline still runs after.
@@ -130,20 +127,18 @@ public partial class MainForm
             return;
         }
 
-        var versionText = string.IsNullOrWhiteSpace(releaseVersion) ? string.Empty : $" до {releaseVersion}";
-        var message = $"Для «{modeName}» у {_selectedGame.DisplayName} доступне оновлення{versionText}. Відкрийте Хаб, щоб оновити.";
+        var content = AppNotificationContent.ForLocalizationUpdate(
+            gameId, modeKey, modeName, _selectedGame.DisplayName, releaseIdentity, releaseVersion);
         if (LocalizationNotificationForTest is { } notificationObserver)
         {
-            notificationObserver(message);
-            _localizationNotificationTracker.MarkDelivered(gameId, modeKey, releaseIdentity);
+            notificationObserver(content.Body);
+            _localizationNotificationTracker.MarkSubmitted(gameId, modeKey, releaseIdentity);
             return;
         }
 
-        RequestTrayNotification(
-            "localization",
-            $"{gameId}/{modeKey}/{releaseIdentity}",
-            message,
-            () => _localizationNotificationTracker.MarkDelivered(gameId, modeKey, releaseIdentity),
+        RequestAppNotification(
+            content,
+            () => _localizationNotificationTracker.MarkSubmitted(gameId, modeKey, releaseIdentity),
             () => _localizationNotificationTracker.MarkFailed(gameId, modeKey, releaseIdentity));
     }
 
@@ -160,11 +155,10 @@ public partial class MainForm
             return;
         }
 
-        RequestTrayNotification(
-            "application_update",
-            candidateTag!,
-            $"Доступна нова версія «{ApplicationBrand.DisplayName}» {candidateTag}. Відкрийте застосунок, щоб оновитися.",
-            () => _applicationUpdateNotificationTracker.MarkDelivered(candidateTag),
+        var content = AppNotificationContent.ForApplicationUpdate(candidateTag!);
+        RequestAppNotification(
+            content,
+            () => _applicationUpdateNotificationTracker.MarkSubmitted(candidateTag),
             () => _applicationUpdateNotificationTracker.MarkFailed(candidateTag));
     }
 
@@ -178,91 +172,90 @@ public partial class MainForm
         return null;
     }
 
-    private void RequestTrayNotification(string type, string identity, string message,
+    private void RequestAppNotification(AppNotificationContent content,
         Action markDelivered, Action markFailed)
     {
-        var now = DateTimeOffset.UtcNow;
-        if (_pendingTrayNotification is { } previous)
+        if (AppNotificationForTest is { } notificationObserver)
         {
-            if (now - previous.RequestedAt < TimeSpan.FromMinutes(2))
+            notificationObserver(content);
+            markDelivered();
+            return;
+        }
+
+        if (_appNotificationService == null || !_appNotificationService.IsRegistered)
+        {
+            markFailed();
+            _logger.Warning($"Windows app notification unavailable: type={content.Type} identity={content.Identity} reason=service_not_registered.");
+            return;
+        }
+
+        if (_appNotificationService.TryShow(content.Type, content.Identity, content.Title, content.Body))
+        {
+            markDelivered();
+            _logger.Info($"Update notification queued in Windows Action Center: type={content.Type} identity={content.Identity}.");
+        }
+        else
+        {
+            markFailed();
+            _logger.Warning($"Update notification was not queued in Windows Action Center: type={content.Type} identity={content.Identity}; it remains eligible for retry.");
+        }
+    }
+
+    private void AppNotificationService_NotificationActivated(string? arguments)
+    {
+        if (IsDisposed || Disposing || _closing)
+            return;
+
+        _logger.Info($"Opening Hub after Windows notification activation: arguments={arguments}.");
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(RestoreFromTray));
+            return;
+        }
+
+        RestoreFromTray();
+    }
+
+    private void AppNotificationService_NotificationFailed(string type, string identity)
+    {
+        void MarkRetryable()
+        {
+            if (IsDisposed || Disposing)
+                return;
+
+            if (string.Equals(type, "application_update", StringComparison.Ordinal))
             {
-                markFailed();
-                _logger.Debug($"Tray notification deferred: type={type} identity={identity} reason=another_request_unresolved.");
+                _applicationUpdateNotificationTracker.MarkFailed(identity);
                 return;
             }
 
-            if (!previous.Shown)
+            if (!string.Equals(type, "localization", StringComparison.Ordinal))
+                return;
+
+            var firstSeparator = identity.IndexOf('/');
+            var lastSeparator = identity.LastIndexOf('/');
+            if (firstSeparator <= 0 || lastSeparator <= firstSeparator || lastSeparator == identity.Length - 1)
             {
-                previous.MarkFailed();
-                _logger.Warning($"Tray notification was not acknowledged by Windows within two minutes: type={previous.Type} identity={previous.Identity}; retrying.");
+                _logger.Warning("Failed Windows localization notification has an invalid identity; automatic retry cannot be scheduled.");
+                return;
             }
-            else
-            {
-                _logger.Debug($"Tray notification closed without a close event before next request: type={previous.Type} identity={previous.Identity}.");
-            }
+
+            _localizationNotificationTracker.MarkFailed(
+                identity[..firstSeparator],
+                identity[(firstSeparator + 1)..lastSeparator],
+                identity[(lastSeparator + 1)..]);
         }
 
-        _pendingTrayNotification = new TrayNotificationAttempt(type, identity, now, markDelivered, markFailed);
-        _logger.Info($"Tray notification request: type={type} identity={identity}.");
-        try
-        {
-            _notifyIcon.ShowBalloonTip(5000, ApplicationBrand.DisplayName, message, ToolTipIcon.Info);
-        }
-        catch (Exception ex)
-        {
-            _pendingTrayNotification = null;
-            markFailed();
-            _logger.Warning($"Tray notification request failed: type={type} identity={identity} error={ex.Message}");
-        }
-    }
+        if (IsDisposed || Disposing)
+            return;
 
-    private void OnTrayNotificationShown()
-    {
-        if (_pendingTrayNotification is not { } attempt)
+        if (InvokeRequired)
         {
-            _logger.Info("Tray notification shown event received without a pending request.");
+            BeginInvoke(new Action(MarkRetryable));
             return;
         }
 
-        attempt.Shown = true;
-        attempt.MarkDelivered();
-        _logger.Info($"Tray notification shown event received: type={attempt.Type} identity={attempt.Identity}.");
-    }
-
-    private void OnTrayNotificationClosed()
-    {
-        if (_pendingTrayNotification is not { } attempt)
-        {
-            _logger.Debug("Tray notification closed event received without a pending request.");
-            return;
-        }
-
-        attempt.MarkDelivered();
-        _pendingTrayNotification = null;
-        _logger.Info($"Tray notification closed by Windows: type={attempt.Type} identity={attempt.Identity}.");
-    }
-
-    private void OnTrayNotificationClicked()
-    {
-        if (_pendingTrayNotification is not { } attempt)
-        {
-            _logger.Info("Tray notification clicked event received without a pending request.");
-            return;
-        }
-
-        attempt.MarkDelivered();
-        _pendingTrayNotification = null;
-        _logger.Info($"Tray notification clicked: type={attempt.Type} identity={attempt.Identity}.");
-    }
-
-    private sealed record TrayNotificationAttempt(
-        string Type,
-        string Identity,
-        DateTimeOffset RequestedAt,
-        Action MarkDelivered,
-        Action MarkFailed)
-    {
-        public bool Shown { get; set; }
+        MarkRetryable();
     }
 
     private void RegisterSecondaryActivationListener()
