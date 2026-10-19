@@ -4,6 +4,8 @@
 
 Чинний процес — **CODEX-OWNED**: дозволені задачі плануються, реалізуються й перевіряються в Codex без обов'язкового зовнішнього архітектора. Internal review та automated gates описані в `docs/ai-workflow/`; історичні acceptance записи не змінюються. Process/harness sync не авторизує новий продуктовий етап.
 
+Selected local skills і короткий root routing описані в `docs/ai-workflow/SKILLS.md`; поточні active/backlog/archive плани та один PRIMARY збережені. Інший planning framework і перенесення CI в local-only hooks не застосовуються.
+
 **Primary:** `localization-hub-multigame`
 **Current phase:** v1.2.21 — RELEASED / PUBLIC VERIFIED
 **Next:** OWNER DECISION REQUIRED.

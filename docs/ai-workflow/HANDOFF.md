@@ -1,6 +1,6 @@
-# Звіт і передача контексту
+# Передача контексту
 
-Повідомити результат, зміни/причину, focused/full validation із counts/exit codes, internal review findings/limitations, commit/parent/branch/push та exact-SHA CI. Невиконані перевірки й scope назвати прямо. Для release додати source/run IDs, tag/artifact/public hashes і finalization.
+Project evidence зберігається за AGENTS §34.5; цей документ визначає persistence, а не форму відповіді.
 
 ## Persistence
 

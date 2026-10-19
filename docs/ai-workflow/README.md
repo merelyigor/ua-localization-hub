@@ -26,6 +26,8 @@
 - [PROMPTS.md](PROMPTS.md) — контракт задачі.
 - [HANDOFF.md](HANDOFF.md) — звіт і передача контексту.
 - [PROJECT_CHAT_RULES.md](PROJECT_CHAT_RULES.md) — переносний bootstrap до 7500 UTF-16 code units.
+- [SKILLS.md](SKILLS.md) — selected local skills, triggers, hashes та відновлення без plugin hooks.
+- [DOMAIN_RULES.md](DOMAIN_RULES.md) — повні умовні technical contracts зі збереженою нумерацією §.
 - [Процедура релізу](../releases/README.md) — publication authority, RC і finalization.
 
 ## Harness
@@ -37,6 +39,6 @@ pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code
 
 Docs — суто документація. Code — код/tests/scripts/CI/config, включно з Release build/full tests. Команда не commit/push-ить, не запускає застосунок і не публікує. Focused regressions обираються за affected flow. Звіт із SHA/exit codes зберігається в ignored `artifacts/validation/`; він не є автоматичним acceptance.
 
-Проєктний `.codex/config.toml` збільшує instruction budget до 128 KiB, бо `AGENTS.md` перевищує default 32 KiB. Налаштування завантажується підтримуваними клієнтами для trusted project з наступної сесії. Не змінює глобальні permissions, модель, credentials чи sandbox. Якщо клієнт його не підтримує, mandatory docs читаються явно. [Офіційна документація](https://developers.openai.com/codex/guides/agents-md).
+Кореневий AGENTS.md скорочено до budget 32 KiB; повні technical contracts читаються за scoped routing. Preservation gate перевіряє всі 43 перенесені розділи та root safety/commit paragraphs. Project config не змінює глобальні permissions, модель або credentials. [Офіційна документація](https://developers.openai.com/codex/guides/agents-md).
 
 Реальні game files не є тестовою fixture. Публікація потребує Owner intent. Історичний external acceptance не приписується внутрішньому review.

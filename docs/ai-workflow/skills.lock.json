@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "source_revision": "2129873a37e0896403afafea6163f828e4e7465c",
+  "skills": [
+    {
+      "name": "report-format",
+      "source_path": "plugins/merely/skills/report-format",
+      "files": [
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "6f15659bdb8ba085f7c331f7583fda67bacd236d743395d6f747f4efdce47e1d"
+        },
+        {
+          "path": "assets/report-format.md",
+          "sha256": "3d883932b54f772b613190f3f2b97d44c4faf939c8b5a8300c6543318d2a2bce"
+        },
+        {
+          "path": "references/changing-the-format.md",
+          "sha256": "69a634dfdc24567163cb2384ba3c1899a8185651e16f11b04c4add65f81cecca"
+        },
+        {
+          "path": "references/checker-output.md",
+          "sha256": "e6cbd54c3b88ee312e9e1819d51a04ddb077375249345a06c751b6b70a70ce11"
+        },
+        {
+          "path": "references/enforcers.md",
+          "sha256": "7a523a6de9491b4034e619421d763e2a5bd0d2a0b6c76b700c0b0843d86b9bb4"
+        },
+        {
+          "path": "references/rule-classes.md",
+          "sha256": "b6527d35a003d7a281b90e7abb3b928515d4262fa6fe84a5b561425983a68637"
+        },
+        {
+          "path": "scripts/report_format_check.py",
+          "sha256": "9f6199ccb0f96ffa54dfaa49a846a9b20d76bec0e20f202fd8a2c1bebee28457"
+        },
+        {
+          "path": "SKILL.md",
+          "sha256": "6bc4f77dcea1d41bd9453653fe9e055df127fff23e640998a8f972a7aa2c8743"
+        }
+      ]
+    },
+    {
+      "name": "systematic-debugging",
+      "source_path": "plugins/merely/skills/systematic-debugging",
+      "files": [
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "fdee71c45dbb06469391b2fd77041d4441240e12afb201371f6df0121308281b"
+        },
+        {
+          "path": "references/condition-based-waiting.md",
+          "sha256": "9d861723683bb236d46ef9b06bc5ded143505848d3ca2825346be11a56fafd4f"
+        },
+        {
+          "path": "references/defense-in-depth.md",
+          "sha256": "f9ec9d93732be5dc722b6c37aa5ce809fb333f604e778a96827541873d823e89"
+        },
+        {
+          "path": "references/root-cause-tracing.md",
+          "sha256": "5025ba40e274426e744eff92724cf4301d702dd8b891027c94fa7579f8f4e587"
+        },
+        {
+          "path": "SKILL.md",
+          "sha256": "f7e06b8f2ee0e478219a224e4b67d7d81be2561eb87e934c9b3008c8ef4d11f2"
+        }
+      ]
+    },
+    {
+      "name": "adversarial-review",
+      "source_path": "plugins/merely/skills/adversarial-review",
+      "files": [
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "6ed8917bf9b87b78674fe8d99bc92a4b16c8e3e72d4562049dd5a273c2844594"
+        },
+        {
+          "path": "SKILL.md",
+          "sha256": "b69dc7b5603906207930045d36af83923e6997c6e662c237e7f1ce301581968c"
+        }
+      ]
+    },
+    {
+      "name": "verification-before-completion",
+      "source_path": "plugins/merely/skills/verification-before-completion",
+      "files": [
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "a9b380eb313d65599ac31f41d352dbc458416d0b485612aebbfcedca01612f65"
+        },
+        {
+          "path": "SKILL.md",
+          "sha256": "da924540230beb86e0305f5dc7b3437c6bc61955c62048e84b89762d5f3f045c"
+        }
+      ]
+    },
+    {
+      "name": "test-quality-audit",
+      "source_path": "plugins/merely/skills/test-quality-audit",
+      "files": [
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "b227434d4e0ebc55ee0a4e1230a37e7a79eb2eebaad758c995479db25a8bf345"
+        },
+        {
+          "path": "SKILL.md",
+          "sha256": "dac62d97b35cccafcf4baa888812784566d7cf1629012538bdcf238bc5cc6c0e"
+        }
+      ]
+    },
+    {
+      "name": "agent-rules-optimizer",
+      "source_path": "plugins/merely/skills/agent-rules-optimizer",
+      "files": [
+        {
+          "path": "agents/openai.yaml",
+          "sha256": "520fade409969145fafa3389a1423f79352c66e5576caca1ffd8ee30039f2598"
+        },
+        {
+          "path": "references/audit-checklist.md",
+          "sha256": "cf7d468beb83c35145911621889b7dc99f7a970d550fe8dd83adfb3014131d5d"
+        },
+        {
+          "path": "references/canonical-rules-file.md",
+          "sha256": "5c7b0ba1b3f0b516a7b13794b1fa03a8f3ad8362d42501550f0f7250e1c01fb3"
+        },
+        {
+          "path": "references/classification.md",
+          "sha256": "2c07a571cd8bb83693be3306337ebd3b3219ae925e4a9d0ab2e2388e4f7c8531"
+        },
+        {
+          "path": "references/client-chains.md",
+          "sha256": "885890d19c7a1e5af66858f68d68c4a0a036bffc611c5fa1a99a675388b0edfa"
+        },
+        {
+          "path": "references/do-not-touch.md",
+          "sha256": "2cbd1f6c7ac649d8a9561ae4e434cdd712415c1be7160ddc756b349ec5b97faf"
+        },
+        {
+          "path": "references/dry-run.md",
+          "sha256": "d55e702b52a634c87ed62059d0b4fbcf9d1510c31a09399d315a1ccc2324099a"
+        },
+        {
+          "path": "scripts/check_ledger.py",
+          "sha256": "28e77a506eb8874114d90b64c498d89274e4f4a05c711a838ebbe94bc60a9f0d"
+        },
+        {
+          "path": "scripts/check_rule_refs.py",
+          "sha256": "423a0be4011f70d8b803ee748753a5f618a4ff2dec512bba3ffa97bc4788d5f8"
+        },
+        {
+          "path": "SKILL.md",
+          "sha256": "66bb5561fa188cab4fd560d30f36824e50cc60cd7c7409cc8eab5f6b1516d5d7"
+        }
+      ]
+    }
+  ]
+}

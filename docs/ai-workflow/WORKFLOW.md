@@ -16,9 +16,11 @@
 
 1. Перевірити контекст, baseline і status; зберегти чужі зміни.
 2. Дослідити повний affected flow, додати regression для дефекту.
+   Для ще не доведеної причини використати локальний systematic-debugging за [SKILLS.md](SKILLS.md); reproduction має відтворювати справжній lifecycle gate.
 3. Реалізувати мінімальну зміну; синхронізувати contracts/CURRENT/journal/plans. NEXT змінювати лише для public-facing змін.
 4. Запустити focused tests і harness; виправити failures, не маскувати їх skip або слабшими assertions.
 5. Перевірити фінальний diff за [REVIEW.md](REVIEW.md); після correction знову перевірити affected behavior.
+   Перед твердженням про завершення застосувати verification-before-completion; зберегти actual command/exit/output evidence, а не лише звіт іншого агента.
 6. Якщо task не local-only/pre-commit: stage тільки intended files, повторити `scripts/Check-RepositorySafety.ps1` та `git diff --cached --check`, оглянути staged diff, commit/push і дочекатися normal CI на точному SHA.
 7. Звітувати completed або конкретний blocker із доказами. Продовжувати вже дозволені залежні кроки без нового prompt.
 

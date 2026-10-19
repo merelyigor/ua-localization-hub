@@ -10,6 +10,8 @@ Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 Чинний workflow — **CODEX-OWNED**: planning/implementation/internal review у Codex, automated risk-based gates, без обов'язкового зовнішнього архітектора. Це process-only рішення Owner; історичні external acceptance залишаються фактами. Stage 8B не авторизований, новий Stage не створюється. Деталі: `docs/ai-workflow/README.md`.
 
+Owner-authorized skills/rules follow-up підключає лише локальні report/debug/review/verification/audit/optimizer resources; safety, CI й release contract збережені. Повні нумеровані contracts — `docs/ai-workflow/DOMAIN_RULES.md`, registry планів не мігрує в іншу структуру.
+
 ## Goal
 
 Перетворити BDO-UA Client на один Windows launcher/hub для кількох незалежних ігор із локалізаціями. Поточна публічна назва застосунку — `Хаб Українізаторів BDO - WWM`. Production catalog містить Black Desert Online та Windows multi-layout Where Winds Meet із окремими game-specific API/install boundaries.

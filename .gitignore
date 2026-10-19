@@ -33,3 +33,6 @@ Thumbs.db
 
 ## User-specific
 appsettings.Local.json
+
+## Private project-local skill imports (restored from a pinned source)
+.agents/skills/

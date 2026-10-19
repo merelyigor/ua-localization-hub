@@ -4,6 +4,8 @@
 
 Прочитай `AGENTS.md`, `docs/ai-workflow/README.md`, `docs/development/CURRENT.md`; перевір baseline/branch/status/diff і relevant plan/contracts/source/tests. Архівні pending-review записи не є новим gate.
 
+Scoped technical contracts — `docs/ai-workflow/DOMAIN_RULES.md`; перед зміною області прочитай relevant § за root routing. Selected skills/triggers та privacy/fallback — `docs/ai-workflow/SKILLS.md`; imports не є залежністю CI й не дозволяють змінювати safety або release gates.
+
 Визнач scope, ризик, інваріанти, план і критерії успіху. Низький ризик — self-review; середній — focused regressions/review; високий — synthetic failure/rollback/restart tests та окремий внутрішній pre-commit review агентом Codex. Якщо delegation недоступне, виконай adversarial pass і назви обмеження. BLOCKER/IMPORTANT або failed mandatory gate блокують залежні кроки.
 
 `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs` — суто docs.

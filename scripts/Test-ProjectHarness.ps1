@@ -24,6 +24,7 @@ try {
     Assert-True 'private config filename rejected' ((Invoke-Safety 'config.json').Code -ne 0)
     Assert-True 'generated binary filename rejected' ((Invoke-Safety 'artifacts/output.exe').Code -ne 0)
     Assert-True 'review patch filename rejected' ((Invoke-Safety 'review.patch').Code -ne 0)
+    Assert-True 'private skill source cannot be tracked' ((Invoke-Safety '.agents/skills/private/SKILL.md').Code -ne 0)
     Assert-True 'path escape rejected' ((Invoke-Safety '../outside.md').Code -ne 0)
 
     $owned = Join-Path $fixture 'owned'
@@ -47,6 +48,12 @@ try {
     $checker = Join-Path $PSScriptRoot 'Check-WorkflowContract.ps1'
     & pwsh -NoProfile -File $checker -RepositoryRoot $fixture | Out-Host
     Assert-True 'current policy/links/instruction budget valid' ($LASTEXITCODE -eq 0)
+    $domainPath = Join-Path $fixture 'docs/ai-workflow/DOMAIN_RULES.md'
+    $originalDomain = [IO.File]::ReadAllText($domainPath)
+    [IO.File]::WriteAllText($domainPath, $originalDomain.Replace('§13.10 WWM', '§13.10 Unsafe WWM'))
+    & pwsh -NoProfile -File $checker -RepositoryRoot $fixture *> $null
+    Assert-True 'changed game safety paragraph fails preservation gate' ($LASTEXITCODE -ne 0)
+    [IO.File]::WriteAllText($domainPath, $originalDomain)
     [IO.File]::WriteAllText((Join-Path $fixture '.codex/config.toml'), 'project_doc_max_bytes = 1')
     & pwsh -NoProfile -File $checker -RepositoryRoot $fixture *> $null
     Assert-True 'truncated instruction budget rejected' ($LASTEXITCODE -ne 0)
@@ -75,6 +82,8 @@ try {
     $report = [IO.File]::ReadAllText($reports[0].FullName) | ConvertFrom-Json
     Assert-True 'failure report records exact exit and stops later gates' ($report.result -eq 'FAIL' -and
         $report.steps.Count -eq 1 -and $report.steps[0].exit_code -eq 7)
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'Test-ProjectSkills.ps1') | Out-Host
+    Assert-True 'project skill integration regression suite' ($LASTEXITCODE -eq 0)
     Write-Output "Harness tests: $passed passed."
 } finally {
     $resolved = (Resolve-Path -LiteralPath $fixture).Path

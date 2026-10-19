@@ -47,7 +47,8 @@ try {
         }
         if ($relative -match '(?i)(^|[/\\])(?:\.env(?:\..*)?|config\.json|appsettings\.Local\.json)$' -or
             $relative -match '(?i)\.(?:pem|key|pfx|p12|log|patch|exe|dll|zip|7z)$' -or
-            $relative -match '(?i)(^|[/\\])(?:bin|obj|artifacts|TestResults)[/\\]') {
+            $relative -match '(?i)(^|[/\\])(?:bin|obj|artifacts|TestResults)[/\\]' -or
+            $relative -match '(?i)^\.agents[/\\]skills[/\\]') {
             throw "Private/generated/review artifact must not be tracked: $relative"
         }
         if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
