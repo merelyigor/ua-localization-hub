@@ -3,7 +3,7 @@
 ## Current focus
 
 **Primary:** `localization-hub-multigame`
-**Current phase:** v1.2.20 — RELEASED / PUBLIC VERIFIED
+**Current phase:** v1.2.21 — RELEASED / PUBLIC VERIFIED
 **Next:** OWNER DECISION REQUIRED.
 **Implementation authorization:** NONE. No Stage 11C; Stage 8B is OPTIONAL / NOT STARTED.
 
@@ -11,11 +11,11 @@
 
 | Focus | ID | Plan | Current phase | Next |
 |---|---|---|---|---|
-| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.20 — released | OWNER DECISION REQUIRED |
+| PRIMARY | `localization-hub-multigame` | [active/localization-hub-multigame.md](active/localization-hub-multigame.md) | v1.2.21 — released | OWNER DECISION REQUIRED |
 
-Release cycles through `v1.2.20` are published and archived. Owner explicitly waived Architect review for v1.2.15–v1.2.19; v1.2.20 was an Owner-authorized notification test. No external acceptance is claimed for these releases.
+Release cycles through `v1.2.21` are published and archived. Owner explicitly waived Architect review for v1.2.15–v1.2.19 and v1.2.21; v1.2.20 was an Owner-authorized notification test. No external acceptance is claimed for v1.2.21.
 
-Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.20 is published stable as Release ID `416758893`, tag peeling to `507fc8031c74578af3d144341e1f1bee827c7c74`; its tray update notification was confirmed by the running v1.2.19 process log. Stage 8B remains OPTIONAL / NOT STARTED. No implementation work is authorized; no Stage 11C is introduced.
+Stage 9/10/11A/11B and prior accepted compatibility/migration corrections remain REVIEWED / ACCEPTED. v1.2.21 is published stable as Release ID `416789267` from source `2927fbfb1eba12b69c073299e2f68d44f42a463a`; facts are archived in `docs/releases/v1.2.21.md`. Stage 8B remains OPTIONAL / NOT STARTED. No implementation work is authorized; no Stage 11C is introduced.
 
 ## Backlog
 

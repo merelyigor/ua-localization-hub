@@ -2,9 +2,9 @@
 
 Оновлено: 2026-10-19
 
-## Persistent Windows update notifications — IMPLEMENTED / VALIDATED
+## v1.2.21 — RELEASED / PUBLIC VERIFIED
 
-Owner requested reliable notifications for Hub releases and BDO/WWM localization updates, including retention in Windows Notification Center. The v1.2.21 implementation replaces transient WinForms balloon tips with Windows toast notifications under a stable AUMID, logs Windows notification settings and lifecycle failures, and permits retry after a reported failure. Local Release build succeeded with 0 warnings/errors, full suite passed 1247/1247, focused notification tests passed 34/34, and the single-file publish workflow passed. Release facts and exact CI/artifact evidence will be recorded after the authorized publication. No real game files were touched. Windows may still suppress banners/history according to the user's notification/privacy settings.
+Persistent Windows update notifications for Hub and BDO/WWM localization updates shipped using Windows toast notifications under a stable AUMID, with diagnostic lifecycle logging and retry after reported delivery failures. Normal CI #284 / run `39179115550` passed on source `2927fbfb1eba12b69c073299e2f68d44f42a463a` (1247/1247 tests); RC #53 / run `39179392341` passed and produced source-bound schema-2 bundles. Stable Release ID `416789267` was published at `2026-10-19T00:14:52Z`; annotated tag `v1.2.21` peels to the source SHA. Public canonical and legacy ZIPs were independently downloaded and matched RC digests. Windows may still suppress banners/history according to user notification/privacy settings. No real game files were touched. Owner waived native smoke and Architect review for this publication; no external review acceptance is claimed. Details: [`docs/releases/v1.2.21.md`](../releases/v1.2.21.md).
 
 ## v1.2.20 — RELEASED / PUBLIC VERIFIED
 
@@ -46,13 +46,13 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.20** (Release ID `416758893`), source SHA `507fc8031c74578af3d144341e1f1bee827c7c74`; live latest — v1.2.20. Точні asset facts записані у [`docs/releases/v1.2.20.md`](../releases/v1.2.20.md).
+Останній стабільний реліз: **v1.2.21** (Release ID `416789267`), source SHA `2927fbfb1eba12b69c073299e2f68d44f42a463a`; live latest — v1.2.21. Точні asset facts записані у [`docs/releases/v1.2.21.md`](../releases/v1.2.21.md).
 
 v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install; їхній вміст не змінюється. У цьому циклі реальні файли гри не змінювалися. Owner waived external Architect review; acceptance не заявляється.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.20 is **RELEASED / PUBLIC VERIFIED** as an Owner-authorized notification test; external Architect acceptance is not claimed. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.21 is **RELEASED / PUBLIC VERIFIED**; the Owner waived native smoke and external Architect review for this publication. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
 
 ## Architecture Summary
 

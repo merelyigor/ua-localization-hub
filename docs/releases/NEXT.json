@@ -3,9 +3,7 @@
   "summary": "",
   "new": [],
   "fixed": [],
-  "reliability": [
-    "Сповіщення про оновлення надходять до Центру сповіщень Windows і можуть залишатися там, якщо їх не помітили одразу."
-  ],
+  "reliability": [],
   "performance": [],
   "changes": [],
   "limitations": []
