@@ -18,9 +18,9 @@ Harness: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs|Code` (�
 
 Ресерч за незалежним GitHub-проєктом і настановами спільноти підтвердив: офіційний клієнт використовує `LocalData/Patch/HD/oversea/locale/`, Steam/Epic — `Package/HD/oversea/locale/`; обидва файли встановлюються в одну цільову папку. Відомі каталоги `wwm_standard`, `wwm_standart`, `wwm_lite` спрямовуються в LocalData; невідомий dual-layout root лишається на Package; LocalData-only root використовує LocalData. Детальні release facts: [`docs/releases/v1.2.23.md`](../releases/v1.2.23.md). Stable Release ID `418899341` опубліковано `2026-10-20T21:29:50Z`; live latest stable — `v1.2.23`. RC run `39499774442` і normal CI run `39499235238` пройшли на source SHA `1da3f17d77427fcffc5abb0893377c009dcc9b53`; public ZIP-и незалежно завантажені та збігаються з RC SHA-256. Реальні файли гри не змінювалися.
 
-## Поточне уточнення UI v1.2.25 — У РОБОТІ
+## v1.2.25 — RELEASED / PUBLIC VERIFIED / FINALIZED
 
-`Перевстановити` переходить у компактну нейтральну кнопку у верхньому лівому куті карток BDO/WWM; основні `Встановити` та `Оновити` залишаються в нижньому action slot і візуально відрізняються від неї. Валідація та випуск очікують завершення.
+Кнопка `Перевстановити` для точно встановленого актуального релізу BDO/WWM тепер мала, нейтральна й відділена від основної дії картки; `Встановити` та `Оновити` лишилися головними кнопками. Code gate: Release build без warnings/errors, 1261/1261 тестів; normal CI `39510522941` та RC `39510884158` пройшли на source SHA `4e6901df659477b4bd926c67b5a91aa2512138e1`. Stable Release ID `418965960` опубліковано `2026-10-20T23:03:12Z`; live latest stable — `v1.2.25`. Обидва публічні ZIP-и незалежно завантажено, перевірено та звірено з RC digests. Деталі: [`docs/releases/v1.2.25.md`](../releases/v1.2.25.md). Реальні файли гри не змінювалися; native UI smoke не виконувався.
 
 ## v1.2.24 — RELEASED / PUBLIC VERIFIED
 
