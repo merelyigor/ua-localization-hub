@@ -82,7 +82,7 @@ public sealed class WwmInstallService
         }
         if (committed)
         {
-            if (!CleanupGameTemps(gameRoot, journal.OperationId))
+            if (!CleanupGameTemps(gameRoot, journal.OperationId, journal))
                 return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Результат транзакції підтверджено, але тимчасові файли WWM ще не вдалося прибрати.");
             if (journal.Operation == "restore" && !TryDeleteDirectory(_store.SnapshotDirectory))
                 return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Відновлення виконано, але знімок ще не вдалося безпечно прибрати; відновлення транзакції повториться під час наступного запуску.");
@@ -291,9 +291,6 @@ public sealed class WwmInstallService
             Directory.CreateDirectory(operationDir);
             var previousState = File.Exists(_store.StateFile) ? await File.ReadAllBytesAsync(_store.StateFile, token).ConfigureAwait(false) : null;
             var previous = await CaptureTargetsAsync(gameRoot, operationDir, token).ConfigureAwait(false);
-            var attributeOnlyTargets = CurrentBinding.Layout == WwmInstallationLayout.Package
-                ? await CaptureLocalDataOverrideAttributesAsync(gameRoot, token).ConfigureAwait(false)
-                : new List<WwmPreviousTarget>();
             var newState = new WwmInstallationState
             {
                 SchemaVersion = 2,
@@ -313,14 +310,14 @@ public sealed class WwmInstallService
             var stateJson = WwmStateStore.SerializeState(newState);
             journal = new WwmTransactionJournal
             {
-                SchemaVersion = attributeOnlyTargets.Count == 0 ? 2 : 3,
+                SchemaVersion = 2,
                 OperationId = operationId,
                 Operation = "install",
                 CreatedPreHubSnapshot = createdPreHubSnapshot,
                 PreviousStateExisted = previousState != null,
                 PreviousStateBase64 = previousState == null ? "" : Convert.ToBase64String(previousState),
                 PreviousTargets = previous,
-                AttributeOnlyTargets = attributeOnlyTargets,
+                AttributeOnlyTargets = new(),
                 TargetManifest = staged.Targets.ToList(),
                 ExpectedStateSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stateJson))).ToLowerInvariant(),
                 GameBuildId = buildId,
@@ -330,25 +327,6 @@ public sealed class WwmInstallService
             };
             phase = "write_journal";
             await _store.WriteJournalAsync(journal, token).ConfigureAwait(false);
-
-            if (attributeOnlyTargets.Any(item => item.Existed
-                && item.Attributes is { } attributes && (((FileAttributes)attributes) & FileAttributes.ReadOnly) != 0))
-            {
-                if (!await MatchesPreviousOutcomeAsync(gameRoot, journal, token).ConfigureAwait(false))
-                    throw new InvalidDataException("WWM targets changed after rollback baseline capture.");
-                capturedBaselineVerified = true;
-                foreach (var item in attributeOnlyTargets.Where(item => item.Existed
-                    && item.Attributes is { } attributes && (((FileAttributes)attributes) & FileAttributes.ReadOnly) != 0))
-                {
-                    token.ThrowIfCancellationRequested();
-                    var target = SafeManagedTarget(gameRoot, item.RelativePath, WwmInstallationLayout.LocalDataPatch);
-                    if (!await MatchesPreviousTargetAsync(gameRoot, item, token, WwmInstallationLayout.LocalDataPatch).ConfigureAwait(false))
-                        throw new InvalidDataException("WWM LocalData override changed after rollback baseline capture.");
-                    mutationStarted = true;
-                    targetMutationOccurred = true;
-                    ClearReadOnlyAttribute(target);
-                }
-            }
 
             var appliedTargets = 0;
             foreach (var item in staged.Targets)
@@ -444,7 +422,7 @@ public sealed class WwmInstallService
                     return WwmMutationResult.Failure(retired ? WwmMutationError.Cancelled : WwmMutationError.RecoveryRequired,
                         retired ? "Операцію скасовано до зміни файлів гри." : "Операцію скасовано; безпечне очищення транзакції буде повторено під час наступного запуску.");
                 }
-                CleanupGameTemps(gameRoot, operationId);
+                CleanupGameTemps(gameRoot, operationId, journal);
                 return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Стан файлів WWM змінився до підтвердженої заміни; журнал і резервні дані збережено.");
             }
             var rolledBack = await CompleteRollbackAsync(gameRoot, journal, operationDir).ConfigureAwait(false);
@@ -1247,41 +1225,6 @@ public sealed class WwmInstallService
         return result;
     }
 
-    private async Task<List<WwmPreviousTarget>> CaptureLocalDataOverrideAttributesAsync(string root, CancellationToken token)
-    {
-        var paths = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch);
-        var result = new List<WwmPreviousTarget>(paths.Length);
-        for (var index = 0; index < paths.Length; index++)
-        {
-            token.ThrowIfCancellationRequested();
-            var relative = paths[index];
-            var target = SafeManagedTarget(root, relative, WwmInstallationLayout.LocalDataPatch);
-            if (!File.Exists(target))
-            {
-                result.Add(new WwmPreviousTarget { RelativePath = relative, Existed = false });
-                continue;
-            }
-
-            var before = new FileInfo(target);
-            var attributes = File.GetAttributes(target);
-            if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
-                throw new InvalidDataException($"Unsafe WWM LocalData override type: {relative}");
-            var beforeHash = await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false);
-            var after = new FileInfo(target);
-            if (before.Length != after.Length || before.LastWriteTimeUtc != after.LastWriteTimeUtc
-                || attributes != File.GetAttributes(target)
-                || !string.Equals(beforeHash, await HashHelper.ComputeFileSha256Async(target, token).ConfigureAwait(false), StringComparison.OrdinalIgnoreCase))
-                throw new IOException($"WWM LocalData override changed while its attribute rollback baseline was captured: {relative}");
-
-            result.Add(new WwmPreviousTarget
-            {
-                RelativePath = relative, Existed = true, SizeBytes = before.Length, Sha256 = beforeHash,
-                Attributes = (int)attributes
-            });
-        }
-        return result;
-    }
-
     private async Task<bool> MatchesPreviousTargetAsync(string root, WwmPreviousTarget previous, CancellationToken token,
         WwmInstallationLayout? targetLayout = null)
     {
@@ -1376,12 +1319,12 @@ public sealed class WwmInstallService
             var oldState = journal.PreviousStateExisted ? Convert.FromBase64String(journal.PreviousStateBase64) : null;
             await RestoreStateBytesAsync(oldState, token).ConfigureAwait(false);
             phase = "cleanup_game_temps";
-            return CleanupGameTemps(root, journal.OperationId);
+            return CleanupGameTemps(root, journal.OperationId, journal);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException or FormatException)
         {
             LogTransactionFailure(journal.OperationId, "rollback", activeTarget, phase, ex);
-            CleanupGameTemps(root, journal.OperationId);
+            CleanupGameTemps(root, journal.OperationId, journal);
             return false;
         }
     }
@@ -1403,12 +1346,16 @@ public sealed class WwmInstallService
         return tempPath;
     }
 
-    private bool CleanupGameTemps(string root, string operationId)
+    private bool CleanupGameTemps(string root, string operationId, WwmTransactionJournal? journal = null)
     {
         if (!Guid.TryParseExact(operationId, "N", out _)) return false;
-        var cleanupTargets = CurrentTargets
-            .Concat(WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
+        var cleanupTargets = journal == null
+            ? CurrentTargets
+            : journal.PreviousTargets.Select(item => item.RelativePath)
+                .Concat(journal.TargetManifest.Select(item => item.RelativePath))
+                .Concat(journal.ExpectedAbsentTargets)
+                .Concat(journal.AttributeOnlyTargets.Select(item => item.RelativePath))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
         foreach (var relativePath in cleanupTargets)
         {
             foreach (var kind in new[] { ".hub-", ".rollback-" })

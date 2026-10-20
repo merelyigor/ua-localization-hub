@@ -643,7 +643,7 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
-    public async Task WwmUnknownDualLayout_IsPresentedButAllMutationActionsStayDisabled()
+    public async Task WwmUnknownDualLayout_EnablesMutationForPackageTarget()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
             MainFormTestFixture.CreateSuccessfulApiHandler(),
@@ -657,13 +657,14 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.WaitForSwitchCompletionAsync();
         await fixture.WaitForAsync(form => form.SelectedGame.Id == "where-winds-meet"
             && form.WwmGameStatusForTest == "Знайдено Where Winds Meet"
-            && form.OperationMessageForTest.Contains("кілька цільових розкладок", StringComparison.Ordinal));
+            && form.WwmInstallActionsEnabledForTest);
 
         var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
         Assert.Equal(WwmInstallationSource.UnknownWindows, session.CurrentDetection.Source);
-        Assert.True(session.CurrentDetection.HasAmbiguousTargetLayout);
-        Assert.False(session.MutationSupported);
-        Assert.False(fixture.Form.WwmInstallActionsEnabledForTest);
+        Assert.False(session.CurrentDetection.HasAmbiguousTargetLayout);
+        Assert.Equal(WwmInstallationLayout.Package, session.CurrentDetection.TargetLayout);
+        Assert.True(session.MutationSupported);
+        Assert.True(fixture.Form.WwmInstallActionsEnabledForTest);
         Assert.False(fixture.Form.WwmRestoreEnabledForTest);
     }
 

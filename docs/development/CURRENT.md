@@ -58,7 +58,7 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Останній стабільний реліз: **v1.2.21** (Release ID `416789267`), source SHA `2927fbfb1eba12b69c073299e2f68d44f42a463a`; live latest — v1.2.21. Точні asset facts записані у [`docs/releases/v1.2.21.md`](../releases/v1.2.21.md).
 
-v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install; їхній вміст не змінюється. У цьому циклі реальні файли гри не змінювалися. Owner waived external Architect review; acceptance не заявляється.
+v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install. Поточний patch прибирає цю побічну зміну: UnknownWindows dual-layout обирає Package, а Package install і звичайне очищення тимчасових файлів не читають та не змінюють LocalData.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 

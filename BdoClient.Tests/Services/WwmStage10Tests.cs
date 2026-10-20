@@ -437,7 +437,7 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
-    public async Task PackageInstall_ClearsReadOnlyOnLocalDataOverridesWithoutReplacingTheirBytes()
+    public async Task PackageInstall_LeavesLocalDataOverridesAndAttributesUntouched()
     {
         using var temp = new TestTemp();
         var (_, root) = CreateSteamRoot(temp.Root, "steam", "game");
@@ -469,14 +469,14 @@ public sealed class WwmStage10Tests
         {
             var path = Path.Combine(root, localDataTargets[index]);
             Assert.Equal(original[index], await File.ReadAllBytesAsync(path));
-            Assert.False((File.GetAttributes(path) & FileAttributes.ReadOnly) != 0);
+            Assert.True((File.GetAttributes(path) & FileAttributes.ReadOnly) != 0);
         }
         Assert.Equal(2, store.Load(out _)!.SchemaVersion);
         Assert.Null(store.LoadJournal(out _));
     }
 
     [Fact]
-    public async Task PackageInstallFailure_RestoresLocalDataOverrideBytesAndReadOnlyAttributes()
+    public async Task PackageInstallFailure_LeavesLocalDataOverridesAndAttributesUntouched()
     {
         using var temp = new TestTemp();
         var (_, root) = CreateSteamRoot(temp.Root, "steam", "game");
@@ -498,7 +498,7 @@ public sealed class WwmStage10Tests
         var store = new WwmStateStore(paths);
         var service = new WwmInstallService(client, paths, store, Logger)
         {
-            AfterTargetAppliedForTest = count => { if (count == 1) throw new IOException("Injected target failure after LocalData attributes changed."); }
+            AfterTargetAppliedForTest = count => { if (count == 1) throw new IOException("Injected Package target failure."); }
         };
 
         var result = await service.InstallAsync(detection, CreatePackageMetadata(archive));
@@ -516,7 +516,7 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
-    public async Task PackageInstallCrashRecovery_RestoresLocalDataReadOnlyWithoutRewritingItsBytes()
+    public async Task LegacyPackageInstallCrashRecovery_RestoresRecordedLocalDataAttributes()
     {
         using var temp = new TestTemp();
         var (_, root) = CreateSteamRoot(temp.Root, "steam", "game");
@@ -1529,12 +1529,20 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
-    public async Task UnknownDualLayout_IsFoundButMutationIsBlocked()
+    public async Task UnknownDualLayout_PrefersPackageAndInstallsWithoutChangingLocalData()
     {
         using var temp = new TestTemp();
         var root = Path.Combine(temp.Root, "dual-root");
         CreateGameMarkers(root);
         Directory.CreateDirectory(Path.Combine(root, WwmGameDefinition.Default.LocalDataPatchLocaleRelativePath));
+        var localDataTargets = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch);
+        var localDataBytes = new[] { new byte[] { 0xA1, 0xA2 }, new byte[] { 0xB1, 0xB2 } };
+        foreach (var (relative, index) in localDataTargets.Select((relative, index) => (relative, index)))
+        {
+            var path = Path.Combine(root, relative);
+            await File.WriteAllBytesAsync(path, localDataBytes[index]);
+            File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
+        }
         var detection = new WwmSteamDetector(Logger, Array.Empty<string>()).DescribeRoot(root, "manual-folder-selection");
         var archive = CreatePackage();
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
@@ -1544,10 +1552,62 @@ public sealed class WwmStage10Tests
             .InstallAsync(detection, CreatePackageMetadata(archive));
 
         Assert.True(detection.IsFound);
-        Assert.True(detection.HasAmbiguousTargetLayout);
-        Assert.False(detection.IsMutationSupported);
-        Assert.Equal(WwmMutationError.InvalidRoot, result.Error);
-        Assert.Empty(Directory.EnumerateFiles(root, "translate_words_map_en*", SearchOption.AllDirectories));
+        Assert.False(detection.HasAmbiguousTargetLayout);
+        Assert.True(detection.IsMutationSupported);
+        Assert.Equal(WwmInstallationLayout.Package, detection.TargetLayout);
+        Assert.True(result.IsSuccess, result.Message);
+        Assert.All(WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.Package),
+            relative => Assert.True(File.Exists(Path.Combine(root, relative))));
+        for (var index = 0; index < localDataTargets.Length; index++)
+        {
+            var path = Path.Combine(root, localDataTargets[index]);
+            Assert.Equal(localDataBytes[index], await File.ReadAllBytesAsync(path));
+            Assert.True((File.GetAttributes(path) & FileAttributes.ReadOnly) != 0);
+        }
+    }
+
+    [Fact]
+    public async Task PackageInstall_DoesNotInspectLocalDataReparsePointDuringCleanup()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "package-root");
+        CreateGameMarkers(root);
+        var localeParent = Path.Combine(root, "LocalData", "Patch", "HD", "oversea");
+        var localeJunction = Path.Combine(localeParent, "locale");
+        var externalLocale = Path.Combine(temp.Root, "external-locale");
+        Directory.CreateDirectory(localeParent);
+        Directory.CreateDirectory(externalLocale);
+        var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = $"/c mklink /J \"{localeJunction}\" \"{externalLocale}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
+        })!;
+        process.WaitForExit();
+        Assert.Equal(0, process.ExitCode);
+
+        try
+        {
+            var detection = new WwmSteamDetector(Logger, Array.Empty<string>()).DescribeRoot(root, "manual-folder-selection");
+            Assert.Equal(WwmInstallationLayout.Package, detection.TargetLayout);
+            var archive = CreatePackage();
+            using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
+            var paths = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
+            paths.EnsureDirectories();
+            var result = await new WwmInstallService(client, paths, new WwmStateStore(paths), Logger)
+                .InstallAsync(detection, CreatePackageMetadata(archive));
+
+            Assert.True(result.IsSuccess, result.Message);
+            Assert.All(WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.Package),
+                relative => Assert.True(File.Exists(Path.Combine(root, relative))));
+        }
+        finally
+        {
+            Directory.Delete(localeJunction);
+        }
     }
 
     [Fact]

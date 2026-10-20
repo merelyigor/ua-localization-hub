@@ -486,8 +486,10 @@ public sealed record WwmDetectionResult(
             => WwmInstallationLayout.Package,
         WwmInstallationSource.OfficialLauncher when Layout.HasFlag(WwmInstallationLayout.LocalDataPatch)
             => WwmInstallationLayout.LocalDataPatch,
-        WwmInstallationSource.UnknownWindows when Layout is WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch
-            => Layout,
+        WwmInstallationSource.UnknownWindows when Layout.HasFlag(WwmInstallationLayout.Package)
+            => WwmInstallationLayout.Package,
+        WwmInstallationSource.UnknownWindows when Layout == WwmInstallationLayout.LocalDataPatch
+            => WwmInstallationLayout.LocalDataPatch,
         _ => WwmInstallationLayout.Unknown
     };
     public bool HasAmbiguousTargetLayout => IsFound && TargetLayout == WwmInstallationLayout.Unknown;
