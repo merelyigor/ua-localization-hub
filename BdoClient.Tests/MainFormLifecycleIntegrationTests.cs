@@ -44,6 +44,34 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
+    public async Task ApplicationUpdateFoundWhileVisible_NotifiesWhenWindowMovesToTray()
+    {
+        using var fixture = await MainFormTestFixture.StartAsync(
+            MainFormTestFixture.CreateSuccessfulApiHandler(), startInBackground: false);
+
+        await fixture.WaitForStartupAsync();
+        await fixture.WaitForAsync(form => form.Visible);
+
+        var notification = new TaskCompletionSource<AppNotificationContent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await fixture.SetAppNotificationObserverAsync(content => notification.TrySetResult(content));
+        await fixture.TriggerApplicationUpdateNotificationAsync("v1.2.25");
+
+        Assert.False(notification.Task.IsCompleted);
+        Assert.Contains(fixture.Logger.DebugMessages, line => line.Contains(
+            "type=application_update", StringComparison.Ordinal)
+            && line.Contains("eligible=false reason=window_visible", StringComparison.Ordinal));
+
+        await fixture.HideToTrayAsync();
+
+        var content = await notification.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("application_update", content.Type);
+        Assert.Equal("v1.2.25", content.Identity);
+        Assert.Contains(fixture.Logger.DebugMessages, line => line.Contains(
+            "type=application_update", StringComparison.Ordinal)
+            && line.Contains("eligible=true reason=none", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task SwitchingSyntheticGame_DrainsOldSessionAndPersistsSelection()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
@@ -3025,6 +3053,13 @@ internal sealed class MainFormTestFixture : IDisposable
         {
             try
             {
+                var version = AppVersion.TryParseReleaseTag(tag);
+                var candidate = version.HasValue && !string.IsNullOrWhiteSpace(tag)
+                    ? new UpdateCandidate(version.Value, tag, new GitHubRelease { TagName = tag })
+                    : null;
+                typeof(MainForm).GetField("_pendingUpdateCandidate",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .SetValue(Form, candidate);
                 Form.ObserveApplicationUpdateNotificationForTest(tag);
                 completion.TrySetResult(null);
             }

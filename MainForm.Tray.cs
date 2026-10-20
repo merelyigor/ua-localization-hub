@@ -95,6 +95,9 @@ public partial class MainForm
         ShowInTaskbar = false;
         Hide();
 
+        // Сповіщення про оновлення, знайдене у відкритому вікні, надсилається після згортання.
+        ObserveApplicationUpdateNotification(_pendingUpdateCandidate?.TagName);
+
         if (_activeGameSession is BdoGameSession) _poller.SetPollingMode(ReleaseFeedPollingMode.Background);
         else if (_activeGameSession is WwmGameSession wwm) wwm.Poller.SetVisible(false);
 
