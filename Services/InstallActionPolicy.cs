@@ -57,8 +57,7 @@ internal static class InstallActionPolicy
         var canInstall = allowWriteActions
             && !operationInProgress
             && structurallyValid
-            && compatResult.IsAllowed
-            && !alreadyInstalled;
+            && compatResult.IsAllowed;
 
         var canRestoreOriginal = allowWriteActions
             && !operationInProgress

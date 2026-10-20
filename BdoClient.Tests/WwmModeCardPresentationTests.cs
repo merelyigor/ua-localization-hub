@@ -72,15 +72,26 @@ public sealed class WwmModeCardPresentationTests
     }
 
     [Fact]
-    public void ExactCurrentPackage_ShowsInstalledWithoutAction()
+    public void ExactCurrentPackage_ShowsInstalledWithReinstallAction()
     {
         var presentation = WwmModeCardPresentation.Create(true, WwmInstalledStateKind.Current,
             stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: false);
 
         Assert.Equal("✓ Встановлено", presentation.StateText);
-        Assert.Null(presentation.ActionText);
-        Assert.False(presentation.ActionEnabled);
+        Assert.Equal("Перевстановити", presentation.ActionText);
+        Assert.True(presentation.ActionEnabled);
         Assert.Equal(ModeCardTone.Success, presentation.Tone);
+        Assert.True(presentation.IsInstalled);
+    }
+
+    [Fact]
+    public void ExactCurrentPackage_DisablesReinstallDuringOperation()
+    {
+        var presentation = WwmModeCardPresentation.Create(true, WwmInstalledStateKind.Current,
+            stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: true);
+
+        Assert.Equal("Перевстановити", presentation.ActionText);
+        Assert.False(presentation.ActionEnabled);
         Assert.True(presentation.IsInstalled);
     }
 

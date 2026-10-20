@@ -268,7 +268,8 @@ internal sealed record WwmModeCardPresentation(
                 gameDetected && !operationInProgress, ModeCardTone.Warning, false);
 
         if (sameInstalledMode && installedState == WwmInstalledStateKind.Current)
-            return new("✓ Встановлено", null, false, ModeCardTone.Success, true);
+            return new("✓ Встановлено", "Перевстановити",
+                gameDetected && !operationInProgress, ModeCardTone.Success, true);
 
         var isUpdate = sameInstalledMode && installedState == WwmInstalledStateKind.UpdateAvailable;
         return new(isUpdate ? "Доступне оновлення" : "Доступно",

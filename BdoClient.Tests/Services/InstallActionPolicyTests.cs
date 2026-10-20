@@ -42,7 +42,7 @@ public class InstallActionPolicyTests
     }
 
     [Fact]
-    public void SameMode_SamePublicId_UpToDate_CanInstallFalse()
+    public void SameMode_SamePublicId_UpToDate_AllowsExplicitReinstall()
     {
         var publicId = "01ABC";
         var selectedMode = MakeMode("english-items", current: MakeCurrent(publicId: publicId));
@@ -52,7 +52,7 @@ public class InstallActionPolicyTests
             LocalizationState.UpToDate, "english-items", publicId,
             selectedMode, selectedCurrent, CompatibilityResult.Allowed(), false);
 
-        Assert.False(policy.CanInstall);
+        Assert.True(policy.CanInstall);
         Assert.True(policy.AlreadyInstalledExactTarget);
     }
 

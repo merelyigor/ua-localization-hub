@@ -45,12 +45,13 @@ public sealed class ModeCardPresentationPolicyTests
     }
 
     [Fact]
-    public void ExactTarget_UpToDate_ShowsInstalledWithoutAction()
+    public void ExactTarget_UpToDate_ShowsInstalledWithReinstallAction()
     {
         var presentation = Create(LocalizationState.UpToDate, "full", "A", Mode("full", "A"));
         Assert.True(presentation.IsInstalled);
         Assert.Equal("✓ Встановлено", presentation.StateText);
-        Assert.Null(presentation.ActionText);
+        Assert.Equal("Перевстановити", presentation.ActionText);
+        Assert.True(presentation.ActionEnabled);
     }
 
     [Fact]

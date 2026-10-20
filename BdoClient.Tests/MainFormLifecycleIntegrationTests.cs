@@ -590,6 +590,8 @@ public sealed class MainFormLifecycleIntegrationTests
         var installedCard = Assert.Single(FindWwmModeCards(fixture.Form));
         Assert.Equal("✓ Встановлено", installedCard.StateTextForTest);
         Assert.True(installedCard.InstalledBadgeVisibleForTest);
+        Assert.Equal("Перевстановити", installedCard.ActionTextForTest);
+        Assert.True(installedCard.ActionEnabledForTest);
         Assert.Contains("успішно встановлено", fixture.Form.OperationMessageForTest, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(WwmInstalledStateKind.Current,
             (await session.InstallService.ResolveStateAsync(session.CurrentDetection,
@@ -602,6 +604,18 @@ public sealed class MainFormLifecycleIntegrationTests
             .RootElement.GetProperty("game_build_id").GetString());
         for (var index = 0; index < targets.Length; index++)
             Assert.Equal(preHubBytes[index], await File.ReadAllBytesAsync(Path.Combine(stateStore.SnapshotDirectory, $"{index}.bin")));
+
+        await fixture.RunWwmInstallAsync("ukrainian", "default");
+
+        Assert.Equal(OperationState.Completed, fixture.Form.OperationStateForTest);
+        Assert.False(fixture.Form.WwmRecoveryBlockedForTest);
+        Assert.Null(stateStore.LoadJournal(out _));
+        Assert.Equal(WwmInstalledStateKind.Current,
+            (await session.InstallService.ResolveStateAsync(session.CurrentDetection,
+                new WwmApiPackage { Mode = new WwmMode { Slug = "ukrainian", Variant = "default" }, Version = "v-test",
+                    DownloadUrl = "https://winds4ua.com.ua/releases/test.zip", SizeBytes = archive.Length, Sha256 = archiveSha })).State);
+        for (var index = 0; index < targets.Length; index++)
+            Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(Path.Combine(fixture.WwmGameRoot, targets[index])));
 
         await fixture.SelectGameAsync("black-desert-online");
         await fixture.WaitForSwitchCompletionAsync();
@@ -929,8 +943,9 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal(UiTheme.SuccessSurface, installedCard.InstalledBadgeBackColorForTest);
         Assert.True(installedCard.IsInstalledForTest);
         Assert.False(installedCard.StatusLabelVisibleForTest);
-        Assert.False(installedCard.ActionVisibleForTest);
-        Assert.False(installedCard.ActionEnabledForTest);
+        Assert.Equal("Перевстановити", installedCard.ActionTextForTest);
+        Assert.True(installedCard.ActionVisibleForTest);
+        Assert.True(installedCard.ActionEnabledForTest);
     }
 
     [Fact]
@@ -1101,7 +1116,7 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.WaitForAsync(form => FindWwmModeCards(form).Any(card => card.ActionEnabledForTest));
         var installedCard = Assert.Single(FindWwmModeCards(fixture.Form));
         Assert.NotEqual("Потрібне відновлення", installedCard.StateTextForTest);
-        Assert.True(installedCard.ActionTextForTest is "Встановити" or "Оновити");
+        Assert.True(installedCard.ActionTextForTest is "Встановити" or "Оновити" or "Перевстановити");
         Assert.False(fixture.Form.WwmRestoreEnabledForTest); // The synthetic snapshot is stale by design.
         for (var index = 0; index < targets.Length; index++)
             Assert.Equal(before[index], await File.ReadAllBytesAsync(Path.Combine(fixture.WwmGameRoot, targets[index])));
@@ -1856,7 +1871,7 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal(2, state.Value.Version);
         Assert.Equal(Convert.ToHexString(SHA256.HashData(latestB)).ToLowerInvariant(), state.Value.Sha256);
         Assert.Equal("✓ Встановлено", fixture.Form.SelectedModeCardStateTextForTest);
-        Assert.Null(fixture.Form.SelectedModeCardActionTextForTest);
+        Assert.Equal("Перевстановити", fixture.Form.SelectedModeCardActionTextForTest);
         Assert.Equal(4, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
         Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01RELEASEB"));
         Assert.Contains(fixture.Logger.Warnings, message => message.Contains("latest/aggregate identity conflict", StringComparison.Ordinal));
@@ -2075,7 +2090,7 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
-    public async Task Install_304UsesCachedFreshTargetAndDoesNotReinstallExactInstalledRelease()
+    public async Task Install_304UsesCachedFreshTargetAndReinstallChecksFreshLatest()
     {
         var installedBytes = Encoding.UTF8.GetBytes("latest release B");
         var handler = CreateInstallHandler(
@@ -2092,13 +2107,14 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.WaitForAsync(form => MainFormTestFixture.CountModeCards(form) == 1);
 
         await fixture.InstallForTestAsync();
+        Assert.Equal("Перевстановити", fixture.Form.SelectedModeCardActionTextForTest);
         await fixture.InstallForTestAsync();
 
-        Assert.Equal(5, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
-        Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01FRESHB"));
+        Assert.Equal(6, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
+        Assert.Equal(2, handler.RequestPaths.Count(path => path == "/download/releases/01FRESHB"));
         Assert.Equal(installedBytes, await File.ReadAllBytesAsync(
             BdoGameDefinition.Default.GetLocalizationFilePath(fixture.GameRoot)));
-        Assert.Equal(OperationState.Idle, fixture.Form.OperationStateForTest);
+        Assert.Equal(OperationState.Completed, fixture.Form.OperationStateForTest);
     }
 
     [Theory]

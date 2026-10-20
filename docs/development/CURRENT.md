@@ -18,6 +18,12 @@ Harness: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs|Code` (�
 
 Ресерч за незалежним GitHub-проєктом і настановами спільноти підтвердив: офіційний клієнт використовує `LocalData/Patch/HD/oversea/locale/`, Steam/Epic — `Package/HD/oversea/locale/`; обидва файли встановлюються в одну цільову папку. Відомі каталоги `wwm_standard`, `wwm_standart`, `wwm_lite` спрямовуються в LocalData; невідомий dual-layout root лишається на Package; LocalData-only root використовує LocalData. Детальні release facts: [`docs/releases/v1.2.23.md`](../releases/v1.2.23.md). Stable Release ID `418899341` опубліковано `2026-10-20T21:29:50Z`; live latest stable — `v1.2.23`. RC run `39499774442` і normal CI run `39499235238` пройшли на source SHA `1da3f17d77427fcffc5abb0893377c009dcc9b53`; public ZIP-и незалежно завантажені та збігаються з RC SHA-256. Реальні файли гри не змінювалися.
 
+## v1.2.24 — перевстановлення з картки локалізації
+
+## v1.2.24 — перевстановлення з картки локалізації
+
+На картках BDO та WWM для точно встановленого актуального релізу доступна дія `Перевстановити` поряд зі станом `✓ Встановлено`. Вона повторно використовує звичайний захищений шлях встановлення: свіжі метадані, перевірка сумісності, резервна копія, транзакційний запис, перевірка результату й rollback. Повний Code gate пройшов: Release build без warnings/errors, 1 257/1 257 тестів. RC і публікація очікуються.
+
 ## v1.2.21 — RELEASED / PUBLIC VERIFIED
 
 Persistent Windows update notifications for Hub and BDO/WWM localization updates shipped using Windows toast notifications under a stable AUMID, with diagnostic lifecycle logging and retry after reported delivery failures. Normal CI #284 / run `39179115550` passed on source `2927fbfb1eba12b69c073299e2f68d44f42a463a` (1247/1247 tests); RC #53 / run `39179392341` passed and produced source-bound schema-2 bundles. Stable Release ID `416789267` was published at `2026-10-19T00:14:52Z`; annotated tag `v1.2.21` peels to the source SHA. Public canonical and legacy ZIPs were independently downloaded and matched RC digests. Windows may still suppress banners/history according to user notification/privacy settings. No real game files were touched. Owner waived native smoke and Architect review for this publication; no external review acceptance is claimed. Details: [`docs/releases/v1.2.21.md`](../releases/v1.2.21.md).

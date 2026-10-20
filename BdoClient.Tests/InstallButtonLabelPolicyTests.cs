@@ -41,7 +41,7 @@ public class InstallButtonLabelPolicyTests
     }
 
     [Fact]
-    public void ExactInstalledTarget_UsesInstallLabelEvenWhenDisabled()
+    public void ExactInstalledTarget_UsesReinstallLabel()
     {
         var text = InstallButtonLabelPolicy.GetText(
             LocalizationState.UpToDate,
@@ -49,6 +49,6 @@ public class InstallButtonLabelPolicyTests
             sameInstalledModeSelected: true,
             exactSelectedTarget: true);
 
-        Assert.Equal("Встановити", text);
+        Assert.Equal("Перевстановити", text);
     }
 }

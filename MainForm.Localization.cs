@@ -1283,7 +1283,7 @@ public partial class MainForm
                 selectedMode, selectedCurrent, compatResult, IsUiWorkBlocked);
 
             if (policy.AlreadyInstalledExactTarget && stateResult.State == LocalizationState.UpToDate)
-                diagnostic = "Встановлена остання доступна версія.";
+                diagnostic = "Локалізацію встановлено. Натисніть «Перевстановити», щоб встановити її повторно.";
             else if (!hasInstalledApiState && selectedCurrent != null)
                 diagnostic = "Натисніть «Встановити», щоб встановити обраний режим.";
             else if (hasInstalledApiState && selectedCurrent != null)

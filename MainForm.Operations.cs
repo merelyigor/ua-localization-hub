@@ -163,10 +163,7 @@ public partial class MainForm
 
             if (!policy.CanInstall)
             {
-                if (policy.AlreadyInstalledExactTarget)
-                    finalMessage = "Цей реліз уже встановлено.";
-                else
-                    finalMessage = "Встановлення недоступне для поточного стану.";
+                finalMessage = "Встановлення недоступне для поточного стану.";
                 return;
             }
 

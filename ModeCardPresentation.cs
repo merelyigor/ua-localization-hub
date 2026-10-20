@@ -44,14 +44,15 @@ internal static class ModeCardPresentationPolicy
                     ? awaitingConfirmation ? "Очікує підтвердження" : "Виконується операція"
                     : StateTextForExisting(exact, sameMode, factualState),
                 activeTarget ? ModeCardTone.Busy : exact ? ModeCardTone.Success : ModeCardTone.Neutral,
-                activeTarget ? null : ActionTextFor(sameMode, factualState), false, exact, activeTarget, null);
+                activeTarget ? null : ActionTextFor(exact, sameMode, factualState), false, exact, activeTarget, null);
         }
 
         if (!compatibility.IsAllowed)
             return new("Несумісно", ModeCardTone.Warning, null, false, exact, false, compatibility.Reason);
 
         if (exact && factualState == LocalizationState.UpToDate)
-            return new("✓ Встановлено", ModeCardTone.Success, null, false, true, false, "Поточний реліз встановлено");
+            return new("✓ Встановлено", ModeCardTone.Success,
+                InstallButtonLabelPolicy.ReinstallText, policy.CanInstall, true, false, "Поточний реліз встановлено");
 
         if (sameMode && factualState == LocalizationState.UpdateAvailable)
             return new("Доступне оновлення", ModeCardTone.Warning,
@@ -69,6 +70,8 @@ internal static class ModeCardPresentationPolicy
     private static string? StateTextForExisting(bool exact, bool sameMode, LocalizationState state) =>
         exact ? "✓ Встановлено" : sameMode && state == LocalizationState.UpdateAvailable ? "Доступне оновлення" : null;
 
-    private static string? ActionTextFor(bool sameMode, LocalizationState state) =>
-        sameMode && state == LocalizationState.UpdateAvailable ? InstallButtonLabelPolicy.UpdateText : InstallButtonLabelPolicy.InstallText;
+    private static string? ActionTextFor(bool exact, bool sameMode, LocalizationState state) =>
+        exact && state == LocalizationState.UpToDate ? InstallButtonLabelPolicy.ReinstallText
+            : sameMode && state == LocalizationState.UpdateAvailable ? InstallButtonLabelPolicy.UpdateText
+            : InstallButtonLabelPolicy.InstallText;
 }
