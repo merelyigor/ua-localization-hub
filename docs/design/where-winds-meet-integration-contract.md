@@ -9,7 +9,7 @@ Owner decisions recorded: stable game ID `where-winds-meet`; initial implementat
 ## Evidence boundary
 
 - **Steam — LOCALLY VERIFIED:** Steam AppID `3564740`, manifest association, installed root markers, executable, and Steam locale directory were inspected read-only. The local Steam manifest reports build ID `25281753`.
-- **Official launcher — no local installation verified:** folder names may guide bounded root discovery, but do not prove Official Launcher provenance. LocalDataPatch is detection-only for ordinary operation; new localization installs require Package. No real Official Launcher provenance or native E2E is claimed.
+- **Official launcher — no local installation verified:** public installer instructions and an independent localization-tools repository identify `LocalData/Patch/HD/oversea/locale/` as the client target and copy both locale files there. Folder names may guide bounded root discovery, but do not prove Official Launcher provenance. No real Official Launcher provenance or native E2E is claimed.
 - Public facts below were checked against the [Winds4UA download instructions](https://winds4ua.com.ua/download), the [current public API documentation](https://winds4ua.com.ua/docs/public-api/releases), and read-only requests to the production API. The API host is `winds4ua.com.ua`.
 - The current package was downloaded to isolated temporary storage, hash-checked and listed; entries were compared read-only with the local Steam locale directory. No archive content was copied to the game.
 
@@ -204,7 +204,7 @@ Before legacy schema migration, an active journal's complete original outcome is
 
 ### LocalData read-only override handling
 
-The selected target layout remains singular: every new WWM install/update writes only to `Package/HD/oversea/locale/`; the install service rejects LocalDataPatch bindings before download or game-file access. A LocalData-only root can be recognized as a game but cannot be used for install/update. Ordinary detection and install/restore checks do not inspect or modify `LocalData/Patch/HD/oversea/locale/`. Legacy unfinished journals may still roll back only LocalData targets recorded by an older client version. Exact candidates `wwm_standard`, `wwm_standart`, and `wwm_lite` are checked directly at fixed-drive roots and a bounded list of common Program Files parents; a valid product marker/layout is still required, and folder names do not establish launcher provenance.
+Updated client-target decision: Steam and Epic metadata-proven installs write both localization files only to `Package/HD/oversea/locale/`; known official-client directory names (`wwm_standard`, `wwm_standart`, `wwm_lite`) with both layouts select LocalData, and an unproven root with only LocalData also selects LocalData. An unproven dual-layout root with a generic directory name keeps Package. The other layout is not mutated. These names guide target selection but do not establish launcher provenance. A trusted prior Hub cycle bound to another layout is transactionally restored before a new install cycle is created for the selected layout; invalid ownership, state, snapshots or journals still fail closed. LocalData target replacement preserves exact rollback bytes and attributes and removes `ReadOnly` only as required to replace the selected files.
 
 ## v1.2.11 RC #39 — legacy automatic Steam-root migration correction
 

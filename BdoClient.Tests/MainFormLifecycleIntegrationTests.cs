@@ -325,7 +325,7 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
-    public async Task WwmLocalDataOnlyRootIsFoundButInstallRemainsUnavailable()
+    public async Task WwmLocalDataOnlyRootIsFoundAndInstallIsAvailable()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
             MainFormTestFixture.CreateSuccessfulApiHandler(),
@@ -346,11 +346,11 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.DoesNotContain("Steam", fixture.Form.WwmGameStatusForTest, StringComparison.OrdinalIgnoreCase);
         var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
         Assert.Equal(WwmInstallationSource.UnknownWindows, session.CurrentDetection.Source);
-        Assert.False(session.MutationSupported);
+        Assert.True(session.MutationSupported);
         Assert.True(card.ActionVisibleForTest);
-        Assert.False(card.ActionEnabledForTest);
+        Assert.True(card.ActionEnabledForTest);
         Assert.False(fixture.Form.WwmRestoreEnabledForTest);
-        Assert.False(fixture.Form.WwmInstallActionsEnabledForTest);
+        Assert.True(fixture.Form.WwmInstallActionsEnabledForTest);
         Assert.Equal(Path.GetFullPath(fixture.WwmGameRoot), fixture.Form.WwmGamePathForTest);
     }
 
@@ -643,7 +643,7 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
-    public async Task WwmUnknownDualLayout_EnablesMutationForPackageTarget()
+    public async Task WwmUnknownDualLayoutWithGenericRoot_EnablesMutationForPackageTarget()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
             MainFormTestFixture.CreateSuccessfulApiHandler(),

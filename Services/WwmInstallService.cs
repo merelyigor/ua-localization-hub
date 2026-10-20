@@ -129,21 +129,41 @@ public sealed class WwmInstallService
                 "Журнал відновлення WWM пошкоджено; файли не змінювалися."));
 
         if (journal != null
-            && journal.TargetLayout == nameof(WwmInstallationLayout.LocalDataPatch)
+            && journal.TargetLayout is nameof(WwmInstallationLayout.LocalDataPatch) or nameof(WwmInstallationLayout.Package)
             && TrySameFullPath(journal.InstallationRoot, detection.GameRoot!))
         {
-            // LocalData is recovery-only: touch it only for an exact-root journal that records
-            // this layout, never as a side effect of current detection or a new install.
+            // Recover the exact layout recorded by the journal before using the currently
+            // selected layout. This also handles interrupted legacy Package installs.
+            var journalLayout = journal.TargetLayout == nameof(WwmInstallationLayout.LocalDataPatch)
+                ? WwmInstallationLayout.LocalDataPatch
+                : WwmInstallationLayout.Package;
             var legacyBinding = new WwmInstallationBinding(WwmGameDefinition.NormalizeInstallationRoot(detection.GameRoot!),
-                detection.Source, WwmInstallationLayout.LocalDataPatch, detection.BuildId,
+                detection.Source, journalLayout, detection.BuildId,
                 WwmGameDefinition.ComputeInstallationFingerprint(detection.GameRoot!));
             return RecoverAsync(detection.GameRoot!, detection.BuildId, token, legacyBinding);
+        }
+
+        var state = _store.Load(out var stateError);
+        if (stateError != null)
+            return Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidState,
+                "Стан WWM пошкоджено; встановлення та відновлення заблоковано."));
+        if (state != null
+            && !string.Equals(state.TargetLayout, detection.TargetLayout.ToString(), StringComparison.Ordinal)
+            && TrySameFullPath(state.InstallationRoot, detection.GameRoot!)
+            && Enum.TryParse<WwmInstallationLayout>(state.TargetLayout, out var stateLayout)
+            && stateLayout is WwmInstallationLayout.LocalDataPatch or WwmInstallationLayout.Package)
+        {
+            var previousBinding = new WwmInstallationBinding(WwmGameDefinition.NormalizeInstallationRoot(detection.GameRoot!),
+                detection.Source, stateLayout, detection.BuildId,
+                WwmGameDefinition.ComputeInstallationFingerprint(detection.GameRoot!));
+            return RecoverAsync(detection.GameRoot!, detection.BuildId, token, previousBinding);
         }
 
         if (detection.IsMutationSupported)
             return RecoverAsync(detection.GameRoot!, detection.BuildId, token, WwmInstallationBinding.FromDetection(detection));
 
-        // A LocalData-only installation is recognized, but has no ordinary mutation target.
+        // A recognized LocalData-only installation has no Package override and can use its
+        // own verified locale target directly.
         return detection.Layout == WwmInstallationLayout.LocalDataPatch
             ? Task.FromResult(WwmMutationResult.Success())
             : Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidRoot,
@@ -155,17 +175,39 @@ public sealed class WwmInstallService
     {
         using var bindingScope = PushBinding(gameRoot, buildId, explicitBinding);
         var binding = _bindingContext.Value!;
-        if (binding.Layout != WwmInstallationLayout.Package)
-            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot,
-                "Українізацію Where Winds Meet можна встановити лише в Package/HD/oversea/locale.");
+        if (binding.Layout is not (WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch))
+            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Для Where Winds Meet не визначено цільову папку локалізації.");
         if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірена розкладка Where Winds Meet недоступна.");
+        var state = _store.Load(out var stateError);
+        if (stateError != null) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM пошкоджено; встановлення заблоковано.");
+        if (state != null && !StateMatchesBinding(state, binding))
+        {
+            var migrationBinding = GetSameRootPreviousLayoutBinding(state, binding);
+            if (migrationBinding == null)
+                return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Збережений стан WWM належить іншій інсталяції або розкладці.");
+            var restoredPreviousLayout = await RestorePreHubAsync(gameRoot, buildId, cancellationToken, migrationBinding).ConfigureAwait(false);
+            if (!restoredPreviousLayout.IsSuccess)
+                return WwmMutationResult.Failure(restoredPreviousLayout.Error,
+                    $"Перед переходом на правильну папку треба безпечно прибрати попередню установку WWM. {restoredPreviousLayout.Message}");
+            state = null;
+        }
+        if (state != null && IsStateStale(state, binding)) return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
+        var pendingJournal = _store.LoadJournal(out var journalError);
+        if (journalError != null)
+            return WwmMutationResult.Failure(WwmMutationError.RecoveryRequired, "Журнал відновлення WWM пошкоджено; встановлення заблоковано.");
+        if (pendingJournal != null && TrySameFullPath(pendingJournal.InstallationRoot, binding.GameRoot)
+            && Enum.TryParse<WwmInstallationLayout>(pendingJournal.TargetLayout, out var journalLayout)
+            && journalLayout is WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch
+            && journalLayout != binding.Layout)
+        {
+            var journalBinding = new WwmInstallationBinding(binding.GameRoot, binding.Source, journalLayout,
+                binding.BuildId, binding.Fingerprint);
+            var journalRecovery = await RecoverAsync(gameRoot, buildId, cancellationToken, journalBinding).ConfigureAwait(false);
+            if (!journalRecovery.IsSuccess) return journalRecovery;
+        }
         var recovered = await RecoverAsync(gameRoot, buildId, cancellationToken).ConfigureAwait(false);
         if (!recovered.IsSuccess) return recovered;
 
-        var state = _store.Load(out var stateError);
-        if (stateError != null) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Стан WWM пошкоджено; встановлення заблоковано.");
-        if (state != null && !StateMatchesBinding(state, binding)) return WwmMutationResult.Failure(WwmMutationError.InvalidState, "Збережений стан WWM належить іншій інсталяції або розкладці.");
-        if (state != null && IsStateStale(state, binding)) return WwmMutationResult.Failure(WwmMutationError.SnapshotStale, GetSnapshotStaleMessage(binding));
         WwmStagedPackage staged;
         try { staged = await new WwmPackageService(_httpClient, _persistencePaths, _logger).DownloadAndStageAsync(package, cancellationToken).ConfigureAwait(false); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return WwmMutationResult.Failure(WwmMutationError.Cancelled, "Операцію скасовано."); }
@@ -207,9 +249,8 @@ public sealed class WwmInstallService
     {
         using var bindingScope = PushBinding(gameRoot, currentBuildId, explicitBinding);
         var binding = _bindingContext.Value!;
-        if (binding.Layout != WwmInstallationLayout.Package)
-            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot,
-                "Відновлення з інтерфейсу доступне лише для Package/HD/oversea/locale.");
+        if (binding.Layout is not (WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch))
+            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Для Where Winds Meet не визначено цільову папку локалізації.");
         if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірена розкладка Where Winds Meet недоступна.");
         var legacyBinding = await BindLegacyMetadataAsync(token).ConfigureAwait(false);
         if (legacyBinding != null) return legacyBinding;
@@ -240,8 +281,8 @@ public sealed class WwmInstallService
     {
         using var bindingScope = PushBinding(gameRoot, currentBuildId, explicitBinding);
         var binding = _bindingContext.Value!;
-        if (binding.Layout != WwmInstallationLayout.Package)
-            return (false, "Відновлення доступне лише для Package/HD/oversea/locale.");
+        if (binding.Layout is not (WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch))
+            return (false, "Для Where Winds Meet не визначено цільову папку локалізації.");
         if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout))
             return (false, "Відновлення оригіналу неможливе: перевірену теку гри не знайдено.");
 
@@ -285,7 +326,12 @@ public sealed class WwmInstallService
         var state = _store.Load(out var error);
         if (error != null) return new(WwmInstalledStateKind.Modified, "Збережений стан WWM пошкоджено.");
         if (state == null) return new(WwmInstalledStateKind.Unknown);
-        if (!StateMatchesBinding(state, binding)) return new(WwmInstalledStateKind.Modified, "Збережений стан належить іншій інсталяції або розкладці.");
+        if (!StateMatchesBinding(state, binding))
+        {
+            if (GetSameRootPreviousLayoutBinding(state, binding) != null)
+                return new(WwmInstalledStateKind.NeedsReinstall, "Попередня версія Хабу встановила файли в іншу папку. Під час повторної установки старий стан буде безпечно відновлено.");
+            return new(WwmInstalledStateKind.Modified, "Збережений стан належить іншій інсталяції або розкладці.");
+        }
         if (IsStateStale(state, binding)) return new(WwmInstalledStateKind.Modified, GetSnapshotStaleMessage(binding));
         if (!await MatchesManifestAsync(gameRoot, state.Targets, token).ConfigureAwait(false))
         {
@@ -1603,6 +1649,25 @@ public sealed class WwmInstallService
             && string.Equals(state.TargetLayout, binding.Layout.ToString(), StringComparison.Ordinal)
             && state.Targets is { } stateTargets
             && stateTargets.All(item => WwmStateStore.GetLayoutForPath(item.RelativePath) == binding.Layout);
+    }
+
+    private WwmInstallationBinding? GetSameRootPreviousLayoutBinding(
+        WwmInstallationState state, WwmInstallationBinding currentBinding)
+    {
+        if (currentBinding.Source is not (WwmInstallationSource.UnknownWindows or WwmInstallationSource.OfficialLauncher)
+            || state.SchemaVersion != 2
+            || !WwmStateStore.IsValidBinding(state.InstallationRoot, state.TargetLayout, state.InstallationFingerprint,
+                state.Targets.Select(item => item.RelativePath).ToArray())
+            || !TrySameFullPath(state.InstallationRoot, currentBinding.GameRoot)
+            || !Enum.TryParse<WwmInstallationLayout>(state.TargetLayout, out var previousLayout)
+            || previousLayout is not (WwmInstallationLayout.Package or WwmInstallationLayout.LocalDataPatch)
+            || previousLayout == currentBinding.Layout
+            || !_definition.IsMutationLayoutSafe(currentBinding.GameRoot, previousLayout))
+            return null;
+
+        return new WwmInstallationBinding(
+            WwmGameDefinition.NormalizeInstallationRoot(currentBinding.GameRoot), WwmInstallationSource.UnknownWindows,
+            previousLayout, currentBinding.BuildId, currentBinding.Fingerprint);
     }
 
     private static bool SnapshotMatchesBinding(WwmPreHubSnapshot snapshot, WwmInstallationBinding binding)

@@ -561,11 +561,19 @@ public sealed record WwmDetectionResult(
         WwmInstallationSource.Steam or WwmInstallationSource.EpicGames when Layout.HasFlag(WwmInstallationLayout.Package)
             => WwmInstallationLayout.Package,
         WwmInstallationSource.OfficialLauncher when Layout.HasFlag(WwmInstallationLayout.LocalDataPatch)
-            => Layout.HasFlag(WwmInstallationLayout.Package) ? WwmInstallationLayout.Package : WwmInstallationLayout.Unknown,
+            => WwmInstallationLayout.LocalDataPatch,
+        WwmInstallationSource.UnknownWindows when Layout.HasFlag(WwmInstallationLayout.LocalDataPatch)
+            && (!Layout.HasFlag(WwmInstallationLayout.Package) || IsOfficialLauncherRoot)
+            => WwmInstallationLayout.LocalDataPatch,
         WwmInstallationSource.UnknownWindows when Layout.HasFlag(WwmInstallationLayout.Package)
             => WwmInstallationLayout.Package,
         _ => WwmInstallationLayout.Unknown
     };
+    private bool IsOfficialLauncherRoot => EvidenceMarker == "official-launcher-folder-name"
+        || (GameRoot != null && Path.GetFileName(Path.TrimEndingDirectorySeparator(GameRoot)) is var folderName
+            && (string.Equals(folderName, "wwm_standard", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(folderName, "wwm_standart", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(folderName, "wwm_lite", StringComparison.OrdinalIgnoreCase)));
     public bool HasAmbiguousTargetLayout => IsFound && TargetLayout == WwmInstallationLayout.Unknown;
     public bool IsMutationSupported => IsFound && TargetLayout != WwmInstallationLayout.Unknown;
     public string? ManifestPath => Source == WwmInstallationSource.Steam ? EvidenceMarker : null;

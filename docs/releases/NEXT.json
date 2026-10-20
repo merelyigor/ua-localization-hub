@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "summary": "Покращено автоматичне знаходження Where Winds Meet та уточнено, що доступність локалізації не означає встановлену гру.",
+  "summary": "Виправлено пошук і папку встановлення локалізації Where Winds Meet для офіційного клієнта та Steam/Epic.",
   "new": [],
   "fixed": [
-    "Заборонено встановлення локалізації WWM у LocalData/Patch/HD/oversea/locale; нова установка можлива лише у Package/HD/oversea/locale.",
-    "Виправлено автоматичне знаходження типових папок офіційного лаунчера wwm_standard, wwm_standart і wwm_lite."
+    "Офіційний клієнт WWM встановлює обидва файли локалізації у LocalData/Patch/HD/oversea/locale; Steam та Epic — у Package/HD/oversea/locale.",
+    "Безпечний перехід зі старої установки в іншій папці відновлює її попередній стан перед повторним встановленням."
   ],
   "reliability": [],
   "performance": [],

@@ -2,9 +2,9 @@
 
 Canonical conditional rules з попереднього AGENTS.md; поведінку не змінено. Читати relevant § за routing кореневого AGENTS.md. Номера не перенумеровані; paths у code spans відносні до repository root. Перед будь-якою game mutation прочитай повністю §11, §13–19, §27–29 і §41 для updater.
 
-## Чинне уточнення власника — WWM (2026-10-20)
+## Чинне уточнення власника — WWM (2026-10-21)
 
-Пряма вимога власника для поточного WWM клієнта: нове встановлення/оновлення українізатора дозволене лише в `Package/HD/oversea/locale/`; `LocalData/Patch/HD/oversea/locale/` звичайні install/update/restore не читають і не змінюють. Якщо наявний лише LocalData, гра відображається як знайдена, але дія встановлення недоступна. Старий незавершений журнал може виконати тільки exact rollback, який він уже записав. Це актуальне уточнення застосовується до історичних варіантів у нижчих § та зберігає їхні preservation hashes.
+Після запиту власника перевірити інтернет-джерела та виправити основну функцію хаба цільову layout вибираємо відповідно до фактичного клієнта: доведені Steam/Epic інсталяції встановлюють обидва файли в `Package/HD/oversea/locale/`; відомі каталоги офіційного WWM клієнта (`wwm_standard`, `wwm_standart`, `wwm_lite`) з наявною LocalData layout — в `LocalData/Patch/HD/oversea/locale/`; невідомі корені без Package layout використовують єдину наявну LocalData layout. Відомі каталоги є лише підказкою цілі, не доказом launcher provenance; невідомий dual-layout root лишається на Package. Другу layout звичайна операція не змінює. Перед переходом довіреного попереднього Hub state на іншу layout треба транзакційно відновити попередній pre-Hub стан. Джерела: офіційна публічна інструкція Winds4UA, незалежний GitHub `hpsonnguyen/wwm_localization`, Steam Community guide та інструкції/звіти гравців на форумах локалізації; хешовані технічні § нижче зберігають історичний контракт і preservation hashes.
 
 <a id="section-1"></a>
 
