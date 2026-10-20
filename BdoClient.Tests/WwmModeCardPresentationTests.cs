@@ -45,6 +45,29 @@ public sealed class WwmModeCardPresentationTests
     }
 
     [Fact]
+    public void ReinstallButtonClick_RequestsActionOnceWithoutTriggeringSelection()
+    {
+        var selectionCount = 0;
+        var actionCount = 0;
+        using var card = new WwmModeCard(new WwmMode
+        {
+            Slug = "ukrainian",
+            Variant = "default",
+            Label = "Українська",
+            Available = true
+        });
+        card.Present(WwmModeCardPresentation.Create(true, WwmInstalledStateKind.Current,
+            stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: false));
+        card.SelectionRequested += (_, _) => selectionCount++;
+        card.ActionRequested += (_, _) => actionCount++;
+
+        card.ReinstallButtonForTest.PerformClick();
+
+        Assert.Equal(0, selectionCount);
+        Assert.Equal(1, actionCount);
+    }
+
+    [Fact]
     public void BusyInteractionGate_DisablesActionAndRestoresLatestPresentation()
     {
         using var card = new WwmModeCard(new WwmMode
@@ -72,27 +95,51 @@ public sealed class WwmModeCardPresentationTests
     }
 
     [Fact]
-    public void ExactCurrentPackage_ShowsInstalledWithReinstallAction()
+    public void ExactCurrentPackage_ShowsInstalledWithSecondaryReinstall()
     {
         var presentation = WwmModeCardPresentation.Create(true, WwmInstalledStateKind.Current,
             stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: false);
 
         Assert.Equal("✓ Встановлено", presentation.StateText);
-        Assert.Equal("Перевстановити", presentation.ActionText);
-        Assert.True(presentation.ActionEnabled);
+        Assert.Null(presentation.ActionText);
+        Assert.False(presentation.ActionEnabled);
+        Assert.True(presentation.ShowReinstall);
+        Assert.True(presentation.ReinstallEnabled);
         Assert.Equal(ModeCardTone.Success, presentation.Tone);
         Assert.True(presentation.IsInstalled);
     }
 
     [Fact]
-    public void ExactCurrentPackage_DisablesReinstallDuringOperation()
+    public void ExactCurrentPackage_LeavesSecondaryReinstallVisibleButDisabledDuringOperation()
     {
         var presentation = WwmModeCardPresentation.Create(true, WwmInstalledStateKind.Current,
             stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: true);
 
-        Assert.Equal("Перевстановити", presentation.ActionText);
+        Assert.Null(presentation.ActionText);
         Assert.False(presentation.ActionEnabled);
+        Assert.True(presentation.ShowReinstall);
+        Assert.False(presentation.ReinstallEnabled);
         Assert.True(presentation.IsInstalled);
+    }
+
+    [Fact]
+    public void ExactCurrentCard_ShowsQuietSeparateReinstallButtonAndNoPrimaryAction()
+    {
+        using var card = new WwmModeCard(new WwmMode
+        {
+            Slug = "ukrainian",
+            Variant = "default",
+            Label = "Українська",
+            Available = true
+        });
+        card.Present(WwmModeCardPresentation.Create(true, WwmInstalledStateKind.Current,
+            stateTrusted: true, recoveryBlocked: false, gameDetected: true, operationInProgress: false));
+
+        Assert.False(card.ActionVisibleForTest);
+        Assert.True(card.ReinstallVisibleForTest);
+        Assert.True(card.ReinstallEnabledForTest);
+        Assert.Equal("Перевстановити", card.ReinstallTextForTest);
+        Assert.Equal(UiTheme.NeutralText, card.ReinstallButtonForTest.ForeColor);
     }
 
     [Fact]

@@ -6,6 +6,7 @@ namespace BdoClient;
 internal sealed class LocalizationModeCard : Control
 {
     private readonly Button _actionButton;
+    private readonly Button _reinstallButton;
     private bool _hovered;
     private bool _selected;
     private bool _installed;
@@ -20,6 +21,11 @@ internal sealed class LocalizationModeCard : Control
     internal string? StateTextForTest => _presentation.StateText;
     internal string? ActionTextForTest => _presentation.ActionText;
     internal bool ActionEnabledForTest => _presentation.ActionEnabled;
+    internal Button ActionButtonForTest => _actionButton;
+    internal bool ReinstallVisibleForTest => _reinstallButton.Visible;
+    internal bool ReinstallEnabledForTest => _reinstallButton.Enabled;
+    internal string ReinstallTextForTest => _reinstallButton.Text;
+    internal Button ReinstallButtonForTest => _reinstallButton;
 
     public LocalizationModeCard(LocalizationMode mode)
     {
@@ -35,7 +41,20 @@ internal sealed class LocalizationModeCard : Control
 
         _actionButton = new Button { AutoSize = false, Height = 32, TabStop = true, AccessibleName = $"Дія для режиму {AccessibleName}", Margin = new Padding(0) };
         _actionButton.Click += (_, _) => ActionRequested?.Invoke(this, EventArgs.Empty);
+        _reinstallButton = new Button
+        {
+            AutoSize = false,
+            Size = new Size(UiTheme.Scale(this, 122), UiTheme.Scale(this, 24)),
+            Text = "Перевстановити",
+            AccessibleName = $"Перевстановити {AccessibleName}",
+            Visible = false,
+            TabStop = true,
+            Margin = Padding.Empty
+        };
+        _reinstallButton.Click += (_, _) => ActionRequested?.Invoke(this, EventArgs.Empty);
+        UiTheme.StyleSecondaryButton(_reinstallButton);
         Controls.Add(_actionButton);
+        Controls.Add(_reinstallButton);
         MinimumSize = new Size(240, 220);
     }
 
@@ -45,6 +64,8 @@ internal sealed class LocalizationModeCard : Control
         _actionButton.Text = presentation.ActionText ?? "";
         _actionButton.Visible = !string.IsNullOrWhiteSpace(presentation.ActionText);
         _actionButton.Enabled = presentation.ActionEnabled;
+        _reinstallButton.Visible = presentation.ShowReinstall;
+        _reinstallButton.Enabled = presentation.ReinstallEnabled;
         _actionButton.AccessibleDescription = presentation.StateText ?? "";
         UiTheme.StyleCardActionButton(_actionButton, presentation.Tone == ModeCardTone.Warning);
         var releaseLine = DynamicModePolicy.FormatReleaseLine(Mode);
@@ -68,6 +89,8 @@ internal sealed class LocalizationModeCard : Control
         if (!string.IsNullOrWhiteSpace(Mode.Description))
             height += Measure(Mode.Description.Trim(), bodyFont, textWidth).Height + UiTheme.Scale(this, 8);
         height += Measure(DynamicModePolicy.FormatReleaseLine(Mode), bodyFont, textWidth).Height + UiTheme.Scale(this, 12);
+        if (_reinstallButton.Visible)
+            height += UiTheme.Scale(this, 30);
         var stateText = _presentation.StateText;
         height += _actionButton.Visible ? UiTheme.Scale(this, 32) + padding : string.IsNullOrWhiteSpace(stateText) ? padding : Measure(stateText, bodyFont, textWidth).Height + padding;
         return new Size(width, Math.Max(UiTheme.Scale(this, 208), height));
@@ -76,6 +99,8 @@ internal sealed class LocalizationModeCard : Control
     protected override void OnLayout(LayoutEventArgs levent)
     {
         base.OnLayout(levent);
+        if (_reinstallButton.Visible)
+            _reinstallButton.Bounds = new Rectangle(UiTheme.Scale(this, 18), UiTheme.Scale(this, 42), _reinstallButton.Width, _reinstallButton.Height);
         if (_actionButton.Visible)
         {
             var inset = UiTheme.Scale(this, 18);
@@ -102,7 +127,7 @@ internal sealed class LocalizationModeCard : Control
     }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
     protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
-    protected override void OnEnabledChanged(EventArgs e) { _actionButton.Enabled = Enabled && _presentation.ActionEnabled; Invalidate(); base.OnEnabledChanged(e); }
+    protected override void OnEnabledChanged(EventArgs e) { _actionButton.Enabled = Enabled && _presentation.ActionEnabled; _reinstallButton.Enabled = Enabled && _presentation.ReinstallEnabled; Invalidate(); base.OnEnabledChanged(e); }
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -118,7 +143,7 @@ internal sealed class LocalizationModeCard : Control
                 inset: 18, top: 15);
         }
 
-        var top = padding + UiTheme.Scale(this, 30);
+        var top = padding + UiTheme.Scale(this, _reinstallButton.Visible ? 60 : 30);
         var textWidth = Width - padding * 2;
         using var titleFont = new Font(Font.FontFamily, 11F, FontStyle.Bold);
         using var bodyFont = new Font(Font.FontFamily, 9F, FontStyle.Regular);

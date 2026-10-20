@@ -6,6 +6,27 @@ namespace BdoClient.Tests;
 public sealed class ModeCardPresentationPolicyTests
 {
     [Fact]
+    public void ExactInstalledCard_UsesCompactNeutralReinstallControlAtUpperLeft()
+    {
+        using var card = new LocalizationModeCard(Mode("full", "A")) { Size = new System.Drawing.Size(320, 240) };
+        var presentation = Create(LocalizationState.UpToDate, "full", "A", card.Mode);
+        var actions = 0;
+        card.ActionRequested += (_, _) => actions++;
+
+        card.ApplyPresentation(presentation);
+
+        Assert.Null(card.ActionTextForTest);
+        Assert.True(card.ReinstallVisibleForTest);
+        Assert.True(card.ReinstallEnabledForTest);
+        Assert.Equal("Перевстановити", card.ReinstallTextForTest);
+        Assert.Equal(UiTheme.NeutralText, card.ReinstallButtonForTest.ForeColor);
+        Assert.True(card.ReinstallButtonForTest.Left < card.Width / 2);
+        Assert.True(card.ReinstallButtonForTest.Top < 60);
+        card.ReinstallButtonForTest.PerformClick();
+        Assert.Equal(1, actions);
+    }
+
+    [Fact]
     public void NothingInstalled_CompatibleMode_OffersInstall()
     {
         var presentation = Create(LocalizationState.NotInstalled, null, null, Mode("full", "A"));
@@ -45,13 +66,27 @@ public sealed class ModeCardPresentationPolicyTests
     }
 
     [Fact]
-    public void ExactTarget_UpToDate_ShowsInstalledWithReinstallAction()
+    public void ExactTarget_UpToDate_ShowsInstalledWithSeparateSecondaryReinstall()
     {
         var presentation = Create(LocalizationState.UpToDate, "full", "A", Mode("full", "A"));
         Assert.True(presentation.IsInstalled);
         Assert.Equal("✓ Встановлено", presentation.StateText);
-        Assert.Equal("Перевстановити", presentation.ActionText);
-        Assert.True(presentation.ActionEnabled);
+        Assert.Null(presentation.ActionText);
+        Assert.False(presentation.ActionEnabled);
+        Assert.True(presentation.ShowReinstall);
+        Assert.True(presentation.ReinstallEnabled);
+    }
+
+    [Fact]
+    public void ExactTarget_ReinstallIsDisabledWhenWritesAreNotAllowed()
+    {
+        var presentation = ModeCardPresentationPolicy.Create(
+            LocalizationState.UpToDate, "full", "A", Mode("full", "A"), CompatibilityResult.Allowed(),
+            operationInProgress: false, activeTarget: false, allowWriteActions: false);
+
+        Assert.Null(presentation.ActionText);
+        Assert.True(presentation.ShowReinstall);
+        Assert.False(presentation.ReinstallEnabled);
     }
 
     [Fact]

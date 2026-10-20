@@ -12,7 +12,11 @@ internal sealed record ModeCardPresentation(
     bool ActionEnabled,
     bool IsInstalled,
     bool IsBusy,
-    string? DetailText);
+    string? DetailText)
+{
+    public bool ShowReinstall { get; init; }
+    public bool ReinstallEnabled { get; init; }
+}
 
 internal static class ModeCardPresentationPolicy
 {
@@ -40,11 +44,15 @@ internal static class ModeCardPresentationPolicy
 
         if (operationInProgress)
         {
-            return new(activeTarget
+            return new ModeCardPresentation(activeTarget
                     ? awaitingConfirmation ? "Очікує підтвердження" : "Виконується операція"
                     : StateTextForExisting(exact, sameMode, factualState),
                 activeTarget ? ModeCardTone.Busy : exact ? ModeCardTone.Success : ModeCardTone.Neutral,
-                activeTarget ? null : ActionTextFor(exact, sameMode, factualState), false, exact, activeTarget, null);
+                activeTarget ? null : ActionTextFor(exact, sameMode, factualState), false, exact, activeTarget, null)
+            {
+                ShowReinstall = exact && factualState == LocalizationState.UpToDate,
+                ReinstallEnabled = false
+            };
         }
 
         if (!compatibility.IsAllowed)
@@ -52,7 +60,11 @@ internal static class ModeCardPresentationPolicy
 
         if (exact && factualState == LocalizationState.UpToDate)
             return new("✓ Встановлено", ModeCardTone.Success,
-                InstallButtonLabelPolicy.ReinstallText, policy.CanInstall, true, false, "Поточний реліз встановлено");
+                null, false, true, false, "Поточний реліз встановлено")
+            {
+                ShowReinstall = true,
+                ReinstallEnabled = policy.CanInstall
+            };
 
         if (sameMode && factualState == LocalizationState.UpdateAvailable)
             return new("Доступне оновлення", ModeCardTone.Warning,
@@ -71,7 +83,7 @@ internal static class ModeCardPresentationPolicy
         exact ? "✓ Встановлено" : sameMode && state == LocalizationState.UpdateAvailable ? "Доступне оновлення" : null;
 
     private static string? ActionTextFor(bool exact, bool sameMode, LocalizationState state) =>
-        exact && state == LocalizationState.UpToDate ? InstallButtonLabelPolicy.ReinstallText
+        exact && state == LocalizationState.UpToDate ? null
             : sameMode && state == LocalizationState.UpdateAvailable ? InstallButtonLabelPolicy.UpdateText
             : InstallButtonLabelPolicy.InstallText;
 }

@@ -413,7 +413,7 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 
 §18.6 Основний ідентифікатор release — `public_id`, а не `patch` чи `version`.
 
-§18.7 **Product decision:** Існує один underlying install/update flow. Кожна API-driven картка режиму показує контекстну дію: `Встановити` для першої установки або зміни режиму, `Оновити` — для новішого release того самого режиму, `Перевстановити` — для exact current target. Exact current target також показує `✓ Встановлено`. Перевстановлення використовує той самий validated latest, backup, transactional replace, verify та rollback шлях, що й інші установки. Restore Backup є внутрішньою safety capability, не public UI.
+§18.7 **Product decision:** Існує один underlying install/update flow. Основна дія API-driven картки показує `Встановити` для першої установки або зміни режиму та `Оновити` для новішого release того самого режиму. Точно встановлений актуальний реліз позначається `✓ Встановлено`; для нього окремо показується невелика нейтральна кнопка `Перевстановити` у верхній лівій частині картки, яка не займає основний action slot і не використовує акцент оновлення. Перевстановлення використовує той самий validated latest, backup, transactional replace, verify та rollback шлях, що й інші установки. Restore Backup є внутрішньою safety capability, не public UI.
 
 ---
 

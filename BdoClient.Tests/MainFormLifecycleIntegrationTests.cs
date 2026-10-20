@@ -590,8 +590,9 @@ public sealed class MainFormLifecycleIntegrationTests
         var installedCard = Assert.Single(FindWwmModeCards(fixture.Form));
         Assert.Equal("✓ Встановлено", installedCard.StateTextForTest);
         Assert.True(installedCard.InstalledBadgeVisibleForTest);
-        Assert.Equal("Перевстановити", installedCard.ActionTextForTest);
-        Assert.True(installedCard.ActionEnabledForTest);
+        Assert.Null(installedCard.ActionTextForTest);
+        Assert.True(installedCard.ReinstallVisibleForTest);
+        Assert.True(installedCard.ReinstallEnabledForTest);
         Assert.Contains("успішно встановлено", fixture.Form.OperationMessageForTest, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(WwmInstalledStateKind.Current,
             (await session.InstallService.ResolveStateAsync(session.CurrentDetection,
@@ -943,9 +944,10 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal(UiTheme.SuccessSurface, installedCard.InstalledBadgeBackColorForTest);
         Assert.True(installedCard.IsInstalledForTest);
         Assert.False(installedCard.StatusLabelVisibleForTest);
-        Assert.Equal("Перевстановити", installedCard.ActionTextForTest);
-        Assert.True(installedCard.ActionVisibleForTest);
-        Assert.True(installedCard.ActionEnabledForTest);
+        Assert.Null(installedCard.ActionTextForTest);
+        Assert.False(installedCard.ActionVisibleForTest);
+        Assert.True(installedCard.ReinstallVisibleForTest);
+        Assert.True(installedCard.ReinstallEnabledForTest);
     }
 
     [Fact]
@@ -1453,7 +1455,7 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Contains("Сервер недоступний.", startup.Message);
         Assert.Contains("збережені дані", startup.Message);
         Assert.NotNull(card);
-        Assert.False(card!.Controls.OfType<Button>().Single().Enabled);
+        Assert.False(card!.ActionButtonForTest.Enabled);
     }
 
     [Fact]
@@ -1473,7 +1475,7 @@ public sealed class MainFormLifecycleIntegrationTests
 
         var card = MainFormTestFixture.FindFirstModeCard(fixture.Form);
         Assert.NotNull(card);
-        Assert.False(card!.Controls.OfType<Button>().Single().Enabled);
+        Assert.False(card!.ActionButtonForTest.Enabled);
     }
 
     [Fact]
@@ -1549,7 +1551,7 @@ public sealed class MainFormLifecycleIntegrationTests
 
         var outdatedCard = MainFormTestFixture.FindFirstModeCard(fixture.Form);
         Assert.NotNull(outdatedCard);
-        Assert.False(outdatedCard!.Controls.OfType<Button>().Single().Enabled);
+        Assert.False(outdatedCard!.ActionButtonForTest.Enabled);
 
         fixture.UpdateGamePatch(401);
         fixture.SignalSecondaryActivation();
@@ -1562,7 +1564,7 @@ public sealed class MainFormLifecycleIntegrationTests
 
         var currentCard = MainFormTestFixture.FindFirstModeCard(fixture.Form);
         Assert.NotNull(currentCard);
-        Assert.True(currentCard!.Controls.OfType<Button>().Single().Enabled);
+        Assert.True(currentCard!.ActionButtonForTest.Enabled);
         Assert.Null(fixture.HostException);
     }
 
@@ -1701,7 +1703,7 @@ public sealed class MainFormLifecycleIntegrationTests
 
         var failedCard = MainFormTestFixture.FindFirstModeCard(fixture.Form);
         Assert.NotNull(failedCard);
-        Assert.False(failedCard!.Controls.OfType<Button>().Single().Enabled);
+        Assert.False(failedCard!.ActionButtonForTest.Enabled);
 
         fixture.UpdateGamePatch(401);
         fixture.SignalSecondaryActivation();
@@ -1713,7 +1715,7 @@ public sealed class MainFormLifecycleIntegrationTests
 
         var recoveredCard = MainFormTestFixture.FindFirstModeCard(fixture.Form);
         Assert.NotNull(recoveredCard);
-        Assert.True(recoveredCard!.Controls.OfType<Button>().Single().Enabled);
+        Assert.True(recoveredCard!.ActionButtonForTest.Enabled);
     }
 
     [Fact]
@@ -1871,7 +1873,7 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal(2, state.Value.Version);
         Assert.Equal(Convert.ToHexString(SHA256.HashData(latestB)).ToLowerInvariant(), state.Value.Sha256);
         Assert.Equal("✓ Встановлено", fixture.Form.SelectedModeCardStateTextForTest);
-        Assert.Equal("Перевстановити", fixture.Form.SelectedModeCardActionTextForTest);
+        Assert.Null(fixture.Form.SelectedModeCardActionTextForTest);
         Assert.Equal(4, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));
         Assert.Single(handler.RequestPaths.Where(path => path == "/download/releases/01RELEASEB"));
         Assert.Contains(fixture.Logger.Warnings, message => message.Contains("latest/aggregate identity conflict", StringComparison.Ordinal));
@@ -2107,7 +2109,7 @@ public sealed class MainFormLifecycleIntegrationTests
         await fixture.WaitForAsync(form => MainFormTestFixture.CountModeCards(form) == 1);
 
         await fixture.InstallForTestAsync();
-        Assert.Equal("Перевстановити", fixture.Form.SelectedModeCardActionTextForTest);
+        Assert.Null(fixture.Form.SelectedModeCardActionTextForTest);
         await fixture.InstallForTestAsync();
 
         Assert.Equal(6, handler.RequestPaths.Count(path => path.EndsWith("/releases/latest/english-items", StringComparison.Ordinal)));

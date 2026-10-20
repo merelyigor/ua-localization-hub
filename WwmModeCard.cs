@@ -14,6 +14,7 @@ internal sealed class WwmModeCard : UserControl
     private readonly Label _status;
     private readonly Label _releaseVersion;
     private readonly Button _action;
+    private readonly Button _reinstall;
     private readonly Label _installedBadge;
     private readonly Font _installedBadgeFont;
     public WwmMode Mode { get; }
@@ -31,8 +32,12 @@ internal sealed class WwmModeCard : UserControl
     public string ModeVariant => Mode.Variant!;
     internal bool ActionEnabledForTest => _action.Enabled;
     internal bool ActionVisibleForTest => _action.Visible;
-    internal string ActionTextForTest => _action.Text;
+    internal string? ActionTextForTest => _action.Visible ? _action.Text : null;
     internal Button ActionButtonForTest => _action;
+    internal bool ReinstallVisibleForTest => _reinstall.Visible;
+    internal bool ReinstallEnabledForTest => _reinstall.Enabled;
+    internal string ReinstallTextForTest => _reinstall.Text;
+    internal Button ReinstallButtonForTest => _reinstall;
     internal string StateTextForTest => _status.Text;
     internal bool InstalledBadgeVisibleForTest => _installedBadge.Visible;
     internal string InstalledBadgeTextForTest => _installedBadge.Text;
@@ -73,6 +78,16 @@ internal sealed class WwmModeCard : UserControl
         };
         _status = new Label { Dock = DockStyle.Bottom, Height = 30, ForeColor = UiTheme.SecondaryText, BackColor = Color.Transparent };
         _action = new Button { Dock = DockStyle.Bottom, Height = 34, Visible = false, TabStop = true };
+        _reinstall = new Button
+        {
+            AutoSize = false,
+            Size = new Size(UiTheme.Scale(this, 122), UiTheme.Scale(this, 24)),
+            Text = "Перевстановити",
+            AccessibleName = $"Перевстановити {AccessibleName}",
+            Visible = false,
+            TabStop = true,
+            Margin = Padding.Empty
+        };
         _installedBadgeFont = new Font(Font.FontFamily, 8.5F, FontStyle.Bold);
         _installedBadge = new Label
         {
@@ -89,16 +104,19 @@ internal sealed class WwmModeCard : UserControl
         };
         _installedBadge.Paint += InstalledBadge_Paint;
         UiTheme.StyleAccentSecondaryButton(_action);
+        UiTheme.StyleSecondaryButton(_reinstall);
         _action.Click += (_, _) => ActionRequested?.Invoke(this, EventArgs.Empty);
+        _reinstall.Click += (_, _) => ActionRequested?.Invoke(this, EventArgs.Empty);
         Controls.Add(_description);
         Controls.Add(_releaseVersion);
         Controls.Add(_status);
         Controls.Add(_action);
+        Controls.Add(_reinstall);
         Controls.Add(_title);
         Controls.Add(_installedBadge);
         foreach (Control child in Controls)
         {
-            if (!ReferenceEquals(child, _action))
+            if (!ReferenceEquals(child, _action) && !ReferenceEquals(child, _reinstall))
                 child.Click += (_, _) => SelectionRequested?.Invoke(this, EventArgs.Empty);
             child.MouseEnter += (_, _) => SetHovered(true);
             child.MouseLeave += (_, _) => UpdateHoverFromPointer();
@@ -125,6 +143,10 @@ internal sealed class WwmModeCard : UserControl
         var contentTop = showInstalledBadge
             ? UiTheme.Scale(this, 15) + _installedBadge.GetPreferredSize(Size.Empty).Height + UiTheme.Scale(this, 8)
             : 18;
+        _reinstall.Visible = presentation.ShowReinstall;
+        _reinstall.Enabled = _interactionEnabled && presentation.ReinstallEnabled;
+        if (_reinstall.Visible)
+            contentTop = Math.Max(contentTop, UiTheme.Scale(this, 48));
         Padding = new Padding(18, contentTop, 18, 18);
         _action.Text = presentation.ActionText ?? "";
         _action.Visible = !string.IsNullOrWhiteSpace(presentation.ActionText);
@@ -143,6 +165,7 @@ internal sealed class WwmModeCard : UserControl
         _interactionEnabled = enabled;
         Enabled = true;
         _action.Enabled = enabled && _presentation.ActionEnabled;
+        _reinstall.Enabled = enabled && _presentation.ReinstallEnabled;
         Invalidate();
     }
 
@@ -163,6 +186,8 @@ internal sealed class WwmModeCard : UserControl
     protected override void OnLayout(LayoutEventArgs e)
     {
         base.OnLayout(e);
+        if (_reinstall != null && _reinstall.Visible)
+            _reinstall.Location = new Point(UiTheme.Scale(this, 18), UiTheme.Scale(this, 15));
         if (_installedBadge != null && _installedBadge.Visible)
         {
             var padding = UiTheme.Scale(this, 18);
@@ -250,6 +275,8 @@ internal sealed class WwmModeCard : UserControl
 internal sealed record WwmModeCardPresentation(
     string StateText, string? ActionText, bool ActionEnabled, ModeCardTone Tone, bool IsInstalled)
 {
+    public bool ShowReinstall { get; init; }
+    public bool ReinstallEnabled { get; init; }
     public static WwmModeCardPresentation Create(
         bool sameInstalledMode,
         WwmInstalledStateKind installedState,
@@ -268,8 +295,12 @@ internal sealed record WwmModeCardPresentation(
                 gameDetected && !operationInProgress, ModeCardTone.Warning, false);
 
         if (sameInstalledMode && installedState == WwmInstalledStateKind.Current)
-            return new("✓ Встановлено", "Перевстановити",
-                gameDetected && !operationInProgress, ModeCardTone.Success, true);
+            return new WwmModeCardPresentation("✓ Встановлено", null,
+                false, ModeCardTone.Success, true)
+            {
+                ShowReinstall = true,
+                ReinstallEnabled = gameDetected && !operationInProgress
+            };
 
         var isUpdate = sameInstalledMode && installedState == WwmInstalledStateKind.UpdateAvailable;
         return new(isUpdate ? "Доступне оновлення" : "Доступно",
