@@ -1,11 +1,8 @@
 {
   "schema_version": 1,
-  "summary": "Виправлено пошук і папку встановлення локалізації Where Winds Meet для офіційного клієнта та Steam/Epic.",
+  "summary": "",
   "new": [],
-  "fixed": [
-    "Офіційний клієнт WWM встановлює обидва файли локалізації у LocalData/Patch/HD/oversea/locale; Steam та Epic — у Package/HD/oversea/locale.",
-    "Безпечний перехід зі старої установки в іншій папці відновлює її попередній стан перед повторним встановленням."
-  ],
+  "fixed": [],
   "reliability": [],
   "performance": [],
   "changes": [],

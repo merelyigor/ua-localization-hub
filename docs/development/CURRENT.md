@@ -1,6 +1,6 @@
 # Current Engineering Context
 
-Оновлено: 2026-10-20
+Оновлено: 2026-10-21
 
 ## Чинний процес — CODEX-OWNED
 
@@ -14,9 +14,9 @@ Harness: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs|Code` (�
 
 Виправлення встановлення WWM за наявності двох locale-структур опубліковано у stable v1.2.22. За одночасної наявності `Package` і `LocalData` установка спрямовується лише до `Package/HD/oversea/locale`; звичайне встановлення й очищення не читають і не змінюють файли, байти чи атрибути в LocalData. Source SHA: `286b26ac43f4aaa6da0d6c43ef0fc6fea7ad6129`; normal CI run `39488975592` і Release Candidate run `39489478691` пройшли, кожен із 1248/1248 тестів. Stable Release ID `418833809` опубліковано `2026-10-20T20:20:25Z`; annotated tag `v1.2.22` вказує на цей SHA. Canonical і legacy ZIP незалежно завантажено, їхні digests збігаються з RC artifacts. Реальні файли гри не змінювалися. Деталі: [`docs/releases/v1.2.22.md`](../releases/v1.2.22.md).
 
-## v1.2.23 — автоматичний пошук WWM та вибір фактичної locale layout
+## v1.2.23 — RELEASED / PUBLIC VERIFIED / FINALIZED
 
-Ресерч за незалежним GitHub-проєктом і настановами спільноти підтвердив: офіційний клієнт використовує `LocalData/Patch/HD/oversea/locale/`, Steam/Epic — `Package/HD/oversea/locale/`; обидва файли встановлюються в одну цільову папку. WWM автопошук перевіряє відомі `wwm_standard`, `wwm_standart`, `wwm_lite` шляхи з обов'язковими product markers; назва папки не доводить provenance. Steam/Epic зберігають Package; відомі каталоги офіційного клієнта з обома layout-ами спрямовуються в LocalData; невідомий dual-layout root лишається на Package; LocalData-only root використовує LocalData. Попередній Package cycle відновлюється перед переходом на LocalData. Синтетичні перевірки охоплюють вибір LocalData для трьох відомих офіційних каталогів, Package для generic dual-layout, стан `NeedsReinstall`, безпечне відновлення старого циклу, збій/повтор після підготовки пакета та rollback із ReadOnly. Code profile пройшов: Release 0 warnings / 0 errors, 1256/1256 тестів, safety/workflow/release-note gates PASS. Внутрішній adversarial review: 0 blocker / 0 important; зауваження про відновлення після перерваного переходу закрите regression-тестом. Далі — commit, exact-SHA CI і public release.
+Ресерч за незалежним GitHub-проєктом і настановами спільноти підтвердив: офіційний клієнт використовує `LocalData/Patch/HD/oversea/locale/`, Steam/Epic — `Package/HD/oversea/locale/`; обидва файли встановлюються в одну цільову папку. Відомі каталоги `wwm_standard`, `wwm_standart`, `wwm_lite` спрямовуються в LocalData; невідомий dual-layout root лишається на Package; LocalData-only root використовує LocalData. Детальні release facts: [`docs/releases/v1.2.23.md`](../releases/v1.2.23.md). Stable Release ID `418899341` опубліковано `2026-10-20T21:29:50Z`; live latest stable — `v1.2.23`. RC run `39499774442` і normal CI run `39499235238` пройшли на source SHA `1da3f17d77427fcffc5abb0893377c009dcc9b53`; public ZIP-и незалежно завантажені та збігаються з RC SHA-256. Реальні файли гри не змінювалися.
 
 ## v1.2.21 — RELEASED / PUBLIC VERIFIED
 
