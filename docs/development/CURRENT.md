@@ -18,11 +18,9 @@ Harness: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs|Code` (�
 
 Ресерч за незалежним GitHub-проєктом і настановами спільноти підтвердив: офіційний клієнт використовує `LocalData/Patch/HD/oversea/locale/`, Steam/Epic — `Package/HD/oversea/locale/`; обидва файли встановлюються в одну цільову папку. Відомі каталоги `wwm_standard`, `wwm_standart`, `wwm_lite` спрямовуються в LocalData; невідомий dual-layout root лишається на Package; LocalData-only root використовує LocalData. Детальні release facts: [`docs/releases/v1.2.23.md`](../releases/v1.2.23.md). Stable Release ID `418899341` опубліковано `2026-10-20T21:29:50Z`; live latest stable — `v1.2.23`. RC run `39499774442` і normal CI run `39499235238` пройшли на source SHA `1da3f17d77427fcffc5abb0893377c009dcc9b53`; public ZIP-и незалежно завантажені та збігаються з RC SHA-256. Реальні файли гри не змінювалися.
 
-## v1.2.24 — перевстановлення з картки локалізації
+## v1.2.24 — RELEASED / PUBLIC VERIFIED
 
-## v1.2.24 — перевстановлення з картки локалізації
-
-На картках BDO та WWM для точно встановленого актуального релізу доступна дія `Перевстановити` поряд зі станом `✓ Встановлено`. Вона повторно використовує звичайний захищений шлях встановлення: свіжі метадані, перевірка сумісності, резервна копія, транзакційний запис, перевірка результату й rollback. Повний Code gate пройшов: Release build без warnings/errors, 1 257/1 257 тестів. RC і публікація очікуються.
+Картки BDO та WWM для точно встановленого актуального релізу тепер пропонують `Перевстановити` й зберігають індикатор `✓ Встановлено`. Дія проходить звичайний захищений install flow. Повний Code gate: Release build без warnings/errors, 1 257/1 257 тестів; exact-SHA CI `39505524913` і RC `39505973333` успішні. Stable Release ID `418937623` опубліковано `2026-10-20T22:18:39Z`; live latest stable — `v1.2.24`. Обидва публічні ZIP-и незалежно завантажено та звірено з RC digests. Деталі: [`docs/releases/v1.2.24.md`](../releases/v1.2.24.md). Реальні файли гри не змінювалися; native UI smoke не виконувався.
 
 ## v1.2.21 — RELEASED / PUBLIC VERIFIED
 
