@@ -240,8 +240,82 @@ public sealed class WwmStage10Tests
         Assert.True(definition.ValidateGameRoot(root));
         var result = new WwmSteamDetector(Logger, Array.Empty<string>()).DescribeRoot(root, "manual-folder-selection");
         Assert.Equal(WwmInstallationSource.UnknownWindows, result.Source);
-        Assert.Equal(WwmInstallationLayout.LocalDataPatch, result.TargetLayout);
+        Assert.Equal(WwmInstallationLayout.Unknown, result.TargetLayout);
+        Assert.False(result.IsMutationSupported);
+    }
+
+    [Theory]
+    [InlineData("wwm_standard")]
+    [InlineData("wwm_standart")]
+    [InlineData("wwm_lite")]
+    public void AutomaticDetection_FindsKnownOfficialLauncherFoldersAndSelectsPackageOnly(string folderName)
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, folderName);
+        CreateGameMarkers(root);
+        var localDataLocale = Path.Combine(root, WwmGameDefinition.Default.LocalDataPatchLocaleRelativePath);
+        Directory.CreateDirectory(localDataLocale);
+        var sentinel = Path.Combine(localDataLocale, "translate_words_map_en");
+        File.WriteAllText(sentinel, "unchanged local data override");
+        var candidates = WwmSteamDetector.GetOfficialInstallRootCandidates(new[] { temp.Root });
+        Assert.Contains(root, candidates, StringComparer.OrdinalIgnoreCase);
+        var detector = new WwmSteamDetector(Logger, Array.Empty<string>(), null,
+            path => Directory.EnumerateDirectories(path), officialInstallRoots: candidates);
+
+        var result = detector.Detect();
+
+        Assert.Equal(Path.GetFullPath(root), result.GameRoot);
+        Assert.Equal(WwmInstallationSource.UnknownWindows, result.Source);
+        Assert.Equal(WwmInstallationLayout.Package, result.TargetLayout);
         Assert.True(result.IsMutationSupported);
+        Assert.Equal("unchanged local data override", File.ReadAllText(sentinel));
+    }
+
+    [Fact]
+    public void AutomaticDetection_FindsLocalDataOnlyRootButDoesNotOfferMutation()
+    {
+        using var temp = new TestTemp();
+        var root = Path.Combine(temp.Root, "wwm_standard");
+        CreateGameMarkers(root, localDataPatch: true);
+        var detector = new WwmSteamDetector(Logger, Array.Empty<string>(), null,
+            path => Directory.EnumerateDirectories(path), officialInstallRoots: new[] { root });
+
+        var result = detector.Detect();
+
+        Assert.Equal(Path.GetFullPath(root), result.GameRoot);
+        Assert.Equal(WwmInstallationLayout.Unknown, result.TargetLayout);
+        Assert.False(result.IsMutationSupported);
+    }
+
+    [Fact]
+    public void OfficialRootCandidates_IncludeKnownFoldersUnderCommonProgramFilesParent()
+    {
+        using var temp = new TestTemp();
+        var expected = Path.Combine(temp.Root, "Program Files", "wwm", "wwm_standard");
+        Directory.CreateDirectory(expected);
+
+        var candidates = WwmSteamDetector.GetOfficialInstallRootCandidates(new[] { temp.Root });
+
+        Assert.Contains(expected, candidates, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AutomaticDetection_MultipleKnownInstallRootsRemainAmbiguous()
+    {
+        using var temp = new TestTemp();
+        var standardRoot = Path.Combine(temp.Root, "wwm_standard");
+        var liteRoot = Path.Combine(temp.Root, "wwm_lite");
+        CreateGameMarkers(standardRoot);
+        CreateGameMarkers(liteRoot);
+        var candidates = WwmSteamDetector.GetOfficialInstallRootCandidates(new[] { temp.Root });
+        var detector = new WwmSteamDetector(Logger, Array.Empty<string>(), null,
+            path => Directory.EnumerateDirectories(path), officialInstallRoots: candidates);
+
+        var result = detector.Detect();
+
+        Assert.True(result.IsAmbiguous);
+        Assert.False(result.IsFound);
+        Assert.False(result.IsMutationSupported);
     }
 
     [Fact]
@@ -1405,8 +1479,7 @@ public sealed class WwmStage10Tests
 
     [Theory]
     [InlineData(WwmInstallationLayout.Package, "random-standard-fixture")]
-    [InlineData(WwmInstallationLayout.LocalDataPatch, "arbitrary-lite-fixture")]
-    public async Task SyntheticWindowsLayout_InstallsAndRestoresExactPreHubState(
+    public async Task SyntheticPackageLayout_InstallsAndRestoresExactPreHubState(
         WwmInstallationLayout layout, string folderName)
     {
         using var temp = new TestTemp();
@@ -1432,10 +1505,9 @@ public sealed class WwmStage10Tests
         Assert.NotNull(state);
         Assert.Equal(2, state!.SchemaVersion);
         Assert.Equal(Path.GetFullPath(root), state.InstallationRoot);
-        Assert.Equal(layout.ToString(), state.TargetLayout);
-        Assert.All(state.Targets, item => Assert.Equal(layout, WwmStateStore.GetLayoutForPath(item.RelativePath)));
-        Assert.Equal(layout == WwmInstallationLayout.Package,
-            (File.GetAttributes(Path.Combine(root, targets[0])) & FileAttributes.ReadOnly) != 0);
+        Assert.Equal(WwmInstallationLayout.Package.ToString(), state.TargetLayout);
+        Assert.All(state.Targets, item => Assert.Equal(WwmInstallationLayout.Package, WwmStateStore.GetLayoutForPath(item.RelativePath)));
+        Assert.True((File.GetAttributes(Path.Combine(root, targets[0])) & FileAttributes.ReadOnly) != 0);
         Assert.True((await service.CheckRestoreAvailabilityAsync(detection)).IsAvailable);
 
         var restored = await service.RestorePreHubAsync(detection);
@@ -1452,7 +1524,7 @@ public sealed class WwmStage10Tests
     [Theory]
     [InlineData("unrelated", "release-standard")]
     [InlineData("arbitrary-parent", "wwm_lite")]
-    public async Task OfficialStyleLocalDataPatchRootsWithArbitraryNames_AreMutatedAndRestored(
+    public async Task LocalDataOnlyRoot_IsNotMutatedByLocalizationInstall(
         string parentName, string gameDirectoryName)
     {
         using var temp = new TestTemp();
@@ -1460,7 +1532,7 @@ public sealed class WwmStage10Tests
         CreateGameMarkers(root, localDataPatch: true);
         var detection = new WwmSteamDetector(Logger, Array.Empty<string>()).DescribeRoot(root, "manual-folder-selection");
         Assert.Equal(WwmInstallationSource.UnknownWindows, detection.Source);
-        Assert.Equal(WwmInstallationLayout.LocalDataPatch, detection.TargetLayout);
+        Assert.Equal(WwmInstallationLayout.Unknown, detection.TargetLayout);
         var targets = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch);
         var preexisting = Path.Combine(root, targets[1]);
         var original = new byte[] { 0xAA, 0xBB };
@@ -1472,24 +1544,36 @@ public sealed class WwmStage10Tests
         var store = new WwmStateStore(paths);
         var service = new WwmInstallService(client, paths, store, Logger);
 
-        Assert.True((await service.InstallAsync(detection, CreatePackageMetadata(archive))).IsSuccess);
-        Assert.True(File.Exists(Path.Combine(root, targets[0])));
-        Assert.True(File.Exists(Path.Combine(root, targets[1])));
-        Assert.True((await service.RestorePreHubAsync(detection)).IsSuccess);
+        var result = await service.InstallAsync(detection, CreatePackageMetadata(archive));
+        var explicitLocalDataBinding = new WwmInstallationBinding(Path.GetFullPath(root),
+            WwmInstallationSource.UnknownWindows, WwmInstallationLayout.LocalDataPatch, null,
+            WwmGameDefinition.ComputeInstallationFingerprint(root));
+        var explicitBindingResult = await service.InstallAsync(root, null, CreatePackageMetadata(archive),
+            explicitBinding: explicitLocalDataBinding);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(WwmMutationError.InvalidRoot, result.Error);
+        Assert.False(explicitBindingResult.IsSuccess);
+        Assert.Equal(WwmMutationError.InvalidRoot, explicitBindingResult.Error);
         Assert.False(File.Exists(Path.Combine(root, targets[0])));
         Assert.Equal(original, await File.ReadAllBytesAsync(preexisting));
+        Assert.Null(store.Load(out _));
     }
 
     [Fact]
-    public async Task LocalDataPatchCrashRecovery_RestoresBothPreviousTargets()
+    public async Task LegacyLocalDataJournalRecoversInDualLayoutWithoutTouchingPackage()
     {
         using var temp = new TestTemp();
         var root = Path.Combine(temp.Root, "arbitrary", "nested", "root");
         CreateGameMarkers(root, localDataPatch: true);
+        var packageTargets = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.Package);
+        var packageSentinels = new[] { new byte[] { 91, 92 }, new byte[] { 93, 94 } };
+        Directory.CreateDirectory(Path.Combine(root, WwmGameDefinition.Default.LocaleRelativePath));
+        foreach (var (relative, index) in packageTargets.Select((relative, index) => (relative, index)))
+            await File.WriteAllBytesAsync(Path.Combine(root, relative), packageSentinels[index]);
         var detection = new WwmSteamDetector(Logger, Array.Empty<string>()).DescribeRoot(root, "manual-folder-selection");
-        var targets = detection.TargetLayout == WwmInstallationLayout.LocalDataPatch
-            ? WwmGameDefinition.Default.GetManagedRelativePaths(detection.TargetLayout)
-            : throw new InvalidOperationException("Expected LocalDataPatch detection.");
+        Assert.Equal(WwmInstallationLayout.Package, detection.TargetLayout);
+        var targets = WwmGameDefinition.Default.GetManagedRelativePaths(WwmInstallationLayout.LocalDataPatch);
         var previous = new[] { new byte[] { 11, 12 }, new byte[] { 21, 22 } };
         var installed = new[] { new byte[] { 31, 32 }, new byte[] { 41, 42 } };
         for (var i = 0; i < 2; i++) File.WriteAllBytes(Path.Combine(root, targets[i]), previous[i]);
@@ -1509,12 +1593,13 @@ public sealed class WwmStage10Tests
             expected.Add(new WwmTargetManifestEntry { RelativePath = targets[i], SizeBytes = installed[i].Length, Sha256 = Hash(installed[i]) });
         }
         File.WriteAllBytes(Path.Combine(root, targets[0]), installed[0]);
-        var binding = WwmInstallationBinding.FromDetection(detection);
+        var binding = new WwmInstallationBinding(Path.GetFullPath(root), WwmInstallationSource.UnknownWindows,
+            WwmInstallationLayout.LocalDataPatch, null, WwmGameDefinition.ComputeInstallationFingerprint(root));
         var journal = new WwmTransactionJournal
         {
             SchemaVersion = 2, OperationId = operationId, Operation = "install", PreviousTargets = previousRecords,
             TargetManifest = expected, ExpectedAbsentTargets = new(), ExpectedStateSha256 = Hash(new byte[] { 1 }),
-            InstallationRoot = Path.GetFullPath(root), TargetLayout = detection.TargetLayout.ToString(),
+            InstallationRoot = Path.GetFullPath(root), TargetLayout = WwmInstallationLayout.LocalDataPatch.ToString(),
             InstallationFingerprint = binding.Fingerprint, PreviousStateBase64 = "", PreviousStateExisted = false
         };
         await store.WriteJournalAsync(journal);
@@ -1525,6 +1610,8 @@ public sealed class WwmStage10Tests
 
         Assert.True(recovered.IsSuccess, recovered.Message);
         for (var i = 0; i < 2; i++) Assert.Equal(previous[i], await File.ReadAllBytesAsync(Path.Combine(root, targets[i])));
+        for (var i = 0; i < packageTargets.Length; i++)
+            Assert.Equal(packageSentinels[i], await File.ReadAllBytesAsync(Path.Combine(root, packageTargets[i])));
         Assert.Null(store.LoadJournal(out _));
     }
 
@@ -1632,7 +1719,7 @@ public sealed class WwmStage10Tests
         var restore = await service.RestorePreHubAsync(second);
 
         Assert.False(availability.IsAvailable);
-        Assert.Equal(WwmMutationError.RecoveryRequired, restore.Error);
+        Assert.Equal(WwmMutationError.InvalidRoot, restore.Error);
         Assert.True(File.Exists(Path.Combine(rootA, WwmGameDefinition.Default.ManagedRelativePaths[0])));
         Assert.Empty(Directory.EnumerateFiles(rootB, "translate_words_map_en*", SearchOption.AllDirectories));
     }
@@ -2103,7 +2190,7 @@ public sealed class WwmStage10Tests
     }
 
     [Fact]
-    public async Task LocalDataPatchInstall_FailureAfterFirstTargetRestoresReadOnlyAttributesAndBytes()
+    public async Task LocalDataPatchInstall_IsBlockedBeforeTouchingFilesOrDownloading()
     {
         using var temp = new TestTemp();
         var root = Path.Combine(temp.Root, "arbitrary-localdata-root");
@@ -2119,22 +2206,22 @@ public sealed class WwmStage10Tests
         }
 
         var archive = CreatePackage();
-        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) });
+        var requestCount = 0;
+        using var client = CreateClient(_ =>
+        {
+            requestCount++;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) };
+        });
         var paths = new AppPaths(Path.Combine(temp.Root, "app")).GetGamePersistencePaths("where-winds-meet");
         paths.EnsureDirectories();
         var store = new WwmStateStore(paths);
-        var service = new WwmInstallService(client, paths, store, Logger)
-        {
-            AfterTargetAppliedForTest = count =>
-            {
-                if (count == 1) throw new IOException("Injected failure after LocalDataPatch target replacement.");
-            }
-        };
+        var service = new WwmInstallService(client, paths, store, Logger);
 
         var result = await service.InstallAsync(detection, CreatePackageMetadata(archive));
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(WwmMutationError.Mutation, result.Error);
+        Assert.Equal(WwmMutationError.InvalidRoot, result.Error);
+        Assert.Equal(0, requestCount);
         for (var index = 0; index < targets.Length; index++)
         {
             var target = Path.Combine(root, targets[index]);

@@ -116,15 +116,48 @@ public sealed class WwmInstallService
     }
 
     public Task<WwmMutationResult> RecoverAsync(WwmDetectionResult detection, CancellationToken token = default)
-        => detection.IsMutationSupported
-            ? RecoverAsync(detection.GameRoot!, detection.BuildId, token, WwmInstallationBinding.FromDetection(detection))
-            : Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Для Where Winds Meet не визначено однозначну підтримувану цільову розкладку."));
+    {
+        if (!detection.IsFound)
+            return Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidRoot,
+                "Для Where Winds Meet не визначено однозначну підтримувану цільову розкладку."));
+
+        // Inspect journal metadata before choosing the current install target. An older client
+        // may have left a LocalData transaction even when Package is now also present.
+        var journal = _store.LoadJournal(out var journalError);
+        if (journalError != null)
+            return Task.FromResult(WwmMutationResult.Failure(WwmMutationError.RecoveryRequired,
+                "Журнал відновлення WWM пошкоджено; файли не змінювалися."));
+
+        if (journal != null
+            && journal.TargetLayout == nameof(WwmInstallationLayout.LocalDataPatch)
+            && TrySameFullPath(journal.InstallationRoot, detection.GameRoot!))
+        {
+            // LocalData is recovery-only: touch it only for an exact-root journal that records
+            // this layout, never as a side effect of current detection or a new install.
+            var legacyBinding = new WwmInstallationBinding(WwmGameDefinition.NormalizeInstallationRoot(detection.GameRoot!),
+                detection.Source, WwmInstallationLayout.LocalDataPatch, detection.BuildId,
+                WwmGameDefinition.ComputeInstallationFingerprint(detection.GameRoot!));
+            return RecoverAsync(detection.GameRoot!, detection.BuildId, token, legacyBinding);
+        }
+
+        if (detection.IsMutationSupported)
+            return RecoverAsync(detection.GameRoot!, detection.BuildId, token, WwmInstallationBinding.FromDetection(detection));
+
+        // A LocalData-only installation is recognized, but has no ordinary mutation target.
+        return detection.Layout == WwmInstallationLayout.LocalDataPatch
+            ? Task.FromResult(WwmMutationResult.Success())
+            : Task.FromResult(WwmMutationResult.Failure(WwmMutationError.InvalidRoot,
+                "Для Where Winds Meet не визначено однозначну підтримувану цільову розкладку."));
+    }
 
     public async Task<WwmMutationResult> InstallAsync(string gameRoot, string? buildId, WwmApiPackage package,
         CancellationToken cancellationToken = default, WwmInstallationBinding? explicitBinding = null)
     {
         using var bindingScope = PushBinding(gameRoot, buildId, explicitBinding);
         var binding = _bindingContext.Value!;
+        if (binding.Layout != WwmInstallationLayout.Package)
+            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot,
+                "Українізацію Where Winds Meet можна встановити лише в Package/HD/oversea/locale.");
         if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірена розкладка Where Winds Meet недоступна.");
         var recovered = await RecoverAsync(gameRoot, buildId, cancellationToken).ConfigureAwait(false);
         if (!recovered.IsSuccess) return recovered;
@@ -174,6 +207,9 @@ public sealed class WwmInstallService
     {
         using var bindingScope = PushBinding(gameRoot, currentBuildId, explicitBinding);
         var binding = _bindingContext.Value!;
+        if (binding.Layout != WwmInstallationLayout.Package)
+            return WwmMutationResult.Failure(WwmMutationError.InvalidRoot,
+                "Відновлення з інтерфейсу доступне лише для Package/HD/oversea/locale.");
         if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout)) return WwmMutationResult.Failure(WwmMutationError.InvalidRoot, "Перевірена розкладка Where Winds Meet недоступна.");
         var legacyBinding = await BindLegacyMetadataAsync(token).ConfigureAwait(false);
         if (legacyBinding != null) return legacyBinding;
@@ -204,6 +240,8 @@ public sealed class WwmInstallService
     {
         using var bindingScope = PushBinding(gameRoot, currentBuildId, explicitBinding);
         var binding = _bindingContext.Value!;
+        if (binding.Layout != WwmInstallationLayout.Package)
+            return (false, "Відновлення доступне лише для Package/HD/oversea/locale.");
         if (!_definition.IsMutationLayoutSafe(gameRoot, binding.Layout))
             return (false, "Відновлення оригіналу неможливе: перевірену теку гри не знайдено.");
 

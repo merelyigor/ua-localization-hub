@@ -13,10 +13,14 @@ public sealed class WwmSteamDetector
     private readonly WwmGameDefinition _definition;
     private readonly Func<string, IEnumerable<string>> _enumerateDirectories;
     private readonly string? _epicManifestDirectoryOverride;
+    private readonly IReadOnlyList<string>? _officialInstallRootsOverride;
+
+    private static readonly string[] OfficialInstallFolderNames = { "wwm_standard", "wwm_standart", "wwm_lite" };
 
     public WwmSteamDetector(ILogger logger, IEnumerable<string>? steamRoots = null, WwmGameDefinition? definition = null)
         : this(logger, steamRoots, definition, path => Directory.EnumerateDirectories(path),
-            DefaultMaximumManualDirectories, DefaultMaximumManualDepth)
+            DefaultMaximumManualDirectories, DefaultMaximumManualDepth,
+            officialInstallRoots: steamRoots == null ? GetDefaultOfficialInstallRoots() : Array.Empty<string>())
     {
     }
 
@@ -27,13 +31,17 @@ public sealed class WwmSteamDetector
         Func<string, IEnumerable<string>> enumerateDirectories,
         int maximumManualDirectories = DefaultMaximumManualDirectories,
         int maximumManualDepth = DefaultMaximumManualDepth,
-        string? epicManifestDirectory = null)
+        string? epicManifestDirectory = null,
+        IEnumerable<string>? officialInstallRoots = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _steamRootsOverride = steamRoots?.ToList();
         _definition = definition ?? WwmGameDefinition.Default;
         _enumerateDirectories = enumerateDirectories ?? throw new ArgumentNullException(nameof(enumerateDirectories));
         _epicManifestDirectoryOverride = epicManifestDirectory;
+        _officialInstallRootsOverride = officialInstallRoots == null
+            ? steamRoots == null ? null : Array.Empty<string>()
+            : officialInstallRoots.ToList();
         if (maximumManualDirectories <= 0) throw new ArgumentOutOfRangeException(nameof(maximumManualDirectories));
         if (maximumManualDepth <= 0) throw new ArgumentOutOfRangeException(nameof(maximumManualDepth));
         _maximumManualDirectories = maximumManualDirectories;
@@ -77,6 +85,21 @@ public sealed class WwmSteamDetector
             catch (Exception ex) when (IsPathException(ex))
             {
                 _logger.Debug($"WWM Epic manifest installation path was rejected: {ex.Message}");
+            }
+        }
+        foreach (var candidateRoot in GetOfficialInstallRoots())
+        {
+            if (!_definition.TryGetWindowsLayout(candidateRoot, out var layout)) continue;
+            try
+            {
+                var candidate = WwmGameDefinition.NormalizeInstallationRoot(candidateRoot);
+                // A folder name is only a search hint, not launcher provenance. Keep it UnknownWindows.
+                candidates.TryAdd(candidate, new WwmDetectionResult(candidate, WwmInstallationSource.UnknownWindows,
+                    layout, null, "official-launcher-folder-name"));
+            }
+            catch (Exception ex) when (IsPathException(ex))
+            {
+                _logger.Debug($"WWM well-known install path was rejected: {ex.Message}");
             }
         }
         if (candidates.Count == 0) return WwmDetectionResult.NotFound;
@@ -419,6 +442,59 @@ public sealed class WwmSteamDetector
         return roots.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
+    private IEnumerable<string> GetOfficialInstallRoots()
+        => _officialInstallRootsOverride ?? GetDefaultOfficialInstallRoots();
+
+    private static IReadOnlyList<string> GetDefaultOfficialInstallRoots()
+    {
+        try
+        {
+            return GetOfficialInstallRootCandidates(DriveInfo.GetDrives()
+                .Where(drive => drive.DriveType == DriveType.Fixed)
+                .Select(drive => drive.RootDirectory.FullName));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    internal static IReadOnlyList<string> GetOfficialInstallRootCandidates(IEnumerable<string> driveRoots)
+    {
+        var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string[] parentFolders =
+        {
+            string.Empty,
+            "Program Files",
+            "Program Files (x86)",
+            "wwm",
+            "Where Winds Meet",
+            Path.Combine("Program Files", "wwm"),
+            Path.Combine("Program Files (x86)", "wwm"),
+            Path.Combine("Program Files", "Where Winds Meet"),
+            Path.Combine("Program Files (x86)", "Where Winds Meet")
+        };
+
+        foreach (var driveRoot in driveRoots)
+        {
+            try
+            {
+                foreach (var parent in parentFolders)
+                foreach (var folderName in OfficialInstallFolderNames)
+                {
+                    var candidate = Path.Combine(driveRoot, parent, folderName);
+                    if (Directory.Exists(candidate)) candidates.Add(candidate);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                // An inaccessible drive must not prevent detection in other known locations.
+            }
+        }
+
+        return candidates.ToArray();
+    }
+
     private IEnumerable<string> GetLibraries(string steamRoot)
     {
         var libraries = new List<string> { WwmGameDefinition.NormalizeInstallationRoot(steamRoot) };
@@ -485,11 +561,9 @@ public sealed record WwmDetectionResult(
         WwmInstallationSource.Steam or WwmInstallationSource.EpicGames when Layout.HasFlag(WwmInstallationLayout.Package)
             => WwmInstallationLayout.Package,
         WwmInstallationSource.OfficialLauncher when Layout.HasFlag(WwmInstallationLayout.LocalDataPatch)
-            => WwmInstallationLayout.LocalDataPatch,
+            => Layout.HasFlag(WwmInstallationLayout.Package) ? WwmInstallationLayout.Package : WwmInstallationLayout.Unknown,
         WwmInstallationSource.UnknownWindows when Layout.HasFlag(WwmInstallationLayout.Package)
             => WwmInstallationLayout.Package,
-        WwmInstallationSource.UnknownWindows when Layout == WwmInstallationLayout.LocalDataPatch
-            => WwmInstallationLayout.LocalDataPatch,
         _ => WwmInstallationLayout.Unknown
     };
     public bool HasAmbiguousTargetLayout => IsFound && TargetLayout == WwmInstallationLayout.Unknown;

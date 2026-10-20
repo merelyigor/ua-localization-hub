@@ -1,8 +1,11 @@
 {
   "schema_version": 1,
-  "summary": "",
+  "summary": "Покращено автоматичне знаходження Where Winds Meet та уточнено, що доступність локалізації не означає встановлену гру.",
   "new": [],
-  "fixed": [],
+  "fixed": [
+    "Заборонено встановлення локалізації WWM у LocalData/Patch/HD/oversea/locale; нова установка можлива лише у Package/HD/oversea/locale.",
+    "Виправлено автоматичне знаходження типових папок офіційного лаунчера wwm_standard, wwm_standart і wwm_lite."
+  ],
   "reliability": [],
   "performance": [],
   "changes": [],

@@ -325,7 +325,7 @@ public sealed class MainFormLifecycleIntegrationTests
     }
 
     [Fact]
-    public async Task WwmRecognizedUnknownWindowsRoot_IsNotPresentedAsSteamAndUsesUnambiguousLayout()
+    public async Task WwmLocalDataOnlyRootIsFoundButInstallRemainsUnavailable()
     {
         using var fixture = await MainFormTestFixture.StartAsync(
             MainFormTestFixture.CreateSuccessfulApiHandler(),
@@ -346,11 +346,11 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.DoesNotContain("Steam", fixture.Form.WwmGameStatusForTest, StringComparison.OrdinalIgnoreCase);
         var session = Assert.IsType<WwmGameSession>(fixture.Form.ActiveSessionForTest);
         Assert.Equal(WwmInstallationSource.UnknownWindows, session.CurrentDetection.Source);
-        Assert.True(session.MutationSupported);
+        Assert.False(session.MutationSupported);
         Assert.True(card.ActionVisibleForTest);
-        Assert.True(card.ActionEnabledForTest);
+        Assert.False(card.ActionEnabledForTest);
         Assert.False(fixture.Form.WwmRestoreEnabledForTest);
-        Assert.True(fixture.Form.WwmInstallActionsEnabledForTest);
+        Assert.False(fixture.Form.WwmInstallActionsEnabledForTest);
         Assert.Equal(Path.GetFullPath(fixture.WwmGameRoot), fixture.Form.WwmGamePathForTest);
     }
 
@@ -1276,9 +1276,9 @@ public sealed class MainFormLifecycleIntegrationTests
         Assert.Equal("Українські локалізації для ігор BDO - WWM", fixture.Form.HeaderSubtitle);
         Assert.Equal("Цільові проєкти", fixture.Form.TargetProjectsCaption);
         Assert.Equal("Black Desert Online — BDO UA Translate", fixture.Form.BdoTargetProject);
-        Assert.Equal("Доступно", fixture.Form.BdoTargetStatus);
+        Assert.Equal("Локалізація доступна", fixture.Form.BdoTargetStatus);
         Assert.Equal("Where Winds Meet — Winds4UA (W4U)", fixture.Form.WwmTargetProject);
-        Assert.Equal("Доступно", fixture.Form.WwmTargetStatus);
+        Assert.Equal("Локалізація доступна", fixture.Form.WwmTargetStatus);
         Assert.Equal("Активна гра", fixture.Form.ActiveGameSelectorLabel);
         Assert.Single(fixture.Form.GameSelector.Items.Cast<GameDescriptor>());
         Assert.Equal("Black Desert Online", fixture.Form.GameSelector.Text);

@@ -9,7 +9,7 @@ Owner decisions recorded: stable game ID `where-winds-meet`; initial implementat
 ## Evidence boundary
 
 - **Steam — LOCALLY VERIFIED:** Steam AppID `3564740`, manifest association, installed root markers, executable, and Steam locale directory were inspected read-only. The local Steam manifest reports build ID `25281753`.
-- **Official launcher — no local installation verified:** LocalDataPatch can be selected from an unambiguous validated Windows root, but layout alone does not prove Official Launcher provenance. Stage 11B synthetic LocalDataPatch tests do not claim real Official Launcher provenance or native E2E.
+- **Official launcher — no local installation verified:** folder names may guide bounded root discovery, but do not prove Official Launcher provenance. LocalDataPatch is detection-only for ordinary operation; new localization installs require Package. No real Official Launcher provenance or native E2E is claimed.
 - Public facts below were checked against the [Winds4UA download instructions](https://winds4ua.com.ua/download), the [current public API documentation](https://winds4ua.com.ua/docs/public-api/releases), and read-only requests to the production API. The API host is `winds4ua.com.ua`.
 - The current package was downloaded to isolated temporary storage, hash-checked and listed; entries were compared read-only with the local Steam locale directory. No archive content was copied to the game.
 
@@ -204,7 +204,7 @@ Before legacy schema migration, an active journal's complete original outcome is
 
 ### LocalData read-only override handling
 
-The selected target layout remains singular: Steam/Epic installs and UnknownWindows roots with a Package layout write the validated package only to `Package/HD/oversea/locale/`; they do not inspect or modify `LocalData/Patch/HD/oversea/locale/`. Legacy unfinished journals may still roll back LocalData attributes recorded by an older client version. Proven Official Launcher roots continue to use LocalDataPatch when that is their selected layout; this compatibility path is not used for dual-layout UnknownWindows roots.
+The selected target layout remains singular: every new WWM install/update writes only to `Package/HD/oversea/locale/`; the install service rejects LocalDataPatch bindings before download or game-file access. A LocalData-only root can be recognized as a game but cannot be used for install/update. Ordinary detection and install/restore checks do not inspect or modify `LocalData/Patch/HD/oversea/locale/`. Legacy unfinished journals may still roll back only LocalData targets recorded by an older client version. Exact candidates `wwm_standard`, `wwm_standart`, and `wwm_lite` are checked directly at fixed-drive roots and a bounded list of common Program Files parents; a valid product marker/layout is still required, and folder names do not establish launcher provenance.
 
 ## v1.2.11 RC #39 — legacy automatic Steam-root migration correction
 

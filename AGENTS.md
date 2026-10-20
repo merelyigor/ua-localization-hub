@@ -4,6 +4,10 @@
 
 CODEX-OWNED — агент у Codex веде дозволену задачу від аналізу до internal review, commit/push та exact-SHA CI. Зовнішній архітектор не є обов'язковим gate.
 
+## Чинне уточнення власника — WWM (2026-10-20)
+
+За актуальною прямою вимогою власника всі нові встановлення/оновлення українізатора Where Winds Meet записують лише в `Package/HD/oversea/locale/`. `LocalData/Patch/HD/oversea/locale/` не є ціллю звичайних операцій; якщо Package відсутній, гра може бути знайдена, але встановлення недоступне. Це уточнення має пріоритет над історичним формулюванням §14.10 нижче. Виняток: старий незавершений transaction journal може виконати лише точний записаний rollback.
+
 ## Область і джерела
 
 Owner задає goal/scope і publication intent. Звичайна implementation задача не дозволяє release або mutation реальних файлів гри. Чужі зміни й review artifacts не чіпати. Тести — synthetic/temp; secrets/user config/private skill source не комітити. TLS/path/hash/rollback safety не послаблювати заради green output.
