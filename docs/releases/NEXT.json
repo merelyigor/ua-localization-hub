@@ -1,10 +1,8 @@
 {
   "schema_version": 1,
-  "summary": "Виправлено встановлення українізатора Where Winds Meet у коректну папку гри.",
+  "summary": "",
   "new": [],
-  "fixed": [
-    "Виправлено встановлення Where Winds Meet, коли в грі одночасно є Package і LocalData: клієнт обирає Package\\HD\\oversea\\locale та не змінює файли або атрибути в LocalData."
-  ],
+  "fixed": [],
   "reliability": [],
   "performance": [],
   "changes": [],

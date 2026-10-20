@@ -1,6 +1,6 @@
 # Current Engineering Context
 
-Оновлено: 2026-10-19
+Оновлено: 2026-10-20
 
 ## Чинний процес — CODEX-OWNED
 
@@ -10,7 +10,9 @@ Harness: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs|Code` (�
 
 Дев'ять project-local skills включають report-format, systematic-debugging, adversarial-review, verification-before-completion, test-quality-audit, agent-rules-optimizer, dev-standard, brygada та implement-work-package. Імпорти ignored/pinned на Harness revision `2129873a37e0896403afafea6163f828e4e7465c`; приватний source не публікується. DevStandard execution plans живуть у `docs/plans/active/execution/`, окремо від єдиного продуктового roadmap. Repo-local `.githooks` запускають staged safety перед commit і fail-safe Docs/Code validation перед push; GitHub CI та RC лишаються незалежними обов'язковими gates. Глобальний plugin, plugin hooks, model guards, профіль і credentials не встановлюються. Через попередньо наявні untracked review artifacts DevStandard `approved → in-progress` зараз відмовить, доки дерево не стане чистим поза планом; файли не очищати/переміщати автоматично. Game safety, API/transaction semantics, CI/release contract не змінені.
 
-Це process-only зміна, не новий продукт/Stage/реліз. Останній stable залишається v1.2.21; NEXT не змінюється. Подальша продуктова робота — OWNER DECISION REQUIRED.
+## v1.2.22 — RELEASED / PUBLIC VERIFIED
+
+Виправлення встановлення WWM за наявності двох locale-структур опубліковано у stable v1.2.22. За одночасної наявності `Package` і `LocalData` установка спрямовується лише до `Package/HD/oversea/locale`; звичайне встановлення й очищення не читають і не змінюють файли, байти чи атрибути в LocalData. Source SHA: `286b26ac43f4aaa6da0d6c43ef0fc6fea7ad6129`; normal CI run `39488975592` і Release Candidate run `39489478691` пройшли, кожен із 1248/1248 тестів. Stable Release ID `418833809` опубліковано `2026-10-20T20:20:25Z`; annotated tag `v1.2.22` вказує на цей SHA. Canonical і legacy ZIP незалежно завантажено, їхні digests збігаються з RC artifacts. Реальні файли гри не змінювалися. Деталі: [`docs/releases/v1.2.22.md`](../releases/v1.2.22.md).
 
 ## v1.2.21 — RELEASED / PUBLIC VERIFIED
 
