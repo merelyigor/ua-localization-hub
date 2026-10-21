@@ -303,6 +303,8 @@ WWM install state/transaction — окрема game-scoped versioned schema. Д�
 
 §13.10 WWM install/update встановлює перевірені API bytes у вибрану цільову layout; для UnknownWindows із наявною Package завжди вибирається `Package/HD/oversea/locale/`. Операція Package не читає, не створює, не замінює і не змінює атрибути файлів у `LocalData/Patch/HD/oversea/locale/`. Для legacy незавершених journal попередньої версії recovery може завершити записаний rollback атрибутів. Якщо єдиною layout є LocalDataPatch, попередня поведінка залишається для сумісності. Restore повертає pre-Hub стан вибраних managed targets; LocalData override, що не є target layout, не входить до snapshot/restore. Startup/read-only detection не знімає атрибути й не змінює файли.
 
+§13.11 ReadOnly-атрибут знімається лише з managed target, який є цільовою layout цієї операції (LocalDataPatch); для Package-операції атрибути файлів у `LocalData/Patch/HD/oversea/locale/` не торкаються. Зміна атрибутів поза вибраними managed targets не є частиною звичайної операції: вона потребує окремого owner-рішення та власного transaction/journal. Legacy-відновлення читає записані в journal `attribute_only_targets` файли й відновлює їхні атрибути, але поточна install-операція цей список не заповнює, тому довільні LocalData-файли поза записаним journal не входять у поточний contract.
+
 ---
 
 <a id="section-14"></a>
