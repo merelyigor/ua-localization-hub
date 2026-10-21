@@ -34,81 +34,61 @@ Owner задає goal/scope і publication intent. Звичайна implementati
 
 ## §2 🎯 Призначення
 
-Windows .NET 8 WinForms Hub для BDO і WWM. UI/API/detection/install/storage мають окремі boundaries.
-
-Деталі: [§2](docs/ai-workflow/DOMAIN_RULES.md#section-2).
+Windows .NET 8 WinForms Hub для BDO і WWM; межі UI/API/detection/install/storage: [§2](docs/ai-workflow/DOMAIN_RULES.md#section-2).
 
 ---
 
 ## §3 🧠 Принцип роботи
 
-Перед змінами цієї області прочитай повний §3; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§3](docs/ai-workflow/DOMAIN_RULES.md#section-3).
+Перед змінами цієї області прочитай [повний §3](docs/ai-workflow/DOMAIN_RULES.md#section-3); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §4 ⚖️ Пріоритети
 
-Перед змінами цієї області прочитай повний §4; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§4](docs/ai-workflow/DOMAIN_RULES.md#section-4).
+Перед змінами цієї області прочитай [повний §4](docs/ai-workflow/DOMAIN_RULES.md#section-4); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §5 💻 Код
 
-Перед змінами цієї області прочитай повний §5; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§5](docs/ai-workflow/DOMAIN_RULES.md#section-5).
+Перед змінами цієї області прочитай [повний §5](docs/ai-workflow/DOMAIN_RULES.md#section-5); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §6 🧩 Не ускладнювати
 
-Перед змінами цієї області прочитай повний §6; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§6](docs/ai-workflow/DOMAIN_RULES.md#section-6).
+Перед змінами цієї області прочитай [повний §6](docs/ai-workflow/DOMAIN_RULES.md#section-6); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §7 🏗️ Архітектура
 
-Перед змінами цієї області прочитай повний §7; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§7](docs/ai-workflow/DOMAIN_RULES.md#section-7).
+Перед змінами цієї області прочитай [повний §7](docs/ai-workflow/DOMAIN_RULES.md#section-7); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §8 🖥️ UI
 
-Перед змінами цієї області прочитай повний §8; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§8](docs/ai-workflow/DOMAIN_RULES.md#section-8).
+Перед змінами цієї області прочитай [повний §8](docs/ai-workflow/DOMAIN_RULES.md#section-8); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §9 ⚡ Не блокувати UI
 
-Перед змінами цієї області прочитай повний §9; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§9](docs/ai-workflow/DOMAIN_RULES.md#section-9).
+Перед змінами цієї області прочитай [повний §9](docs/ai-workflow/DOMAIN_RULES.md#section-9); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §10 🔌 API
 
-Перед змінами цієї області прочитай повний §10; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§10](docs/ai-workflow/DOMAIN_RULES.md#section-10).
+Перед змінами цієї області прочитай [повний §10](docs/ai-workflow/DOMAIN_RULES.md#section-10); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §11 📋 API Contract: bdo-ua.com.ua
 
-Перед змінами цієї області прочитай повний §11; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§11](docs/ai-workflow/DOMAIN_RULES.md#section-11).
+Перед змінами цієї області прочитай [повний §11](docs/ai-workflow/DOMAIN_RULES.md#section-11); зберігай наявні contracts і мінімальний scope.
 
 ---
 
@@ -122,9 +102,7 @@ Windows .NET 8 WinForms Hub для BDO і WWM. UI/API/detection/install/storage 
 
 ## §13 🔍 Пошук гри
 
-Перед змінами цієї області прочитай повний §13; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§13](docs/ai-workflow/DOMAIN_RULES.md#section-13).
+Перед змінами цієї області прочитай [повний §13](docs/ai-workflow/DOMAIN_RULES.md#section-13); зберігай наявні contracts і мінімальний scope.
 
 ---
 
@@ -200,73 +178,55 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 
 ## §17 ⬇️ Download
 
-Перед змінами цієї області прочитай повний §17; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§17](docs/ai-workflow/DOMAIN_RULES.md#section-17).
+Перед змінами цієї області прочитай [повний §17](docs/ai-workflow/DOMAIN_RULES.md#section-17); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §18 🔄 Стани та оновлення
 
-Перед змінами цієї області прочитай повний §18; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§18](docs/ai-workflow/DOMAIN_RULES.md#section-18).
+Перед змінами цієї області прочитай [повний §18](docs/ai-workflow/DOMAIN_RULES.md#section-18); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §19 🗑️ Відновлення та повернення до оригіналу
 
-Перед змінами цієї області прочитай повний §19; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§19](docs/ai-workflow/DOMAIN_RULES.md#section-19).
+Перед змінами цієї області прочитай [повний §19](docs/ai-workflow/DOMAIN_RULES.md#section-19); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §20 🪟 Windows
 
-Перед змінами цієї області прочитай повний §20; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§20](docs/ai-workflow/DOMAIN_RULES.md#section-20).
+Перед змінами цієї області прочитай [повний §20](docs/ai-workflow/DOMAIN_RULES.md#section-20); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §21 🎨 UX
 
-Перед змінами цієї області прочитай повний §21; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§21](docs/ai-workflow/DOMAIN_RULES.md#section-21).
+Перед змінами цієї області прочитай [повний §21](docs/ai-workflow/DOMAIN_RULES.md#section-21); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §22 📝 Логування та exceptions
 
-Перед змінами цієї області прочитай повний §22; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§22](docs/ai-workflow/DOMAIN_RULES.md#section-22).
+Перед змінами цієї області прочитай [повний §22](docs/ai-workflow/DOMAIN_RULES.md#section-22); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §23 ⚙️ Конфігурація та cache
 
-Перед змінами цієї області прочитай повний §23; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§23](docs/ai-workflow/DOMAIN_RULES.md#section-23).
+Перед змінами цієї області прочитай [повний §23](docs/ai-workflow/DOMAIN_RULES.md#section-23); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §24 🌐 Мережа
 
-Перед змінами цієї області прочитай повний §24; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§24](docs/ai-workflow/DOMAIN_RULES.md#section-24).
+Перед змінами цієї області прочитай [повний §24](docs/ai-workflow/DOMAIN_RULES.md#section-24); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §25 📚 Залежності
 
-Перед змінами цієї області прочитай повний §25; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§25](docs/ai-workflow/DOMAIN_RULES.md#section-25).
+Перед змінами цієї області прочитай [повний §25](docs/ai-workflow/DOMAIN_RULES.md#section-25); зберігай наявні contracts і мінімальний scope.
 
 ---
 
@@ -274,17 +234,13 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 
 §26.1 Gates: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Code`; лише суто docs — `-Profile Docs`. Scripts/CI/config потребують Code.
 
-§26.3 CI є незалежною exact-SHA перевіркою; failure блокує залежні кроки й publication. Native preview/gh/auth — у повному контракті.
-
-Деталі: [§26](docs/ai-workflow/DOMAIN_RULES.md#section-26).
+§26.3 CI є незалежною exact-SHA перевіркою; failure блокує залежні кроки й publication. Native preview/gh/auth — у [повному контракті §26](docs/ai-workflow/DOMAIN_RULES.md#section-26).
 
 ---
 
 ## §27 🧪 Тести
 
-Перед змінами цієї області прочитай повний §27; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§27](docs/ai-workflow/DOMAIN_RULES.md#section-27).
+Перед змінами цієї області прочитай [повний §27](docs/ai-workflow/DOMAIN_RULES.md#section-27); зберігай наявні contracts і мінімальний scope.
 
 ---
 
@@ -302,9 +258,7 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 
 ## §29 🔗 Сумісність
 
-Перед змінами цієї області прочитай повний §29; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§29](docs/ai-workflow/DOMAIN_RULES.md#section-29).
+Перед змінами цієї області прочитай [повний §29](docs/ai-workflow/DOMAIN_RULES.md#section-29); зберігай наявні contracts і мінімальний scope.
 
 ---
 
@@ -326,9 +280,7 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 
 ## §31 📄 Коментарі та документація
 
-Перед змінами цієї області прочитай повний §31; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§31](docs/ai-workflow/DOMAIN_RULES.md#section-31).
+Перед змінами цієї області прочитай [повний §31](docs/ai-workflow/DOMAIN_RULES.md#section-31); зберігай наявні contracts і мінімальний scope.
 
 ---
 
@@ -437,41 +389,35 @@ API надає release metadata через `GET /releases`. Клієнт вик�
 
 ## §39 📋 Плани
 
-`docs/plans/README.md` лишається продуктовим roadmap registry. Виконавчі плани окремих задач ведуться DevStandard у `docs/plans/active/execution/`; конкретний план стає executable лише після прямого схвалення Owner. §39.3 BACKLOG roadmap автоматично не виконується; PRIMARY рівно один за наявності ACTIVE.
-
-Деталі: [§39](docs/ai-workflow/DOMAIN_RULES.md#section-39).
+`docs/plans/README.md` лишається продуктовим roadmap registry. Виконавчі плани окремих задач ведуться DevStandard у `docs/plans/active/execution/`; план стає executable лише після прямого схвалення Owner. BACKLOG автоматично не виконується; за наявності ACTIVE рівно один PRIMARY. Деталі: [§39](docs/ai-workflow/DOMAIN_RULES.md#section-39).
 
 ---
 
 ## §40 📦 Архів реліз-нотаток
 
-Перед змінами цієї області прочитай повний §40; зберігай наявні contracts та мінімальний scope.
-
-Деталі: [§40](docs/ai-workflow/DOMAIN_RULES.md#section-40).
+Перед змінами цієї області прочитай [повний §40](docs/ai-workflow/DOMAIN_RULES.md#section-40); зберігай наявні contracts і мінімальний scope.
 
 ---
 
 ## §41 🔄 Оновлення клієнта
 
-До self-update/tray/notification/package змін прочитай повний контракт.
+До self-update/tray/notification/package змін прочитай [повний §41](docs/ai-workflow/DOMAIN_RULES.md#section-41).
 
 §41.9 Application update та localization operations (Install, Restore Original) взаємовиключні.
 
-Деталі: [§41](docs/ai-workflow/DOMAIN_RULES.md#section-41).
 
 ---
 
 ## §42 🧭 Persistent development context
 
-CURRENT і append-only monthly journal синхронізуються в implementation commit. Не публікувати приватні logs, user paths або raw source локальних skills.
+CURRENT і append-only monthly journal синхронізуються в implementation commit. Не публікувати приватні logs, user paths або raw source локальних skills. Деталі: [§42](docs/ai-workflow/DOMAIN_RULES.md#section-42).
 
-Деталі: [§42](docs/ai-workflow/DOMAIN_RULES.md#section-42).
 
 ---
 
 ## §43 🤖 AI Development Workflow
 
-Чинний режим **CODEX-OWNED**. Перед meaningful task прочитай `docs/ai-workflow/README.md` і `WORKFLOW.md`; для review — `REVIEW.md`.
+Чинний режим **CODEX-OWNED**. Перед meaningful task прочитай `docs/ai-workflow/README.md` і `WORKFLOW.md`; для review — `REVIEW.md`. Деталі: [§43](docs/ai-workflow/DOMAIN_RULES.md#section-43).
 
 §43.4 High-risk mutation/recovery/migration/updater потребують synthetic failure/rollback/restart evidence та окремого внутрішнього pre-commit review у Codex. BLOCKER/IMPORTANT блокують commit/release.
 
@@ -481,6 +427,5 @@ CURRENT і append-only monthly journal синхронізуються в impleme
 
 §43.15 Навички й triggers — `docs/ai-workflow/SKILLS.md`. Перед фінальною відповіддю прочитай `.agents/skills/report-format/assets/report-format.md`, якщо встановлено: це єдине джерело форми, не копіюй його в project docs. Приватні imports не є залежністю CI; mandatory project gates діють і без них.
 
-Деталі: [§43](docs/ai-workflow/DOMAIN_RULES.md#section-43).
 
 ---
