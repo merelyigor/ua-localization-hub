@@ -1,6 +1,6 @@
 # Current Engineering Context
 
-Оновлено: 2026-10-21
+Оновлено: 2026-11-24
 
 ## Чинний процес — CODEX-OWNED
 
@@ -9,6 +9,10 @@ Owner авторизував постійний перехід до планув
 Harness: `pwsh -File scripts/Invoke-ProjectValidation.ps1 -Profile Docs|Code` (обрати одне значення). Code включає Release build/full suite та repository/release-tooling gates; scripts/CI/config зміни потребують Code. Normal CI та RC також перевіряють workflow contract, hygiene й негативні тести harness. Для Markdown/JSON/PNG-only docs та точно визначених root/agent-doc changes CI зберігає policy/security/tooling gates, але пропускає .NET restore/build/full suite; усі інші, невідомі та mixed changes запускають повну remote validation. RC завжди повний; local Code завжди виконує повний набір. Кореневі rules тепер уміщуються в стандартні 32 KiB; повні § contracts винесені до `docs/ai-workflow/DOMAIN_RULES.md` із preservation hashes. Workflow та release contract: `docs/ai-workflow/README.md`, `docs/releases/README.md`.
 
 Правила: `AGENTS.md` перетворено на always-on kernel + точний маршрут. Повні контракти лишаються в `docs/ai-workflow/DOMAIN_RULES.md` (hash-pinned у `rules-preservation.json`); у кореневому файлі залишено лише універсальні правила (мова, secrets, path safety, security, зміни, DoD, git, публічний репозиторій, заборони, сумніви, принцип) плюс навігацію до решти. `AGENTS.md` — 16 158 bytes / 324 рядки (було 26 105 / 431), у межі 32 768-byte budget. Усі 43 §-номери й усі 67 `§N.M` посилань збережені; зовнішні посилання (§14.2, §34.5, §41, §41.9) розв'язуються. Preservation, workflow, portable-rules, safety, harness і Docs profile пройшли; `check_rule_refs.py` по кореневому файлу лишив 2 хибні спрацювання на runtime-шляхи гри — ті самі, що й раніше.
+
+## v1.2.27 — RELEASED / PUBLIC VERIFIED / FINALIZED
+
+Сповіщення про оновлення Хабу та локалізацій знову доставляються в Центр сповіщень Windows. Причина — три дефекти одного шляху реєстрації AUMID: `PROPVARIANT` мала x64-розмір 16 байт замість 24, через що другий `IPropertyStore.SetValue` падав у `NullReferenceException` і реєстрація toast-каналу не завершувалася (канал мертвий з v1.2.21); ярлик AUMID створювався після `CreateToastNotifier` і Windows відповідав `ERROR_NOT_FOUND`; `ToastNotifier.Setting` для unpackaged застосунку міг кидати помилку й блокувати відправку. Додано 4 regression-тести. Code profile: PASS (усі 11 гейтів), Release build 0 warnings / 0 errors, 1266/1266. Normal CI `45425036449` і RC `45435996639` пройшли на source SHA `51cceabe0b5d4ca0092005b786d0c3d043e7d961`. Stable Release ID `457041575` опубліковано `2026-11-24T16:34:55Z`; live latest stable — `v1.2.27`. Обидва публічні ZIP-и незалежно завантажено й звірено з RC digests. Деталі: [`docs/releases/v1.2.27.md`](../releases/v1.2.27.md).
 
 ## v1.2.26 — RELEASED / PUBLIC VERIFIED / FINALIZED
 
@@ -76,13 +80,13 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.26** (Release ID `418985018`), source SHA `7f25af563deb79862155e042d9e21b04d710a377`; live latest — v1.2.26. Точні asset facts записані у [`docs/releases/v1.2.26.md`](../releases/v1.2.26.md).
+Останній стабільний реліз: **v1.2.27** (Release ID `457041575`), source SHA `51cceabe0b5d4ca0092005b786d0c3d043e7d961`; live latest — v1.2.27. Точні asset facts записані у [`docs/releases/v1.2.27.md`](../releases/v1.2.27.md).
 
 v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install. Поточний patch прибирає цю побічну зміну: UnknownWindows dual-layout обирає Package, а Package install і звичайне очищення тимчасових файлів не читають та не змінюють LocalData.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.26 is **RELEASED / PUBLIC VERIFIED**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.27 is **RELEASED / PUBLIC VERIFIED**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
 
 ## Architecture Summary
 
