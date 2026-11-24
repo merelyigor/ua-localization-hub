@@ -49,9 +49,11 @@ internal sealed class WindowsAppNotificationService : IAppNotificationService, I
 
         try
         {
-            EnsureStartMenuShortcut();
+            // The AUMID shortcut must exist before the notifier is created,
+            // otherwise Windows rejects the notifier with a COMException.
+            TryEnsureStartMenuShortcut();
             _notifier = ToastNotificationManager.CreateToastNotifier(AppUserModelId);
-            _logger.Info($"Windows toast notifications initialized: app_id={AppUserModelId} setting={_notifier.Setting}.");
+            _logger.Info($"Windows toast notifications initialized: app_id={AppUserModelId} setting={DescribeNotificationSetting()}.");
             return true;
         }
         catch (Exception ex)
@@ -73,10 +75,17 @@ internal sealed class WindowsAppNotificationService : IAppNotificationService, I
         ToastNotification? notification = null;
         try
         {
-            var setting = _notifier.Setting;
-            if (setting != NotificationSetting.Enabled)
+            // Reading ToastNotifier.Setting is not reliable for unpackaged
+            // desktop apps: Windows can answer with ERROR_NOT_FOUND even
+            // while delivery itself works. It is therefore only used for
+            // diagnostics, never to block a submission.
+            var setting = TryGetNotificationSetting();
+            if (setting == NotificationSetting.DisabledForUser
+                || setting == NotificationSetting.DisabledForApplication
+                || setting == NotificationSetting.DisabledByGroupPolicy
+                || setting == NotificationSetting.DisabledByManifest)
             {
-                _logger.Warning($"Windows toast not submitted: type={type} identity={identity} reason=notifications_{setting.ToString().ToLowerInvariant()}.");
+                _logger.Warning($"Windows toast not submitted: type={type} identity={identity} reason=notifications_{setting!.Value.ToString().ToLowerInvariant()}.");
                 return false;
             }
 
@@ -93,7 +102,7 @@ internal sealed class WindowsAppNotificationService : IAppNotificationService, I
                 _activeNotifications.Add(notification);
 
             _notifier.Show(notification);
-            _logger.Info($"Windows toast submitted to Action Center: type={content.Type} identity={content.Identity} setting={setting}.");
+            _logger.Info($"Windows toast submitted to Action Center: type={content.Type} identity={content.Identity} setting={DescribeNotificationSetting()}.");
             return true;
         }
         catch (Exception ex)
@@ -145,8 +154,42 @@ internal sealed class WindowsAppNotificationService : IAppNotificationService, I
             _activeNotifications.Remove(notification);
     }
 
+    private NotificationSetting? TryGetNotificationSetting()
+    {
+        if (_notifier == null)
+            return null;
+
+        try
+        {
+            return _notifier.Setting;
+        }
+        catch (Exception ex)
+        {
+            _logger.Debug($"Windows toast notification setting is unavailable: {ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private string DescribeNotificationSetting()
+        => TryGetNotificationSetting()?.ToString() ?? "unknown";
+
     private static string EscapeXml(string value)
         => SecurityElement.Escape(value) ?? string.Empty;
+
+    // The Start Menu shortcut carries the stable AUMID. Registering it is
+    // best-effort: a shortcut failure must not disable toast delivery for the
+    // running session, so it is reported and swallowed separately.
+    private void TryEnsureStartMenuShortcut()
+    {
+        try
+        {
+            EnsureStartMenuShortcut();
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning($"Windows Start Menu shortcut for app_id={AppUserModelId} was not created: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
 
     private static void EnsureStartMenuShortcut()
     {
@@ -274,10 +317,18 @@ internal sealed class WindowsAppNotificationService : IAppNotificationService, I
         }
     }
 
-    [StructLayout(LayoutKind.Explicit, Size = 16)]
+    // PROPVARIANT is 16 bytes on x86 but 24 bytes on x64 (8-byte header +
+    // 16-byte union). The 16-byte layout truncated the union, so the second
+    // IPropertyStore.SetValue call wrote past the marshalled struct and failed
+    // with NullReferenceException, which aborted AUMID registration and left
+    // the client without a working toast notifier.
+    [StructLayout(LayoutKind.Explicit, Size = 24)]
     private struct PropVariant : IDisposable
     {
         [FieldOffset(0)] public ushort VariantType;
+        [FieldOffset(2)] public ushort Reserved1;
+        [FieldOffset(4)] public ushort Reserved2;
+        [FieldOffset(6)] public ushort Reserved3;
         [FieldOffset(8)] public IntPtr PointerValue;
 
         public static PropVariant FromString(string value)

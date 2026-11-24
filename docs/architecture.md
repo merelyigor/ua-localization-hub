@@ -118,7 +118,7 @@ BDO-PROGRAM/
 
 `Services/GameCatalog` містить explicit compile-time production catalog для `black-desert-online` і `where-winds-meet`. `GameDescriptor` задає stable ID/display name. `IGameSession` — вузька спільна межа лише для descriptor/lifetime/stop/dispose; game-specific API, state та install services лишаються у `BdoGameSession` і `WwmGameSession`. `SelectedGameSessionHost` володіє однією активною session; старий poller/session work скасовується й drain-иться, handlers від'єднуються, після чого candidate стає активним. Generation guards блокують stale results.
 
-WWM runtime є Steam-only. `WwmSteamDetector` читає Steam libraries та `appmanifest_3564740.acf`, а root перевіряється за `Engine/Binaries/Win64r/wwm.exe` і `Package/HD/oversea/locale/`. WWM має власні latest API DTO/client, dynamic mode package resolver, poller, `WwmInstallService` та versioned `WwmStateStore`; жодна з цих схем не конвертується у BDO DTO/installation state.
+WWM runtime є multi-layout Windows. `WwmSteamDetector` читає Steam libraries та `appmanifest_3564740.acf`, а root перевіряється за `Engine/Binaries/Win64r/wwm.exe` і щонайменше однією locale-розкладкою (`Package/HD/oversea/locale/` або `LocalData/Patch/HD/oversea/locale/`); Epic підтверджується matching `.item` manifest, а типові каталоги офіційного клієнта (`wwm_standard`, `wwm_standart`, `wwm_lite`) використовуються лише як підказка цільової layout, не як доказ provenance. WWM має власні latest API DTO/client, dynamic mode package resolver, poller, `WwmInstallService` та versioned `WwmStateStore`; жодна з цих схем не конвертується у BDO DTO/installation state.
 
 ## Technical identity boundary
 

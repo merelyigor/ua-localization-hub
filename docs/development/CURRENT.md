@@ -76,13 +76,13 @@ The externally reviewed implementation `f35a9457fbd7294c02ff86de781fc46952a0e887
 
 Хаб Українізаторів BDO - WWM — Windows .NET 8 WinForms застосунок для українських локалізацій. BDO UA Translate для Black Desert Online та Winds4UA (W4U) для Where Winds Meet мають окремі production runtime sessions. Stage 11A detection/presentation і Stage 11B Windows multi-layout mutation **REVIEWED / ACCEPTED**.
 
-Останній стабільний реліз: **v1.2.21** (Release ID `416789267`), source SHA `2927fbfb1eba12b69c073299e2f68d44f42a463a`; live latest — v1.2.21. Точні asset facts записані у [`docs/releases/v1.2.21.md`](../releases/v1.2.21.md).
+Останній стабільний реліз: **v1.2.26** (Release ID `418985018`), source SHA `7f25af563deb79862155e042d9e21b04d710a377`; live latest — v1.2.26. Точні asset facts записані у [`docs/releases/v1.2.26.md`](../releases/v1.2.26.md).
 
 v1.2.15 об'єднав узгоджену взаємодію BDO/WWM карток, обмежений повтор тимчасового GitHub asset 404 і зняття лише `ReadOnly` з наявних WWM LocalData override-файлів під час Package install. Поточний patch прибирає цю побічну зміну: UnknownWindows dual-layout обирає Package, а Package install і звичайне очищення тимчасових файлів не читають та не змінюють LocalData.
 
 Stage 11B та WWM API-driven compatibility UX/recovery corrections залишаються **REVIEWED / ACCEPTED**. RC #39/#40/#41/#42 не прийняті Owner smoke і не повинні повторно використовуватися; RC #43 прийнятий Owner smoke та опублікований як v1.2.11.
 
-Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.21 is **RELEASED / PUBLIC VERIFIED**; the Owner waived native smoke and external Architect review for this publication. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
+Owner-approved PRIMARY roadmap `localization-hub-multigame` remains active. Stage 8B is **OPTIONAL / NOT STARTED**. v1.2.26 is **RELEASED / PUBLIC VERIFIED**. **Next implementation authorization: OWNER DECISION REQUIRED.** No Stage 11C or additional feature is inferred.
 
 ## Architecture Summary
 
