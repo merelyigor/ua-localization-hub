@@ -4,8 +4,8 @@ Plan ID: `localization-hub-multigame`
 Status: ACTIVE
 Focus: PRIMARY
 Implementation authorization: **NONE.**
-Current phase: v1.2.26 — RELEASED / PUBLIC VERIFIED
-Next action: **OWNER DECISION REQUIRED.** Stable v1.2.26 (Release ID `418985018`, source `7f25af563deb79862155e042d9e21b04d710a377`) is archived at [`../../releases/v1.2.26.md`](../../releases/v1.2.26.md). Windows toast notifications for Hub and localization updates have diagnostic lifecycle logging. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
+Current phase: v1.2.27 — RELEASED / PUBLIC VERIFIED
+Next action: **OWNER DECISION REQUIRED.** Stable v1.2.27 (Release ID `457041575`, source `51cceabe0b5d4ca0092005b786d0c3d043e7d961`) is archived at [`../../releases/v1.2.27.md`](../../releases/v1.2.27.md). Windows toast notification delivery is fixed (AUMID registration repaired; previously dead since v1.2.21) and covered by regression tests. Stage 8B remains OPTIONAL / NOT STARTED; no Stage 11C.
 Dependencies: v1.2.7 — RELEASE REVIEWED / ACCEPTED
 
 Чинний workflow — **CODEX-OWNED**: planning/implementation/internal review у Codex, automated risk-based gates, без обов'язкового зовнішнього архітектора. Це process-only рішення Owner; історичні external acceptance залишаються фактами. Stage 8B не авторизований, новий Stage не створюється. Деталі: `docs/ai-workflow/README.md`.
